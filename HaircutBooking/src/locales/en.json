@@ -1,0 +1,121 @@
+{
+  "common": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "back": "Back",
+    "next": "Next",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "price": "Price",
+    "duration": "Duration",
+    "minutes": "minutes",
+    "hours": "hours",
+    "day": "Day",
+    "week": "Week",
+    "month": "Month"
+  },
+  "services": {
+    "mensCut": "Men's Cut",
+    "womensCut": "Women's Cut",
+    "childrensCut": "Children's Cut",
+    "hairColoring": "Hair Coloring",
+    "highlights": "Highlights",
+    "customService": "Custom Service"
+  },
+  "owner": {
+    "dashboard": {
+      "title": "Dashboard",
+      "todayAppointments": "Today's Appointments",
+      "weekAppointments": "This Week's Appointments",
+      "customersServed": "Customers Served",
+      "bookingRate": "Booking Rate",
+      "availableTime": "Available Time",
+      "totalEarnings": "Total Earnings",
+      "togglePeriod": "Toggle Period"
+    },
+    "calendar": {
+      "title": "Appointment Calendar",
+      "dayView": "Day View",
+      "weekView": "Week View",
+      "appointmentDetails": "Appointment Details",
+      "reschedule": "Reschedule",
+      "cancelAppointment": "Cancel Appointment"
+    },
+    "services": {
+      "title": "Service Management",
+      "addService": "Add Service",
+      "serviceName": "Service Name",
+      "activeTime": "Active Time Required",
+      "processingTime": "Processing Time",
+      "totalDuration": "Total Duration",
+      "servicePrice": "Service Price"
+    },
+    "settings": {
+      "title": "Settings",
+      "storeHours": "Store Hours",
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday",
+      "sunday": "Sunday",
+      "openTime": "Open Time",
+      "closeTime": "Close Time",
+      "closed": "Closed",
+      "cancellationPolicy": "Cancellation Policy",
+      "minimumNotice": "Minimum Notice Period"
+    }
+  },
+  "customer": {
+    "booking": {
+      "title": "Book Service",
+      "selectService": "Select Service",
+      "selectDate": "Select Date",
+      "selectTime": "Select Time",
+      "availableTimes": "Available Times",
+      "yourInfo": "Your Information",
+      "name": "Name",
+      "phone": "Phone Number",
+      "email": "Email",
+      "confirmBooking": "Confirm Booking",
+      "bookingConfirmed": "Booking Confirmed",
+      "cancellationNotice": "Note: Cancellations not allowed within {{hours}} hours of appointment"
+    },
+    "summary": {
+      "title": "Booking Summary",
+      "service": "Service",
+      "dateTime": "Date & Time",
+      "totalPrice": "Total Price",
+      "appointmentConfirmed": "Your appointment has been confirmed",
+      "confirmationSent": "Confirmation email sent to your email"
+    },
+    "manage": {
+      "title": "Manage Appointments",
+      "viewAppointments": "View Appointments",
+      "modifyAppointment": "Modify Appointment",
+      "cancelAppointment": "Cancel Appointment"
+    }
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot Password?",
+    "register": "Register",
+    "alreadyHaveAccount": "Already have an account?",
+    "dontHaveAccount": "Don't have an account?"
+  },
+  "errors": {
+    "networkError": "Network Error",
+    "invalidCredentials": "Invalid Credentials",
+    "somethingWentWrong": "Something went wrong",
+    "tryAgain": "Please try again"
+  }
+}

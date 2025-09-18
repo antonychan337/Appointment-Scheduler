@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Your Haircut</title>
+    <script src="shared-data.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        .phone-container {
+            max-width: 375px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 30px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            height: 812px;
+            position: relative;
+        }
+        .header {
+            background: #4A90E2;
+            color: white;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 18px;
+        }
+        .lang-toggle {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid white;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .content {
+            padding: 20px;
+            height: calc(100% - 60px);
+            overflow-y: auto;
+        }
+        .screen {
+            display: none;
+        }
+        .screen.active {
+            display: block;
+        }
+        .service-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .service-card:hover {
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .service-card.selected {
+            background: #E3F2FD;
+            border-color: #4A90E2;
+        }
+        .checkbox {
+            width: 24px;
+            height: 24px;
+            border: 2px solid #ccc;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .checkbox.checked {
+            background: #4A90E2;
+            border-color: #4A90E2;
+            color: white;
+        }
+        .next-button {
+            background: #4A90E2;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            margin-top: 20px;
+            cursor: pointer;
+            border: none;
+            width: 100%;
+            font-size: 16px;
+        }
+        .next-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .date-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .date-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .date-card.selected {
+            background: #E3F2FD;
+            border-color: #4A90E2;
+        }
+        .time-slots {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .time-slot {
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .time-slot.selected {
+            background: #4A90E2;
+            color: white;
+        }
+        .time-slot.unavailable {
+            background: #f5f5f5;
+            color: #999;
+            cursor: not-allowed;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .summary-card {
+            background: #f9f9f9;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .success-icon {
+            width: 60px;
+            height: 60px;
+            background: #4CAF50;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 30px;
+            margin: 20px auto;
+        }
+        .back-button {
+            background: white;
+            color: #4A90E2;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #4A90E2;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .progress-bar {
+            height: 4px;
+            background: #e0e0e0;
+            position: relative;
+            margin-bottom: 20px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4A90E2;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-container">
+        <div class="header">
+            <h1 id="app-title">Book Service</h1>
+            <button class="lang-toggle" onclick="toggleLang()">中文</button>
+        </div>
+
+        <div class="content">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress"></div>
+            </div>
+
+            <!-- Screen 1: Service Selection -->
+            <div id="service-screen" class="screen active">
+                <h2 id="select-service">Select Service</h2>
+                <div style="margin-top: 20px;" id="services-container">
+                    <!-- Services will be loaded dynamically -->
+                </div>
+                <button class="next-button" onclick="goToDateTime()" disabled id="service-next">Next</button>
+            </div>
+
+            <!-- Screen 2: Date & Time Selection -->
+            <div id="datetime-screen" class="screen">
+                <button class="back-button" onclick="goBack('service-screen')">← Back</button>
+                <h2 id="select-datetime">Select Date & Time</h2>
+
+                <h3 style="margin-top: 20px;" id="available-dates">Available Dates</h3>
+                <div class="date-grid" id="date-grid"></div>
+
+                <h3 style="margin-top: 30px;" id="available-times">Available Times</h3>
+                <div class="time-slots" id="time-slots"></div>
+
+                <button class="next-button" onclick="goToInfo()" disabled id="datetime-next">Next</button>
+            </div>
+
+            <!-- Screen 3: Customer Information -->
+            <div id="info-screen" class="screen">
+                <button class="back-button" onclick="goBack('datetime-screen')">← Back</button>
+                <h2 id="your-info">Your Information</h2>
+
+                <div class="form-group">
+                    <label for="name" id="label-name">Name</label>
+                    <input type="text" id="name" placeholder="Enter your name">
+                </div>
+                <div class="form-group">
+                    <label for="phone" id="label-phone">Phone</label>
+                    <input type="tel" id="phone" placeholder="(555) 555-5555" maxlength="14" oninput="this.value = formatPhoneNumber(this.value)" onblur="this.value = formatPhoneNumber(this.value)">
+                    <div id="phone-error" style="color: #f44336; font-size: 12px; margin-top: 5px; display: none;"></div>
+                </div>
+                <div class="form-group">
+                    <label for="email" id="label-email">Email</label>
+                    <input type="email" id="email" placeholder="email@example.com">
+                    <div id="email-error" style="color: #f44336; font-size: 12px; margin-top: 5px; display: none;"></div>
+                </div>
+
+                <button class="next-button" onclick="goToConfirmation()" id="info-next">Review Booking</button>
+            </div>
+
+            <!-- Screen 4: Confirmation -->
+            <div id="confirmation-screen" class="screen">
+                <button class="back-button" onclick="goBack('info-screen')">← Back</button>
+                <h2 id="review-booking">Review Your Booking</h2>
+
+                <div class="summary-card">
+                    <div class="summary-row">
+                        <span id="label-services">Service:</span>
+                        <span id="selected-services"></span>
+                    </div>
+                    <div class="summary-row">
+                        <span id="label-date">Date:</span>
+                        <span id="selected-date"></span>
+                    </div>
+                    <div class="summary-row">
+                        <span id="label-time">Time:</span>
+                        <span id="selected-time"></span>
+                    </div>
+                    <div class="summary-row">
+                        <span id="label-duration">Duration:</span>
+                        <span id="total-duration"></span>
+                    </div>
+                    <div class="summary-row">
+                        <span id="label-price">Total Price:</span>
+                        <span id="total-price" style="font-weight: bold; color: #4A90E2;"></span>
+                    </div>
+                </div>
+
+                <div class="summary-card">
+                    <h3 id="contact-info">Contact Information</h3>
+                    <div style="margin-top: 10px;">
+                        <div id="contact-name"></div>
+                        <div id="contact-phone"></div>
+                        <div id="contact-email"></div>
+                    </div>
+                </div>
+
+                <button class="next-button" onclick="confirmBooking()" id="confirm-button">Confirm Booking</button>
+            </div>
+
+            <!-- Screen 5: Success -->
+            <div id="success-screen" class="screen">
+                <div class="success-icon">✓</div>
+                <h2 style="text-align: center;" id="booking-confirmed">Booking Confirmed!</h2>
+                <p style="text-align: center; color: #666; margin-top: 10px;" id="confirmation-message">
+                    We've sent a confirmation email with your booking details.
+                </p>
+
+                <div class="summary-card" style="margin-top: 30px;">
+                    <h3 id="booking-details">Booking Details</h3>
+                    <div style="margin-top: 15px;">
+                        <div style="margin-bottom: 10px;">
+                            <strong id="label-booking-id">Booking ID:</strong> <span id="booking-id"></span>
+                        </div>
+                        <div style="margin-bottom: 10px;">
+                            <strong id="summary-services">Services:</strong> <span id="final-services"></span>
+                        </div>
+                        <div style="margin-bottom: 10px;">
+                            <strong id="summary-datetime">Date & Time:</strong> <span id="final-datetime"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="next-button" onclick="startNew()" id="new-booking">Make Another Booking</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isZh = false;
+        let selectedServices = [];
+        let selectedDate = null;
+        let selectedTime = null;
+        let currentScreen = 'service-screen';
+
+        const translations = {
+            zh: {
+                appTitle: '预约服务',
+                selectService: '选择服务',
+                nextBtn: '下一步',
+                back: '← 返回',
+                selectDateTime: '选择日期和时间',
+                availableDates: '可选日期',
+                availableTimes: '可选时间',
+                yourInfo: '您的信息',
+                labelName: '姓名',
+                labelPhone: '电话',
+                labelEmail: '邮箱',
+                reviewBooking: '确认预约',
+                labelServices: '服务：',
+                labelDate: '日期：',
+                labelTime: '时间：',
+                labelDuration: '时长：',
+                labelPrice: '总价：',
+                contactInfo: '联系信息',
+                confirmButton: '确认预约',
+                bookingConfirmed: '预约成功！',
+                confirmationMessage: '我们已发送确认邮件到您的邮箱。',
+                bookingDetails: '预约详情',
+                labelBookingId: '预约编号：',
+                summaryServices: '服务项目：',
+                summaryDateTime: '日期时间：',
+                newBooking: '新建预约',
+                services: {
+                    "Men's Cut": '男士理发',
+                    "Women's Cut": '女士理发',
+                    "Children's Cut": '儿童理发',
+                    "Hair Coloring": '染发',
+                    "Highlights": '挑染',
+                    "Perm": '烫发',
+                    "Hair Treatment": '护理'
+                },
+                activeTime: '需在场时间',
+                min: '分钟',
+                placeholders: {
+                    name: '请输入您的姓名',
+                    phone: '请输入您的电话',
+                    email: '请输入您的邮箱'
+                }
+            },
+            en: {
+                appTitle: 'Book Service',
+                selectService: 'Select Service',
+                nextBtn: 'Next',
+                back: '← Back',
+                selectDateTime: 'Select Date & Time',
+                availableDates: 'Available Dates',
+                availableTimes: 'Available Times',
+                yourInfo: 'Your Information',
+                labelName: 'Name',
+                labelPhone: 'Phone',
+                labelEmail: 'Email',
+                reviewBooking: 'Review Your Booking',
+                labelServices: 'Service:',
+                labelDate: 'Date:',
+                labelTime: 'Time:',
+                labelDuration: 'Duration:',
+                labelPrice: 'Total Price:',
+                contactInfo: 'Contact Information',
+                confirmButton: 'Confirm Booking',
+                bookingConfirmed: 'Booking Confirmed!',
+                confirmationMessage: "We've sent a confirmation email with your booking details.",
+                bookingDetails: 'Booking Details',
+                labelBookingId: 'Booking ID:',
+                summaryServices: 'Services:',
+                summaryDateTime: 'Date & Time:',
+                newBooking: 'Make Another Booking',
+                services: {
+                    "Men's Cut": "Men's Cut",
+                    "Women's Cut": "Women's Cut",
+                    "Children's Cut": "Children's Cut",
+                    "Hair Coloring": 'Hair Coloring',
+                    "Highlights": 'Highlights',
+                    "Perm": 'Perm',
+                    "Hair Treatment": 'Hair Treatment'
+                },
+                activeTime: 'Active time',
+                min: 'min',
+                placeholders: {
+                    name: 'Enter your name',
+                    phone: 'Enter your phone number',
+                    email: 'Enter your email'
+                }
+            }
+        };
+
+        const serviceData = {
+            'mens-cut': { name: "Men's Cut", duration: 30, price: 25 },
+            'womens-cut': { name: "Women's Cut", duration: 45, price: 35 },
+            'kids-cut': { name: "Children's Cut", duration: 15, price: 15 },
+            'coloring': { name: "Hair Coloring", duration: 90, price: 80, activeTime: 30 },
+            'highlights': { name: "Highlights", duration: 120, price: 120, activeTime: 40 }
+        };
+
+        function toggleLang() {
+            isZh = !isZh;
+            updateLanguage();
+            loadAvailableServices(); // Reload services with new language
+        }
+
+        function updateLanguage() {
+            const t = isZh ? translations.zh : translations.en;
+
+            document.getElementById('app-title').textContent = t.appTitle;
+            document.querySelector('.lang-toggle').textContent = isZh ? 'EN' : '中文';
+
+            // Update all screens
+            document.getElementById('select-service').textContent = t.selectService;
+            document.getElementById('service-next').textContent = t.nextBtn;
+            document.getElementById('select-datetime').textContent = t.selectDateTime;
+            document.getElementById('available-dates').textContent = t.availableDates;
+            document.getElementById('available-times').textContent = t.availableTimes;
+            document.getElementById('datetime-next').textContent = t.nextBtn;
+            document.getElementById('your-info').textContent = t.yourInfo;
+            document.getElementById('label-name').textContent = t.labelName;
+            document.getElementById('label-phone').textContent = t.labelPhone;
+            document.getElementById('label-email').textContent = t.labelEmail;
+            document.getElementById('info-next').textContent = t.reviewBooking;
+            document.getElementById('review-booking').textContent = t.reviewBooking;
+            document.getElementById('label-services').textContent = t.labelServices;
+            document.getElementById('label-date').textContent = t.labelDate;
+            document.getElementById('label-time').textContent = t.labelTime;
+            document.getElementById('label-duration').textContent = t.labelDuration;
+            document.getElementById('label-price').textContent = t.labelPrice;
+            document.getElementById('contact-info').textContent = t.contactInfo;
+            document.getElementById('confirm-button').textContent = t.confirmButton;
+            document.getElementById('booking-confirmed').textContent = t.bookingConfirmed;
+            document.getElementById('confirmation-message').textContent = t.confirmationMessage;
+            document.getElementById('booking-details').textContent = t.bookingDetails;
+            document.getElementById('label-booking-id').textContent = t.labelBookingId;
+            document.getElementById('summary-services').textContent = t.summaryServices;
+            document.getElementById('summary-datetime').textContent = t.summaryDateTime;
+            document.getElementById('new-booking').textContent = t.newBooking;
+
+            // Update placeholders with null checks
+            const nameInput = document.getElementById('name');
+            const phoneInput = document.getElementById('phone');
+            const emailInput = document.getElementById('email');
+            const notesInput = document.getElementById('notes');
+
+            if (nameInput) nameInput.placeholder = t.placeholders.name;
+            if (phoneInput) phoneInput.placeholder = t.placeholders.phone;
+            if (emailInput) emailInput.placeholder = t.placeholders.email;
+            if (notesInput && t.placeholders.notes) notesInput.placeholder = t.placeholders.notes;
+
+            // Update service cards
+            const serviceCards = document.querySelectorAll('.service-card');
+            serviceCards.forEach(card => {
+                const nameDiv = card.querySelector('.service-name');
+                const englishName = nameDiv.textContent;
+                if (t.services[englishName]) {
+                    nameDiv.textContent = t.services[englishName];
+                }
+
+                // Update active time text
+                const activeTimeDiv = card.querySelector('div[style*="color: #4A90E2"]');
+                if (activeTimeDiv) {
+                    const match = activeTimeDiv.textContent.match(/\d+/);
+                    if (match) {
+                        activeTimeDiv.textContent = `${t.activeTime}: ${match[0]} ${t.min}`;
+                    }
+                }
+
+                // Update price display
+                const priceDiv = card.querySelector('div[style*="color: #666"]');
+                if (priceDiv) {
+                    const match = priceDiv.textContent.match(/(\d+)\s*min.*\$(\d+)/);
+                    if (match) {
+                        priceDiv.textContent = `${match[1]} ${t.min} • $${match[2]}`;
+                    }
+                }
+            });
+
+            // Update back buttons
+            document.querySelectorAll('.back-button').forEach(btn => {
+                btn.textContent = t.back;
+            });
+        }
+
+        function toggleService(element, serviceId) {
+            // First, deselect all other services
+            document.querySelectorAll('.service-card').forEach(card => {
+                card.classList.remove('selected');
+                const cb = card.querySelector('.checkbox');
+                if (cb) {
+                    cb.classList.remove('checked');
+                    cb.innerHTML = '';
+                }
+            });
+
+            // Clear the array and add only the selected service
+            selectedServices = [];
+
+            // Select the clicked service
+            element.classList.add('selected');
+            const checkbox = element.querySelector('.checkbox');
+            checkbox.classList.add('checked');
+            checkbox.innerHTML = '✓';
+            selectedServices.push(serviceId);
+
+            document.getElementById('service-next').disabled = selectedServices.length === 0;
+        }
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            currentScreen = screenId;
+            updateProgress();
+        }
+
+        function updateProgress() {
+            const screens = ['service-screen', 'datetime-screen', 'info-screen', 'confirmation-screen', 'success-screen'];
+            const currentIndex = screens.indexOf(currentScreen);
+            const progress = ((currentIndex + 1) / screens.length) * 100;
+            document.getElementById('progress').style.width = progress + '%';
+        }
+
+        function goToDateTime() {
+            if (selectedServices.length === 0) return;
+            showScreen('datetime-screen');
+            generateDates();
+            // Show message to select date first
+            const timeSlots = document.getElementById('time-slots');
+            const selectDateMsg = isZh ? '请先选择日期' : 'Please select a date first';
+            timeSlots.innerHTML = `<div style="text-align: center; padding: 20px; color: #666; background: #f5f5f5; border-radius: 10px;">${selectDateMsg}</div>`;
+        }
+
+        function generateDates() {
+            const dateGrid = document.getElementById('date-grid');
+            dateGrid.innerHTML = '';
+
+            // Try to get store hours, use defaults if not available
+            let storeHours;
+            try {
+                storeHours = SharedData.getStoreHours();
+            } catch (e) {
+                // Use default hours if SharedData isn't available
+                storeHours = {
+                    monday: { open: '09:00', close: '18:00', closed: false },
+                    tuesday: { open: '09:00', close: '18:00', closed: false },
+                    wednesday: { open: '09:00', close: '18:00', closed: false },
+                    thursday: { open: '09:00', close: '18:00', closed: false },
+                    friday: { open: '09:00', close: '20:00', closed: false },
+                    saturday: { open: '10:00', close: '17:00', closed: false },
+                    sunday: { open: '', close: '', closed: true }
+                };
+            }
+
+            const today = new Date();
+            for (let i = 0; i < 14; i++) {  // Show 2 weeks
+                const date = new Date(today);
+                date.setDate(today.getDate() + i);
+
+                const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+                const dayHours = storeHours[dayName];
+                const isClosed = !dayHours || dayHours.closed;
+
+                const dateCard = document.createElement('div');
+                dateCard.className = 'date-card';
+                if (isClosed) {
+                    dateCard.style.opacity = '0.5';
+                    dateCard.style.cursor = 'not-allowed';
+                }
+                // Get localized day and month names
+                const weekdayShort = isZh ?
+                    ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()] :
+                    date.toLocaleDateString('en', { weekday: 'short' });
+                const monthShort = isZh ?
+                    (date.getMonth() + 1) + '月' :
+                    date.toLocaleDateString('en', { month: 'short' });
+
+                dateCard.innerHTML = `
+                    <div style="font-size: 14px; color: #666;">${weekdayShort}</div>
+                    <div style="font-size: 20px; margin: 5px 0;">${date.getDate()}</div>
+                    <div style="font-size: 12px; color: ${isClosed ? '#f44336' : '#666'};">${isClosed ? (isZh ? '休息' : 'Closed') : monthShort}</div>
+                `;
+                if (!isClosed) {
+                    dateCard.onclick = () => selectDate(dateCard, date);
+                }
+                dateGrid.appendChild(dateCard);
+            }
+        }
+
+        function selectDate(element, date) {
+            document.querySelectorAll('.date-card').forEach(d => d.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedDate = date;
+            selectedTime = null; // Reset time when date changes
+            generateTimeSlots();
+            checkDateTimeComplete();
+        }
+
+        function generateTimeSlots() {
+            const timeSlots = document.getElementById('time-slots');
+            timeSlots.innerHTML = '';
+
+            if (!selectedDate) {
+                const selectDateMsg = isZh ? '请先选择日期' : 'Please select a date first';
+                timeSlots.innerHTML = `<div style="text-align: center; color: #666;">${selectDateMsg}</div>`;
+                return;
+            }
+
+            // Calculate total service duration
+            const totalDuration = selectedServices.reduce((sum, serviceId) => {
+                return sum + (serviceData[serviceId]?.duration || 30);
+            }, 0);
+
+            // Get available slots or use defaults
+            let availableSlots;
+            try {
+                availableSlots = SharedData.getAvailableSlots(selectedDate, totalDuration);
+            } catch (e) {
+                // Generate default slots if SharedData isn't available
+                const dayName = selectedDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+                const defaultHours = {
+                    monday: { start: 9, end: 18 },
+                    tuesday: { start: 9, end: 18 },
+                    wednesday: { start: 9, end: 18 },
+                    thursday: { start: 9, end: 18 },
+                    friday: { start: 9, end: 20 },
+                    saturday: { start: 10, end: 17 },
+                    sunday: null
+                };
+
+                availableSlots = [];
+                const hours = defaultHours[dayName];
+                if (hours) {
+                    // Generate 15-minute intervals
+                    const startMinutes = hours.start * 60;
+                    const endMinutes = hours.end * 60;
+                    const lastValidSlot = endMinutes - totalDuration;
+
+                    for (let minutes = startMinutes; minutes <= lastValidSlot; minutes += 15) {
+                        const hour = Math.floor(minutes / 60);
+                        const min = minutes % 60;
+                        availableSlots.push(`${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`);
+                    }
+                }
+            }
+
+            if (availableSlots.length === 0) {
+                timeSlots.innerHTML = '<div style="text-align: center; color: #f44336;">No available slots for this date</div>';
+                return;
+            }
+
+            // Filter out past times if showing today
+            const now = new Date();
+            const isToday = selectedDate.toDateString() === now.toDateString();
+            const currentHours = now.getHours();
+            const currentMinutes = now.getMinutes();
+
+            const filteredSlots = availableSlots.filter(time => {
+                if (!isToday) return true; // Show all times for future dates
+
+                const [hours, minutes] = time.split(':').map(Number);
+                const slotMinutes = hours * 60 + minutes;
+                const nowMinutes = currentHours * 60 + currentMinutes;
+
+                // Only show times that are at least 15 minutes in the future
+                return slotMinutes > nowMinutes + 15;
+            });
+
+            if (filteredSlots.length === 0) {
+                timeSlots.innerHTML = '<div style="text-align: center; color: #f44336;">No available slots for today</div>';
+                return;
+            }
+
+            filteredSlots.forEach(time => {
+                const slot = document.createElement('div');
+                slot.className = 'time-slot';
+
+                // Format time for display (convert 24hr to 12hr with AM/PM)
+                const [hours, minutes] = time.split(':').map(Number);
+                const period = hours >= 12 ? 'PM' : 'AM';
+                const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+                const displayTime = `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+                slot.textContent = displayTime;
+
+                // Check if enough time remains for the service
+                const slotMinutes = hours * 60 + minutes;
+                const endMinutes = slotMinutes + totalDuration;
+                const dayName = selectedDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+
+                // Get closing time (use default if SharedData not available)
+                let closeMinutes = 18 * 60; // Default 6PM
+                try {
+                    const dayHours = SharedData.getStoreHours()[dayName];
+                    if (dayHours && dayHours.close) {
+                        const [closeHour, closeMin] = dayHours.close.split(':').map(Number);
+                        closeMinutes = closeHour * 60 + closeMin;
+                    }
+                } catch (e) {
+                    // Use defaults based on day
+                    if (dayName === 'friday') closeMinutes = 20 * 60;
+                    else if (dayName === 'saturday') closeMinutes = 17 * 60;
+                }
+
+                if (endMinutes > closeMinutes) {
+                    slot.classList.add('unavailable');
+                    slot.title = isZh ? '剩余时间不足' : 'Not enough time remaining';
+                } else {
+                    // Check if this time slot is already booked (considering active periods)
+                    let isBooked = false;
+                    try {
+                        // Get the total duration of selected services for conflict checking
+                        const totalDuration = selectedServices.reduce((sum, id) => {
+                            const service = SharedData.getServices()[id];
+                            return sum + (service ? service.duration : 0);
+                        }, 0);
+
+                        // Check if any active periods would conflict
+                        isBooked = SharedData.isTimeSlotBooked(selectedDate, time, totalDuration);
+                    } catch (e) {
+                        // If SharedData not available, skip booking check
+                    }
+
+                    if (isBooked) {
+                        slot.classList.add('unavailable');
+                        slot.title = isZh ? '已预约' : 'Already booked';
+                    } else {
+                        slot.onclick = () => selectTime(slot, time);
+                    }
+                }
+
+                timeSlots.appendChild(slot);
+            });
+        }
+
+        function selectTime(element, time) {
+            document.querySelectorAll('.time-slot').forEach(t => t.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedTime = time;
+            checkDateTimeComplete();
+        }
+
+        function checkDateTimeComplete() {
+            document.getElementById('datetime-next').disabled = !selectedDate || !selectedTime;
+        }
+
+        function goToInfo() {
+            if (!selectedDate || !selectedTime) return;
+            showScreen('info-screen');
+        }
+
+        function goToConfirmation() {
+            const name = document.getElementById('name').value;
+            const phone = document.getElementById('phone').value;
+            const email = document.getElementById('email').value;
+
+            if (!name || !phone || !email) {
+                alert(isZh ? '请填写所有必填信息' : 'Please fill in all required information');
+                return;
+            }
+
+            if (!validatePhone(phone)) {
+                alert(isZh ? '请输入10位电话号码' : 'Please enter a valid 10-digit phone number');
+                document.getElementById('phone').focus();
+                return;
+            }
+
+            if (!validateEmail(email)) {
+                alert(isZh ? '请输入有效的电子邮件地址' : 'Please enter a valid email address');
+                document.getElementById('email').focus();
+                return;
+            }
+
+            // Update summary
+            const t = isZh ? translations.zh : translations.en;
+            const serviceNames = selectedServices.map(s => t.services[serviceData[s].name] || serviceData[s].name);
+            document.getElementById('selected-services').textContent = serviceNames.join(', ');
+            const dateStr = isZh ?
+                `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日` :
+                selectedDate.toLocaleDateString();
+            document.getElementById('selected-date').textContent = dateStr;
+            document.getElementById('selected-time').textContent = selectedTime;
+
+            const totalDuration = selectedServices.reduce((sum, s) => sum + serviceData[s].duration, 0);
+            document.getElementById('total-duration').textContent = `${totalDuration} ${t.min}`;
+
+            const totalPrice = selectedServices.reduce((sum, s) => sum + serviceData[s].price, 0);
+            document.getElementById('total-price').textContent = '$' + totalPrice;
+
+            document.getElementById('contact-name').textContent = name;
+            document.getElementById('contact-phone').textContent = phone;
+            document.getElementById('contact-email').textContent = email;
+
+            showScreen('confirmation-screen');
+        }
+
+        // Phone number formatting and validation
+        function formatPhoneNumber(value) {
+            // Remove all non-digits
+            const cleaned = value.replace(/\D/g, '');
+
+            // Format as (XXX) XXX-XXXX
+            if (cleaned.length === 0) return '';
+            if (cleaned.length <= 3) return `(${cleaned}`;
+            if (cleaned.length <= 6) return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+            return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+        }
+
+        function validatePhone(phone) {
+            const cleaned = phone.replace(/\D/g, '');
+            return cleaned.length === 10;
+        }
+
+        function validateEmail(email) {
+            return email.includes('@') && email.indexOf('@') > 0 && email.indexOf('@') < email.length - 1;
+        }
+
+        // Make formatPhoneNumber available globally for inline event handlers
+        window.formatPhoneNumber = formatPhoneNumber;
+
+        function confirmBooking() {
+            // Gather booking information
+            const name = document.getElementById('name').value;
+            const phone = document.getElementById('phone').value;
+            const email = document.getElementById('email').value;
+
+            const t = isZh ? translations.zh : translations.en;
+            const serviceNames = selectedServices.map(s => t.services[serviceData[s].name] || serviceData[s].name);
+            const totalDuration = selectedServices.reduce((sum, s) => sum + serviceData[s].duration, 0);
+            const totalPrice = selectedServices.reduce((sum, s) => sum + serviceData[s].price, 0);
+
+            // Collect active periods if any services have them
+            const activePeriods = [];
+            let currentOffset = 0;
+
+            // Get services from SharedData to get actual active periods
+            const services = SharedData.getServices();
+
+            selectedServices.forEach(serviceId => {
+                const service = services[serviceId];
+                if (service && service.activePeriods && service.activePeriods.length > 0) {
+                    // Add this service's active periods with proper offset
+                    service.activePeriods.forEach(period => {
+                        activePeriods.push({
+                            start: currentOffset + period.start,
+                            end: currentOffset + period.end
+                        });
+                    });
+                } else if (service) {
+                    // If no active periods, the entire duration is active
+                    activePeriods.push({
+                        start: currentOffset,
+                        end: currentOffset + service.duration
+                    });
+                }
+                currentOffset += service ? service.duration : 0;
+            });
+
+            // Create appointment object
+            // Format date as YYYY-MM-DD to avoid timezone issues
+            const year = selectedDate.getFullYear();
+            const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+            const day = String(selectedDate.getDate()).padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
+
+            const appointment = {
+                services: selectedServices,
+                serviceNames: serviceNames,
+                date: dateStr,
+                time: selectedTime,
+                totalDuration: totalDuration,
+                totalPrice: totalPrice,
+                activePeriods: activePeriods,
+                customerName: name,
+                customerPhone: phone,
+                customerEmail: email,
+                notes: ''
+            };
+
+            // Save appointment
+            let bookingId;
+            try {
+                bookingId = SharedData.saveAppointment(appointment);
+            } catch (e) {
+                // Fallback booking ID if SharedData not available
+                bookingId = 'BK' + Math.random().toString(36).substr(2, 9).toUpperCase();
+            }
+
+            document.getElementById('booking-id').textContent = bookingId;
+            document.getElementById('final-services').textContent = serviceNames.join(', ');
+            const finalDateStr = isZh ?
+                `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日` :
+                selectedDate.toLocaleDateString();
+            document.getElementById('final-datetime').textContent =
+                `${finalDateStr} ${selectedTime}`;
+
+            showScreen('success-screen');
+        }
+
+        function goBack(screenId) {
+            showScreen(screenId);
+        }
+
+        function startNew() {
+            selectedServices = [];
+            selectedDate = null;
+            selectedTime = null;
+
+            // Reset forms
+            document.getElementById('name').value = '';
+            document.getElementById('phone').value = '';
+            document.getElementById('email').value = '';
+
+            // Reset selections
+            document.querySelectorAll('.service-card').forEach(card => {
+                card.classList.remove('selected');
+                card.querySelector('.checkbox').classList.remove('checked');
+                card.querySelector('.checkbox').innerHTML = '';
+            });
+
+            document.getElementById('service-next').disabled = true;
+
+            showScreen('service-screen');
+        }
+
+        function loadAvailableServices() {
+            const services = SharedData.getServices();
+            const container = document.getElementById('services-container');
+            container.innerHTML = '';
+
+            Object.keys(services).forEach(serviceId => {
+                const service = services[serviceId];
+                if (!service.enabled) return; // Skip disabled services
+
+                const serviceCard = document.createElement('div');
+                serviceCard.className = 'service-card';
+                serviceCard.onclick = () => toggleService(serviceCard, serviceId);
+
+                const t = isZh ? translations.zh : translations.en;
+                const serviceName = t.services[service.name] || service.name;
+                const minText = isZh ? '分钟' : 'min';
+
+                serviceCard.innerHTML = `
+                    <div>
+                        <div class="service-name">${serviceName}</div>
+                        <div style="color: #666; font-size: 14px;">${service.duration} ${minText} • $${service.price}</div>
+                    </div>
+                    <div class="checkbox"></div>
+                `;
+
+                container.appendChild(serviceCard);
+            });
+
+            if (container.children.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #666;">No services available at this time</div>';
+            }
+        }
+
+        // Initialize
+        loadAvailableServices();
+        updateLanguage();
+        updateProgress();
+
+        // Setup input event listeners when DOM is ready
+        function setupInputListeners() {
+            const phoneInput = document.getElementById('phone');
+            const emailInput = document.getElementById('email');
+
+            if (phoneInput) {
+                phoneInput.addEventListener('input', function(e) {
+                    const formatted = formatPhoneNumber(e.target.value);
+                    e.target.value = formatted;
+
+                    const errorDiv = document.getElementById('phone-error');
+                    if (formatted && !validatePhone(formatted)) {
+                        errorDiv.textContent = isZh ? '请输入10位电话号码' : 'Please enter a 10-digit phone number';
+                        errorDiv.style.display = 'block';
+                    } else {
+                        errorDiv.style.display = 'none';
+                    }
+                });
+
+                phoneInput.addEventListener('blur', function(e) {
+                    const formatted = formatPhoneNumber(e.target.value);
+                    e.target.value = formatted;
+                });
+            }
+
+            if (emailInput) {
+                emailInput.addEventListener('input', function(e) {
+                    const errorDiv = document.getElementById('email-error');
+                    if (e.target.value && !validateEmail(e.target.value)) {
+                        errorDiv.textContent = isZh ? '请输入有效的电子邮件地址' : 'Please enter a valid email address';
+                        errorDiv.style.display = 'block';
+                    } else {
+                        errorDiv.style.display = 'none';
+                    }
+                });
+            }
+        }
+
+        // Setup listeners immediately and also after delay to be safe
+        setupInputListeners();
+        setTimeout(setupInputListeners, 100);
+
+        // Also setup on DOMContentLoaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupInputListeners);
+        } else {
+            setupInputListeners();
+        }
+
+        // Listen for changes from owner app
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'services') {
+                loadAvailableServices();
+                // Clear selections if a selected service is no longer available
+                const services = SharedData.getServices();
+                selectedServices = selectedServices.filter(id => services[id]?.enabled);
+                if (selectedServices.length === 0) {
+                    document.getElementById('service-next').disabled = true;
+                }
+            } else if (e.key === 'storeHours') {
+                // Regenerate dates if on date selection screen
+                if (currentScreen === 'datetime-screen') {
+                    generateDates();
+                    if (selectedDate) {
+                        generateTimeSlots();
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
