@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EmailJS Admin Configuration - FOR ADMIN USE ONLY</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .admin-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
+            width: 100%;
+            overflow: hidden;
+        }
+        .admin-header {
+            background: #1a1a1a;
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .admin-header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .warning-badge {
+            display: inline-block;
+            background: #ff4444;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .form-group {
+            margin-bottom: 25px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        .required {
+            color: #ff4444;
+        }
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .input-hint {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .info-section {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 25px 0;
+            border-radius: 4px;
+        }
+        .info-section h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .info-section p {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .current-config {
+            background: #e8f5e9;
+            border: 1px solid #4caf50;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .current-config h3 {
+            color: #2e7d32;
+            margin-bottom: 10px;
+        }
+        .config-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #c8e6c9;
+        }
+        .config-item:last-child {
+            border-bottom: none;
+        }
+        .config-label {
+            font-weight: 500;
+            color: #555;
+        }
+        .config-value {
+            color: #2e7d32;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+        .btn {
+            flex: 1;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-save {
+            background: #667eea;
+            color: white;
+        }
+        .btn-save:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .btn-test {
+            background: #4caf50;
+            color: white;
+        }
+        .btn-test:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+        .btn-clear {
+            background: #ff6b6b;
+            color: white;
+        }
+        .btn-clear:hover {
+            background: #ff5252;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+        .success-message {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
+        .template-links {
+            background: #f0f7ff;
+            border: 1px solid #2196f3;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        .template-links h4 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+        .template-links a {
+            color: #2196f3;
+            text-decoration: none;
+            display: block;
+            padding: 5px 0;
+        }
+        .template-links a:hover {
+            text-decoration: underline;
+        }
+        @media (max-width: 600px) {
+            .btn-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="admin-header">
+            <h1>🔐 EmailJS Configuration</h1>
+            <div class="warning-badge">Admin Access Only</div>
+        </div>
+
+        <div class="content">
+            <div class="info-section">
+                <h3>⚠️ Important</h3>
+                <p>This configuration controls the email service for ALL appointment notifications. Only modify these settings if you have the correct EmailJS credentials.</p>
+            </div>
+
+            <div class="current-config" id="current-config">
+                <h3>📊 Current Configuration</h3>
+                <div id="config-display">
+                    <p style="color: #999;">Loading current configuration...</p>
+                </div>
+            </div>
+
+            <form id="emailjs-form">
+                <div class="form-group">
+                    <label for="service-id">
+                        Service ID <span class="required">*</span>
+                    </label>
+                    <input type="text" id="service-id" placeholder="service_xxxxxxx" required>
+                    <div class="input-hint">Your EmailJS service identifier (e.g., service_lv63ea4)</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmation-template">
+                        Confirmation Template ID <span class="required">*</span>
+                    </label>
+                    <input type="text" id="confirmation-template" placeholder="template_xxxxxxx" required>
+                    <div class="input-hint">Template for booking confirmations and reschedules</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="cancellation-template">
+                        Cancellation Template ID <span class="required">*</span>
+                    </label>
+                    <input type="text" id="cancellation-template" placeholder="template_xxxxxxx" value="template_ppbr3sc" required>
+                    <div class="input-hint">Template for appointment cancellations</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="public-key">
+                        Public Key <span class="required">*</span>
+                    </label>
+                    <input type="text" id="public-key" placeholder="your_public_key" required>
+                    <div class="input-hint">Your EmailJS public API key</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="reply-to">
+                        Reply-To Email
+                    </label>
+                    <input type="text" id="reply-to" placeholder="noreply@example.com">
+                    <div class="input-hint">Email address for customer replies (optional)</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="admin-password">
+                        Admin Password <span class="required">*</span>
+                    </label>
+                    <input type="password" id="admin-password" placeholder="Enter admin password to save" required>
+                    <div class="input-hint">Required to save configuration changes</div>
+                </div>
+            </form>
+
+            <div class="template-links">
+                <h4>📋 Quick Links</h4>
+                <a href="https://dashboard.emailjs.com/admin" target="_blank">→ EmailJS Dashboard</a>
+                <a href="email-templates.html" target="_blank">→ View Email Templates</a>
+                <a href="test-email.html" target="_blank">→ Test Email Sending</a>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-save" onclick="saveConfiguration()">💾 Save Configuration</button>
+                <button class="btn btn-test" onclick="testConfiguration()">📧 Test Email</button>
+                <button class="btn btn-clear" onclick="clearConfiguration()">🗑️ Clear All</button>
+            </div>
+
+            <div class="success-message" id="success-message">
+                ✅ Configuration saved successfully!
+            </div>
+
+            <div class="error-message" id="error-message">
+                ❌ Error: <span id="error-text"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Admin password (you should change this)
+        const ADMIN_PASSWORD = 'admin123';
+
+        // Load current configuration
+        function loadCurrentConfig() {
+            const config = JSON.parse(localStorage.getItem('emailConfig') || '{}');
+            const displayDiv = document.getElementById('config-display');
+
+            if (config.serviceId) {
+                displayDiv.innerHTML = `
+                    <div class="config-item">
+                        <span class="config-label">Service ID:</span>
+                        <span class="config-value">${maskString(config.serviceId)}</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">Confirmation Template:</span>
+                        <span class="config-value">${maskString(config.templateId || config.confirmationTemplateId || 'Not set')}</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">Cancellation Template:</span>
+                        <span class="config-value">${maskString(config.cancelledTemplateId || 'Not set')}</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">Public Key:</span>
+                        <span class="config-value">${maskString(config.publicKey)}</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">Last Updated:</span>
+                        <span class="config-value">${config.updatedAt ? new Date(config.updatedAt).toLocaleString() : 'Unknown'}</span>
+                    </div>
+                `;
+
+                // Fill form with current values
+                document.getElementById('service-id').value = config.serviceId || '';
+                document.getElementById('confirmation-template').value = config.templateId || config.confirmationTemplateId || '';
+                document.getElementById('cancellation-template').value = config.cancelledTemplateId || 'template_ppbr3sc';
+                document.getElementById('public-key').value = config.publicKey || '';
+                document.getElementById('reply-to').value = config.replyTo || '';
+            } else {
+                displayDiv.innerHTML = '<p style="color: #ff6b6b;">⚠️ No configuration found. Please set up EmailJS.</p>';
+            }
+        }
+
+        // Mask sensitive strings
+        function maskString(str) {
+            if (!str || str === 'Not set') return str;
+            if (str.length <= 8) return '***';
+            return str.substring(0, 4) + '***' + str.substring(str.length - 4);
+        }
+
+        // Save configuration
+        function saveConfiguration() {
+            const password = document.getElementById('admin-password').value;
+
+            if (password !== ADMIN_PASSWORD) {
+                showError('Invalid admin password');
+                return;
+            }
+
+            const config = {
+                serviceId: document.getElementById('service-id').value.trim(),
+                templateId: document.getElementById('confirmation-template').value.trim(),
+                confirmationTemplateId: document.getElementById('confirmation-template').value.trim(),
+                cancelledTemplateId: document.getElementById('cancellation-template').value.trim(),
+                publicKey: document.getElementById('public-key').value.trim(),
+                replyTo: document.getElementById('reply-to').value.trim(),
+                updatedAt: new Date().toISOString(),
+                configuredBy: 'admin'
+            };
+
+            if (!config.serviceId || !config.templateId || !config.cancelledTemplateId || !config.publicKey) {
+                showError('Please fill in all required fields');
+                return;
+            }
+
+            // Save to localStorage
+            localStorage.setItem('emailConfig', JSON.stringify(config));
+
+            // Show success message
+            showSuccess();
+
+            // Reload current config display
+            loadCurrentConfig();
+
+            // Clear password field
+            document.getElementById('admin-password').value = '';
+        }
+
+        // Test configuration
+        function testConfiguration() {
+            const config = JSON.parse(localStorage.getItem('emailConfig') || '{}');
+
+            if (!config.serviceId) {
+                showError('No configuration found. Please save configuration first.');
+                return;
+            }
+
+            const testEmail = prompt('Enter email address for test:');
+            if (!testEmail) return;
+
+            // Here you would normally send a test email
+            alert(`Test email would be sent to: ${testEmail}\n\nNote: This requires the shared-data.js file to be loaded for actual sending.`);
+        }
+
+        // Clear configuration
+        function clearConfiguration() {
+            const password = prompt('Enter admin password to clear all configuration:');
+
+            if (password !== ADMIN_PASSWORD) {
+                showError('Invalid admin password');
+                return;
+            }
+
+            if (confirm('Are you sure you want to clear all EmailJS configuration? This cannot be undone.')) {
+                localStorage.removeItem('emailConfig');
+
+                // Clear form
+                document.getElementById('emailjs-form').reset();
+
+                // Reload display
+                loadCurrentConfig();
+
+                showSuccess('Configuration cleared successfully!');
+            }
+        }
+
+        // Show success message
+        function showSuccess(message = 'Configuration saved successfully!') {
+            const successDiv = document.getElementById('success-message');
+            successDiv.textContent = '✅ ' + message;
+            successDiv.style.display = 'block';
+
+            setTimeout(() => {
+                successDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            document.getElementById('error-text').textContent = message;
+            errorDiv.style.display = 'block';
+
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Load configuration on page load
+        window.addEventListener('DOMContentLoaded', loadCurrentConfig);
+    </script>
+</body>
+</html>

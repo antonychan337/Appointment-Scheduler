@@ -97,8 +97,14 @@ const SharedData = {
     // Save new appointment
     saveAppointment(appointment) {
         const appointments = this.getAppointments();
-        appointment.id = 'APT' + Date.now() + Math.random().toString(36).substr(2, 5);
-        appointment.createdAt = new Date().toISOString();
+        // Only set ID if not already provided (owner app sets its own ID)
+        if (!appointment.id) {
+            appointment.id = 'APT' + Date.now() + Math.random().toString(36).substr(2, 5);
+        }
+        // Only set createdAt if not already provided
+        if (!appointment.createdAt) {
+            appointment.createdAt = new Date().toISOString();
+        }
         appointments.push(appointment);
         localStorage.setItem('appointments', JSON.stringify(appointments));
 
@@ -128,7 +134,7 @@ const SharedData = {
 
     // Check if a specific date/time is available
     isTimeAvailable(date, time) {
-        const dayName = date.toLocaleDateString('en-US', { weekday: 'lowercase' });
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
         const hours = this.getStoreHours();
         const dayHours = hours[dayName];
 
@@ -145,7 +151,7 @@ const SharedData = {
 
     // Get available time slots for a date
     getAvailableSlots(date, serviceDuration = 30) {
-        const dayName = date.toLocaleDateString('en-US', { weekday: 'lowercase' });
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
         const hours = this.getStoreHours();
         const dayHours = hours[dayName];
 
@@ -390,5 +396,386 @@ const SharedData = {
         const dateStr = `${year}-${month}-${day}`;
 
         return blockedTimes.filter(block => block.date === dateStr);
+    },
+
+    // Email Functions (with real email support for different types)
+    sendEmail(type, appointment, oldAppointment = null) {
+        // type can be: 'confirmation', 'rescheduled', 'cancelled'
+
+        // Check owner's email preferences
+        const emailPrefs = JSON.parse(localStorage.getItem('emailPreferences') || '{}');
+
+        // Check if emails are enabled at all
+        if (emailPrefs.enabled === false) {
+            console.log('Email notifications disabled by owner');
+            return;
+        }
+
+        // Check specific email type preference
+        if (type === 'confirmation' && emailPrefs.confirmations === false) {
+            console.log('Confirmation emails disabled by owner');
+            return;
+        }
+        if (type === 'rescheduled' && emailPrefs.reschedules === false) {
+            console.log('Reschedule emails disabled by owner');
+            return;
+        }
+        if (type === 'cancelled' && emailPrefs.cancellations === false) {
+            console.log('Cancellation emails disabled by owner');
+            return;
+        }
+
+        // Check if EmailJS is configured
+        const emailConfig = JSON.parse(localStorage.getItem('emailConfig') || '{}');
+        if (!emailConfig.serviceId || !emailConfig.publicKey || !emailConfig.templateId) {
+            console.warn('EmailJS not configured - skipping email send');
+            return;
+        }
+
+        let baseUrl;
+
+        // Check if we're running locally (file:// protocol)
+        const isLocalTesting = window.location.protocol === 'file:';
+
+        if (isLocalTesting) {
+            // For local testing, always use the local file path
+            const currentPath = window.location.pathname;
+
+            // Clean up the path (remove any double slashes, etc.)
+            let cleanPath = currentPath.replace(/\/+/g, '/');
+
+            // Check if we're in customer-app or another page
+            if (cleanPath.includes('customer-app.html')) {
+                // Already in customer app, use current location
+                baseUrl = 'file://' + cleanPath;
+            } else {
+                // In another page (owner app, test page, etc.)
+                // Build path to customer-app.html
+                const dirPath = cleanPath.substring(0, cleanPath.lastIndexOf('/'));
+                baseUrl = 'file://' + dirPath + '/customer-app.html';
+            }
+        } else {
+            // Production environment - use configured URL
+            const bookingUrl = localStorage.getItem('bookingUrl');
+            if (bookingUrl) {
+                const urlData = JSON.parse(bookingUrl);
+                baseUrl = `https://mycompany.com/${urlData.slug}`;
+            } else {
+                // Fallback to current location
+                baseUrl = window.location.origin + '/customer-app.html';
+            }
+        }
+
+        // Format date for display
+        const appointmentDate = new Date(appointment.date + 'T00:00:00');
+        const dateStr = appointmentDate.toLocaleDateString('en', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        // Get owner profile and cancellation policy (emailConfig already retrieved above)
+        const ownerProfile = JSON.parse(localStorage.getItem('ownerProfile') || '{}');
+        const cancellationPolicy = JSON.parse(localStorage.getItem('cancellationPolicy') || '{}');
+        
+        // Get customer's language preference (stored when they last used the app)
+        const customerLang = localStorage.getItem(`customerLang_${appointment.customerEmail}`) || 'en';
+        const isCustomerZh = customerLang === 'zh';
+
+        // Create email HTML content
+        const emailContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #2196F3; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background: #f9f9f9; padding: 20px; border: 1px solid #e0e0e0; }
+        .detail-row { margin: 10px 0; }
+        .label { font-weight: bold; color: #666; }
+        .value { color: #333; }
+        .actions { margin-top: 30px; text-align: center; }
+        .btn { display: inline-block; padding: 12px 30px; margin: 0 10px; text-decoration: none; border-radius: 5px; }
+        .btn-modify { background: #4CAF50; color: white; }
+        .btn-cancel { background: #f44336; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Appointment Confirmed!</h1>
+        </div>
+        <div class="content">
+            <p>Dear ${appointment.customerName},</p>
+            <p>Your appointment has been confirmed. Here are your booking details:</p>
+
+            <div class="detail-row">
+                <span class="label">Booking ID:</span>
+                <span class="value">${appointment.id}</span>
+            </div>
+
+            <div class="detail-row">
+                <span class="label">Services:</span>
+                <span class="value">${appointment.serviceNames.join(', ')}</span>
+            </div>
+
+            <div class="detail-row">
+                <span class="label">Date:</span>
+                <span class="value">${dateStr}</span>
+            </div>
+
+            <div class="detail-row">
+                <span class="label">Time:</span>
+                <span class="value">${this.formatTime(appointment.time)}</span>
+            </div>
+
+            <div class="detail-row">
+                <span class="label">Duration:</span>
+                <span class="value">${appointment.totalDuration} minutes</span>
+            </div>
+
+            <div class="detail-row">
+                <span class="label">Total Price:</span>
+                <span class="value">$${appointment.totalPrice}</span>
+            </div>
+
+            <div class="actions">
+                <a href="${baseUrl}?action=modify&bookingId=${appointment.id}" class="btn btn-modify">
+                    Modify Appointment
+                </a>
+                <a href="${baseUrl}?action=cancel&bookingId=${appointment.id}" class="btn btn-cancel">
+                    Cancel Appointment
+                </a>
+            </div>
+
+            <p style="margin-top: 30px; color: #666; font-size: 14px;">
+                If you need to make any changes, click the buttons above or contact us directly.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+        `;
+
+        // Try to send real email if EmailJS is configured
+        if (typeof emailjs !== 'undefined' && emailConfig.serviceId) {
+            // Get the appropriate template ID based on email type
+            let templateId;
+            if (type === 'confirmation' || type === 'rescheduled') {
+                // Use the same template for both confirmation and rescheduled
+                templateId = emailConfig.templateId || emailConfig.confirmationTemplateId;
+            } else if (type === 'cancelled') {
+                // Use the cancellation template (hardcoded for now)
+                templateId = emailConfig.cancelledTemplateId || 'template_ppbr3sc';
+            }
+
+            if (!templateId) {
+                console.warn(`No template ID configured for ${type} emails`);
+                return;
+            }
+
+            // Format cancellation policy text
+            let policyText = '';
+            if (cancellationPolicy.minNoticeHours && cancellationPolicy.minNoticeHours > 0) {
+                const hours = cancellationPolicy.minNoticeHours;
+                if (hours === 1) {
+                    policyText = isCustomerZh ? 
+                        '取消政策：需要提前1小时通知' : 
+                        'Cancellation Policy: 1 hour notice required';
+                } else if (hours < 24) {
+                    policyText = isCustomerZh ? 
+                        `取消政策：需要提前${hours}小时通知` : 
+                        `Cancellation Policy: ${hours} hours notice required`;
+                } else {
+                    const days = Math.floor(hours / 24);
+                    policyText = isCustomerZh ? 
+                        `取消政策：需要提前${days}天通知` : 
+                        `Cancellation Policy: ${days} day${days > 1 ? 's' : ''} notice required`;
+                }
+            }
+
+            // Prepare bilingual template parameters
+            const templateParams = {
+                to_email: appointment.customerEmail,
+                customer_name: appointment.customerName,
+                business_name: ownerProfile.storeName || emailConfig.businessName || 'Premium Cuts Barbershop',
+                reply_to: emailConfig.replyTo || 'noreply@example.com',
+                booking_id: appointment.id,
+                services: appointment.serviceNames ? appointment.serviceNames.join(', ') : appointment.services.join(', '),
+                date: dateStr,
+                time: this.formatTime(appointment.time),
+                duration: appointment.totalDuration + (isCustomerZh ? ' 分钟' : ' minutes'),
+                price: '$' + appointment.totalPrice,
+                cancellation_policy: policyText,
+                // Bilingual headers
+                email_subject: type === 'confirmation' ? 
+                    (isCustomerZh ? '预约确认' : 'Appointment Confirmation') :
+                    type === 'rescheduled' ? 
+                    (isCustomerZh ? '预约已重新安排' : 'Appointment Rescheduled') :
+                    (isCustomerZh ? '预约已取消' : 'Appointment Cancelled'),
+                greeting: isCustomerZh ? `尊敬的${appointment.customerName}` : `Dear ${appointment.customerName}`,
+                confirmation_message: isCustomerZh ? 
+                    '您的预约已确认。以下是您的预约详情：' : 
+                    'Your appointment has been confirmed. Here are your booking details:',
+                label_booking_id: isCustomerZh ? '预约编号：' : 'Booking ID:',
+                label_services: isCustomerZh ? '服务项目：' : 'Services:',
+                label_date: isCustomerZh ? '日期：' : 'Date:',
+                label_time: isCustomerZh ? '时间：' : 'Time:',
+                label_duration: isCustomerZh ? '时长：' : 'Duration:',
+                label_price: isCustomerZh ? '价格：' : 'Total Price:',
+                label_location: isCustomerZh ? '地址：' : 'Location:',
+                label_contact: isCustomerZh ? '联系方式：' : 'Contact:',
+                button_modify: isCustomerZh ? '修改预约' : 'Modify Appointment',
+                button_cancel: isCustomerZh ? '取消预约' : 'Cancel Appointment',
+                footer_message: isCustomerZh ? 
+                    '如需更改，请点击上面的按钮或直接联系我们。' : 
+                    'If you need to make any changes, click the buttons above or contact us directly.'
+            };
+
+            // For rescheduled appointments, modify the subject/content
+            if (type === 'rescheduled' && oldAppointment) {
+                const oldDate = new Date(oldAppointment.date + 'T00:00:00');
+                const oldDateStr = oldDate.toLocaleDateString('en', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+
+                // Add a note about the rescheduling in the services field
+                templateParams.services = `RESCHEDULED - ${templateParams.services}\n(Previously: ${oldDateStr} at ${this.formatTime(oldAppointment.time)})`;
+            }
+
+            // Add type-specific parameters
+            if (type === 'confirmation' || type === 'rescheduled') {
+                templateParams.modify_link = `${baseUrl}?action=modify&bookingId=${appointment.id}`;
+                templateParams.cancel_link = `${baseUrl}?action=cancel&bookingId=${appointment.id}`;
+            }
+
+            if (type === 'rescheduled' && oldAppointment) {
+                // Add old appointment details for rescheduled email
+                const oldDate = new Date(oldAppointment.date + 'T00:00:00');
+                templateParams.old_date = oldDate.toLocaleDateString('en', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                templateParams.old_time = this.formatTime(oldAppointment.time);
+                templateParams.old_services = oldAppointment.serviceNames ?
+                    oldAppointment.serviceNames.join(', ') :
+                    oldAppointment.services.join(', ');
+            }
+
+            if (type === 'cancelled') {
+                templateParams.booking_link = baseUrl;
+            }
+
+            // Send email using EmailJS with the appropriate template
+            emailjs.send(emailConfig.serviceId, templateId, templateParams)
+                .then(function(response) {
+                    console.log('✅ Email sent successfully!', response.status, response.text);
+
+                    // Store sent email record
+                    const sentEmails = JSON.parse(localStorage.getItem('sentEmails') || '[]');
+                    const subjects = {
+                        confirmation: 'Appointment Confirmation',
+                        rescheduled: 'Appointment Rescheduled',
+                        cancelled: 'Appointment Cancelled'
+                    };
+                    sentEmails.push({
+                        to: appointment.customerEmail,
+                        subject: subjects[type],
+                        type: type,
+                        sentAt: new Date().toISOString(),
+                        appointmentId: appointment.id,
+                        status: 'sent',
+                        method: 'emailjs'
+                    });
+                    localStorage.setItem('sentEmails', JSON.stringify(sentEmails));
+                })
+                .catch(function(error) {
+                    console.error('❌ Failed to send email:', error);
+                    alert('Email could not be sent. Please check your email configuration.');
+                });
+
+            return true;
+        } else {
+            // Fallback: Show in console and store locally
+            console.log('=== EMAIL CONFIRMATION (Demo Mode) ===');
+            console.log('ℹ️ To send real emails, configure EmailJS in Settings');
+            console.log('To:', appointment.customerEmail);
+            console.log('Subject: Appointment Confirmation');
+            console.log('Content:', emailContent);
+
+            // Store sent emails
+            const sentEmails = JSON.parse(localStorage.getItem('sentEmails') || '[]');
+            sentEmails.push({
+                to: appointment.customerEmail,
+                subject: 'Appointment Confirmation',
+                content: emailContent,
+                sentAt: new Date().toISOString(),
+                appointmentId: appointment.id,
+                status: 'demo',
+                method: 'console'
+            });
+            localStorage.setItem('sentEmails', JSON.stringify(sentEmails));
+
+            // Show demo notification
+            if (typeof alert !== 'undefined') {
+                alert('Demo Mode: Email confirmation logged to console.\nTo send real emails, configure EmailJS in owner settings.');
+            }
+
+            return true;
+        }
+    },
+
+    // Update appointment (for modification)
+    updateAppointment(appointmentId, updates) {
+        const appointments = this.getAppointments();
+        const index = appointments.findIndex(apt => apt.id === appointmentId);
+
+        if (index === -1) {
+            return false;
+        }
+
+        // Update appointment
+        appointments[index] = {
+            ...appointments[index],
+            ...updates,
+            modifiedAt: new Date().toISOString()
+        };
+
+        localStorage.setItem('appointments', JSON.stringify(appointments));
+
+        // Trigger storage event
+        window.dispatchEvent(new StorageEvent('storage', {
+            key: 'appointments',
+            newValue: JSON.stringify(appointments),
+            url: window.location.href
+        }));
+
+        return true;
+    },
+
+    // Get appointment by ID
+    getAppointmentById(appointmentId) {
+        const appointments = this.getAppointments();
+        return appointments.find(apt => apt.id === appointmentId);
+    },
+
+    // Convenience methods for specific email types
+    sendConfirmationEmail(appointment) {
+        this.sendEmail('confirmation', appointment);
+    },
+
+    sendRescheduledEmail(newAppointment, oldAppointment) {
+        this.sendEmail('rescheduled', newAppointment, oldAppointment);
+    },
+
+    sendCancellationEmail(appointment) {
+        this.sendEmail('cancelled', appointment);
     }
 };

@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shop Owner Dashboard</title>
     <script src="shared-data.js"></script>
+    <!-- EmailJS SDK -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script type="text/javascript">
+        (function(){
+            // Initialize EmailJS with the configured public key
+            const emailConfig = JSON.parse(localStorage.getItem('emailConfig') || '{}');
+            if (emailConfig.publicKey) {
+                emailjs.init(emailConfig.publicKey);
+            }
+        })();
+    </script>
     <style>
         * {
             margin: 0;
@@ -114,6 +125,7 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
+            flex: 0 0 auto; /* Don't grow or shrink */
         }
         .calendar-nav {
             display: flex;
@@ -128,11 +140,20 @@
         }
         /* Weekly Calendar Styles */
         .weekly-calendar {
-            height: calc(100vh - 250px);
-            max-height: 450px;
+            flex: 1; /* Take remaining space in calendar section */
             display: flex;
             flex-direction: column;
             width: 100%;
+            min-height: 0; /* Allow shrinking */
+        }
+        /* Special handling for calendar section to prevent double scrollbar */
+        #calendar-section {
+            height: 100%;
+            display: none;  /* Hidden by default */
+            flex-direction: column;
+        }
+        #calendar-section.active {
+            display: flex;
         }
         .week-header {
             display: grid;
@@ -204,13 +225,23 @@
             z-index: 5;
             cursor: move;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            transition: opacity 0.2s, z-index 0s;
+            pointer-events: auto;
+        }
+        .appointment-block:hover {
+            z-index: 100; /* Bring to front on hover */
+            opacity: 1 !important;
+        }
+        .appointment-block.overlapped {
+            opacity: 0.85; /* Make slightly transparent when overlapping */
         }
         .appointment-period {
             position: absolute;
             left: 2px;
             right: 2px;
             border-radius: 4px;
-            z-index: 4;
+            z-index: 3;
+            pointer-events: none;
         }
         .appointment-period.active {
             background: #2196F3;
@@ -643,6 +674,93 @@
         </div>
     </div>
 
+    <!-- Owner Booking Modal -->
+    <div id="owner-booking-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="owner-booking-title">Create Booking</h3>
+                <button class="modal-close" onclick="closeOwnerBookingModal()">×</button>
+            </div>
+
+            <!-- Service Selection -->
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label id="label-service-selection" style="display: block; margin-bottom: 5px; font-size: 14px; color: #333;">Select Service</label>
+                <select id="owner-booking-service" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 14px;" onchange="onOwnerServiceChange()">
+                    <option value="">Choose a service...</option>
+                    <!-- Services will be populated dynamically -->
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+
+            <!-- Customer Information -->
+            <div id="customer-info-section">
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label id="label-customer-name" style="display: block; margin-bottom: 5px; font-size: 14px; color: #333;">Customer Name *</label>
+                    <input type="text" id="owner-booking-name" placeholder="Enter customer name" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 14px;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label id="label-customer-phone" style="display: block; margin-bottom: 5px; font-size: 14px; color: #333;">Phone (Optional)</label>
+                    <input type="tel" id="owner-booking-phone" placeholder="Enter phone number" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 14px;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label id="label-customer-email" style="display: block; margin-bottom: 5px; font-size: 14px; color: #333;">Email (Optional)</label>
+                    <input type="email" id="owner-booking-email" placeholder="Enter email address" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 14px;">
+                </div>
+            </div>
+
+            <!-- Date/Time Section -->
+            <div id="datetime-section" style="background: #f5f5f5; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+                <div id="date-single-section">
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label id="label-booking-date" style="display: block; margin-bottom: 5px; font-size: 14px; color: #333;">Date</label>
+                        <input type="date" id="owner-booking-date" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 14px;">
+                    </div>
+                </div>
+
+                <div id="date-range-section" style="display: none;">
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label id="label-start-date" style="display: block; margin-bottom: 5px; font-size: 14px; color: #333;">Start Date</label>
+                            <input type="date" id="owner-booking-start-date" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 14px;">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label id="label-end-date" style="display: block; margin-bottom: 5px; font-size: 14px; color: #333;">End Date</label>
+                            <input type="date" id="owner-booking-end-date" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 14px;">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label id="label-start-time" style="display: block; margin-bottom: 5px; font-size: 14px; color: #333;">Start Time</label>
+                        <input type="time" id="owner-booking-start" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 14px;" onchange="onOwnerStartTimeChange()">
+                    </div>
+
+                    <div class="form-group" style="flex: 1;">
+                        <label id="label-end-time" style="display: block; margin-bottom: 5px; font-size: 14px; color: #333;">End Time</label>
+                        <input type="time" id="owner-booking-end" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 14px;" readonly>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary -->
+            <div id="booking-summary" style="background: #E3F2FD; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none;">
+                <div style="font-size: 14px; color: #333;">
+                    <div id="summary-service"></div>
+                    <div id="summary-duration" style="margin-top: 5px;"></div>
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div style="display: flex; gap: 10px;">
+                <button class="confirm-button" onclick="confirmOwnerBooking()" style="flex: 1; background: #4A90E2; color: white; border: none; padding: 10px; border-radius: 5px; font-size: 14px; cursor: pointer;">Create Booking</button>
+                <button class="cancel-button" onclick="closeOwnerBookingModal()" style="flex: 1; background: #e0e0e0; color: #333; border: none; padding: 10px; border-radius: 5px; font-size: 14px; cursor: pointer;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Appointment Details Modal -->
     <div id="appointment-modal" class="modal-overlay">
         <div class="modal-content">
@@ -685,6 +803,373 @@
             <div class="modal-actions">
                 <button class="modal-btn reschedule" id="btn-reschedule" onclick="rescheduleAppointment()">Reschedule</button>
                 <button class="modal-btn cancel" id="btn-cancel" onclick="cancelAppointment()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Cancellation Policy Modal -->
+    <div id="cancellation-policy-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 id="cancel-policy-modal-title">Cancellation Policy</h3>
+                <button class="modal-close" onclick="closeCancellationPolicy()">×</button>
+            </div>
+            <div style="padding: 20px;">
+                <p id="cancel-policy-intro" style="color: #666; margin-bottom: 20px;">
+                    Set the minimum notice period required for customers to cancel or reschedule appointments.
+                </p>
+
+                <div style="margin-bottom: 20px;">
+                    <label id="min-notice-label" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                        Minimum Notice Period (hours):
+                    </label>
+                    <input type="number"
+                           id="min-notice-hours"
+                           min="0"
+                           max="168"
+                           step="1"
+                           placeholder="e.g., 24"
+                           style="width: 100%; padding: 10px; border: 1px solid #e0e0e0; border-radius: 5px;">
+                    <small id="policy-hint" style="color: #666; display: block; margin-top: 5px;">
+                        Enter 0 to allow cancellations anytime, or up to 168 hours (1 week)
+                    </small>
+                </div>
+
+                <div id="policy-preview" style="padding: 15px; background: #f5f5f5; border-radius: 8px; margin-bottom: 20px; display: none;">
+                    <strong id="policy-preview-title">Policy Preview:</strong>
+                    <p id="policy-preview-text" style="margin-top: 10px;"></p>
+                </div>
+
+                <div style="padding: 15px; background: #fff3e0; border-radius: 8px; margin-bottom: 20px;">
+                    <strong style="color: #ff9800;">⚠️ <span id="policy-important">Important:</span></strong>
+                    <ul style="margin-top: 10px; padding-left: 20px; color: #666;">
+                        <li id="policy-note1">This policy applies to customer-initiated changes only</li>
+                        <li id="policy-note2">You can still modify or cancel appointments at any time</li>
+                        <li id="policy-note3">Customers will see this policy when booking</li>
+                    </ul>
+                </div>
+
+                <button id="save-policy-btn"
+                        class="add-button"
+                        onclick="saveCancellationPolicy()"
+                        style="width: 100%; margin-top: 10px;">
+                    Save Policy
+                </button>
+
+                <div id="policy-message" style="margin-top: 15px; padding: 10px; border-radius: 5px; display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Owner Profile Modal -->
+    <div id="profile-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 id="profile-modal-title">Business Profile</h3>
+                <button class="modal-close" onclick="closeProfileModal()">×</button>
+            </div>
+            <div style="padding: 20px;">
+                <p id="profile-modal-intro" style="color: #666; margin-bottom: 20px;">
+                    Manage your business information that will appear in emails and customer communications.
+                </p>
+                
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="owner-first-name" id="label-first-name" style="display: block; margin-bottom: 5px; font-weight: 500;">
+                        First Name <span style="color: red;">*</span>
+                    </label>
+                    <input type="text" id="owner-first-name" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="owner-last-name" id="label-last-name" style="display: block; margin-bottom: 5px; font-weight: 500;">
+                        Last Name <span style="color: red;">*</span>
+                    </label>
+                    <input type="text" id="owner-last-name" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="owner-phone" id="label-owner-phone" style="display: block; margin-bottom: 5px; font-weight: 500;">
+                        Phone Number <span style="color: #999;">(optional)</span>
+                    </label>
+                    <input type="tel" id="owner-phone" placeholder="(555) 555-5555" maxlength="14" 
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"
+                           oninput="this.value = formatOwnerPhone(this.value)">
+                    <div id="owner-phone-error" style="color: #f44336; font-size: 12px; margin-top: 5px; display: none;"></div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="owner-email" id="label-owner-email" style="display: block; margin-bottom: 5px; font-weight: 500;">
+                        Email <span style="color: #999;">(optional)</span>
+                    </label>
+                    <input type="email" id="owner-email" placeholder="your@email.com" 
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"
+                           oninput="validateOwnerEmail()">
+                    <div id="owner-email-error" style="color: #f44336; font-size: 12px; margin-top: 5px; display: none;"></div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="owner-wechat" id="label-wechat" style="display: block; margin-bottom: 5px; font-weight: 500;">
+                        WeChat ID <span style="color: #999;">(optional)</span>
+                    </label>
+                    <input type="text" id="owner-wechat" placeholder="WeChat ID" 
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="store-name" id="label-store-name" style="display: block; margin-bottom: 5px; font-weight: 500;">
+                        Store Name <span style="color: red;">*</span>
+                    </label>
+                    <input type="text" id="store-name" placeholder="Premium Cuts Barbershop" 
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="store-address" id="label-store-address" style="display: block; margin-bottom: 5px; font-weight: 500;">
+                        Store Address <span style="color: red;">*</span>
+                    </label>
+                    <textarea id="store-address" placeholder="123 Main Street, City, State 12345" 
+                              style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; min-height: 60px; resize: vertical;"></textarea>
+                </div>
+
+                <div id="profile-success" style="display: none; background: #E8F5E9; color: #2E7D32; padding: 10px; border-radius: 4px; margin-top: 15px; text-align: center;">
+                    ✅ <span id="profile-success-msg">Profile saved successfully!</span>
+                </div>
+            </div>
+
+            <div class="modal-actions" style="padding: 15px; border-top: 1px solid #e0e0e0;">
+                <button class="modal-btn" id="save-profile-btn" onclick="saveOwnerProfile()" style="background: #2196F3; color: white;">
+                    Save Profile
+                </button>
+                <button class="modal-btn" id="cancel-profile-btn" onclick="closeProfileModal()" style="background: #f5f5f5;">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Email Settings Modal -->
+    <div id="email-settings-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 id="email-settings-modal-title">Email Notifications</h3>
+                <button class="modal-close" onclick="closeEmailSettings()">×</button>
+            </div>
+            <div style="padding: 20px;">
+                <p id="email-settings-intro" style="color: #666; margin-bottom: 20px;">
+                    Choose which email notifications to send to your customers.
+                </p>
+
+                <!-- Main Toggle -->
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <label for="email-notifications-enabled" style="font-weight: 600; font-size: 16px; cursor: pointer;">
+                                <span id="email-main-toggle-label">Send email notifications</span>
+                            </label>
+                            <p id="email-main-toggle-desc" style="color: #666; font-size: 14px; margin: 5px 0 0 0;">
+                                Automatically notify customers about their appointments
+                            </p>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="email-notifications-enabled" onchange="toggleEmailNotifications()">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Sub-options (only visible when main toggle is on) -->
+                <div id="email-sub-options" style="display: none; margin-left: 20px;">
+                    <div style="border-left: 3px solid #007AFF; padding-left: 20px;">
+                        <!-- Confirmation Emails -->
+                        <div style="margin-bottom: 15px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <label for="email-confirmations" style="cursor: pointer;">
+                                    <strong id="email-confirmation-label">Booking confirmations</strong>
+                                    <span id="email-confirmation-desc" style="color: #666; font-size: 14px; display: block;">
+                                        Send when appointments are booked
+                                    </span>
+                                </label>
+                                <label class="switch" style="transform: scale(0.8);">
+                                    <input type="checkbox" id="email-confirmations" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Rescheduling Emails -->
+                        <div style="margin-bottom: 15px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <label for="email-reschedules" style="cursor: pointer;">
+                                    <strong id="email-reschedule-label">Reschedule notifications</strong>
+                                    <span id="email-reschedule-desc" style="color: #666; font-size: 14px; display: block;">
+                                        Send when appointments are rescheduled
+                                    </span>
+                                </label>
+                                <label class="switch" style="transform: scale(0.8);">
+                                    <input type="checkbox" id="email-reschedules" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Cancellation Emails -->
+                        <div style="margin-bottom: 15px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <label for="email-cancellations" style="cursor: pointer;">
+                                    <strong id="email-cancellation-label">Cancellation notices</strong>
+                                    <span id="email-cancellation-desc" style="color: #666; font-size: 14px; display: block;">
+                                        Send when appointments are cancelled
+                                    </span>
+                                </label>
+                                <label class="switch" style="transform: scale(0.8);">
+                                    <input type="checkbox" id="email-cancellations" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Admin Config Status -->
+                <div id="email-config-status" style="margin-top: 20px; padding: 12px; border-radius: 6px; font-size: 14px;">
+                    <!-- Status will be filled by JavaScript -->
+                </div>
+
+                <div id="email-settings-success" style="display: none; background: #E8F5E9; color: #2E7D32; padding: 10px; border-radius: 4px; margin-top: 15px; text-align: center;">
+                    ✅ Settings saved successfully!
+                </div>
+            </div>
+
+            <div class="modal-actions" style="padding: 15px; border-top: 1px solid #e0e0e0;">
+                <button class="modal-btn" id="save-email-settings-btn" onclick="saveEmailSettings()" style="background: #2196F3; color: white;">
+                    Save Settings
+                </button>
+                <button class="modal-btn" id="cancel-email-settings-btn" onclick="closeEmailSettings()" style="background: #f5f5f5;">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+        }
+        input:checked + .slider {
+            background-color: #007AFF;
+        }
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+        .slider.round {
+            border-radius: 34px;
+        }
+        .slider.round:before {
+            border-radius: 50%;
+        }
+    </style>
+
+    <!-- Booking Link Modal -->
+    <div id="booking-link-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 id="booking-link-modal-title">Booking Link</h3>
+                <button class="modal-close" onclick="closeBookingLinkModal()">×</button>
+            </div>
+
+            <div style="padding: 20px;">
+                <p id="booking-link-intro" style="color: #666; margin-bottom: 20px;">
+                    Create a custom URL that customers can use to book appointments with you.
+                </p>
+
+                <div style="margin-bottom: 20px;">
+                    <label id="url-label" style="display: block; margin-bottom: 8px; font-weight: bold;">Your Custom URL</label>
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <span style="background: #f5f5f5; padding: 10px; border-radius: 4px 0 0 4px; border: 1px solid #e0e0e0;">
+                            mycompany.com/
+                        </span>
+                        <input type="text"
+                               id="custom-url-slug"
+                               placeholder="your-business-name"
+                               style="flex: 1; padding: 10px; border: 1px solid #e0e0e0; border-radius: 0 4px 4px 0; border-left: none;"
+                               onkeyup="validateUrlSlug()"
+                               pattern="[a-z0-9-]+"
+                               maxlength="50">
+                    </div>
+                    <div id="url-error" style="color: #f44336; font-size: 12px; margin-top: 5px; display: none;"></div>
+                    <div id="url-success" style="color: #4CAF50; font-size: 12px; margin-top: 5px; display: none;"></div>
+                </div>
+
+                <button id="check-availability-btn"
+                        class="add-button"
+                        onclick="checkUrlAvailability()"
+                        style="margin-bottom: 10px; width: 100%;">
+                    Check Availability
+                </button>
+
+                <div id="url-display" style="display: none; margin-top: 20px; padding: 15px; background: #f0f8ff; border-radius: 8px; border: 1px solid #2196F3;">
+                    <div style="font-weight: bold; margin-bottom: 10px;" id="your-booking-link">Your Booking Link:</div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="text"
+                               id="full-url"
+                               readonly
+                               style="flex: 1; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px; background: white;">
+                        <button class="add-button" onclick="copyToClipboard()" style="padding: 8px 15px;">
+                            📋 <span id="copy-btn-text">Copy</span>
+                        </button>
+                    </div>
+                    <div id="copy-feedback" style="color: #4CAF50; font-size: 12px; margin-top: 5px; display: none;">
+                        Copied to clipboard!
+                    </div>
+                </div>
+
+                <div id="qr-code-section" style="display: none; margin-top: 20px; text-align: center;">
+                    <div style="font-weight: bold; margin-bottom: 10px;" id="qr-code-title">QR Code</div>
+                    <div id="qr-code" style="padding: 20px; background: white; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <!-- QR code would be generated here -->
+                        <div style="width: 150px; height: 150px; margin: 0 auto; background: #f5f5f5; display: flex; align-items: center; justify-content: center; color: #999;">
+                            QR Code
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions" style="padding: 15px; border-top: 1px solid #e0e0e0;">
+                <button class="modal-btn" id="save-url-btn" onclick="saveBookingUrl()" style="background: #2196F3; color: white;" disabled>
+                    Save URL
+                </button>
+                <button class="modal-btn" id="cancel-booking-link-btn" onclick="closeBookingLinkModal()" style="background: #f5f5f5;">
+                    Cancel
+                </button>
             </div>
         </div>
     </div>
@@ -802,7 +1287,7 @@
                                                         <span style="font-size: 12px; color: #4A90E2;">min</span>
                                                     </div>
                                                 </div>
-                                                <button class="add-period-btn" onclick="addPeriodToService('mens-cut')" style="margin-top: 5px; padding: 3px 8px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">+ Add period</button>
+                                                <button class="add-period-btn" onclick="addPeriodToService('mens-cut')" style="margin-top: 5px; padding: 3px 8px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">Add period</button>
                                             </div>
                                         </div>
                                     </div>
@@ -836,7 +1321,7 @@
                                                         <span style="font-size: 12px; color: #4A90E2;">min</span>
                                                     </div>
                                                 </div>
-                                                <button class="add-period-btn" onclick="addPeriodToService('womens-cut')" style="margin-top: 5px; padding: 3px 8px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">+ Add period</button>
+                                                <button class="add-period-btn" onclick="addPeriodToService('womens-cut')" style="margin-top: 5px; padding: 3px 8px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">Add period</button>
                                             </div>
                                         </div>
                                     </div>
@@ -870,7 +1355,7 @@
                                                         <span style="font-size: 12px; color: #4A90E2;">min</span>
                                                     </div>
                                                 </div>
-                                                <button class="add-period-btn" onclick="addPeriodToService('kids-cut')" style="margin-top: 5px; padding: 3px 8px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">+ Add period</button>
+                                                <button class="add-period-btn" onclick="addPeriodToService('kids-cut')" style="margin-top: 5px; padding: 3px 8px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">Add period</button>
                                             </div>
                                         </div>
                                     </div>
@@ -913,7 +1398,7 @@
                                                         <button onclick="removePeriodFromService(this, 'coloring')" style="padding: 2px 6px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">×</button>
                                                     </div>
                                                 </div>
-                                                <button class="add-period-btn" onclick="addPeriodToService('coloring')" style="margin-top: 5px; padding: 3px 8px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">+ Add period</button>
+                                                <button class="add-period-btn" onclick="addPeriodToService('coloring')" style="margin-top: 5px; padding: 3px 8px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">Add period</button>
                                             </div>
                                         </div>
                                     </div>
@@ -964,7 +1449,7 @@
                                                         <button onclick="removePeriodFromService(this, 'highlights')" style="padding: 2px 6px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">×</button>
                                                     </div>
                                                 </div>
-                                                <button class="add-period-btn" onclick="addPeriodToService('highlights')" style="margin-top: 5px; padding: 3px 8px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">+ Add period</button>
+                                                <button class="add-period-btn" onclick="addPeriodToService('highlights')" style="margin-top: 5px; padding: 3px 8px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">Add period</button>
                                             </div>
                                         </div>
                                     </div>
@@ -1051,6 +1536,50 @@
                                 <button class="add-button" id="save-hours-btn" onclick="saveStoreHours()">Save Hours</button>
                                 <div id="hours-message" style="margin-top: 10px; padding: 10px; border-radius: 5px; display: none;"></div>
                             </div>
+
+                            <!-- Time Off Section -->
+                            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                                <h3 id="time-off-title" style="margin-bottom: 15px; color: #333;">Time Off</h3>
+                                <div style="margin-bottom: 15px;">
+                                    <label style="display: flex; align-items: center; cursor: pointer;">
+                                        <input type="checkbox" id="time-off-enabled" onchange="toggleTimeOff()" style="margin-right: 10px;">
+                                        <span id="time-off-label">I need to take time off</span>
+                                    </label>
+                                </div>
+
+                                <div id="time-off-fields" style="display: none;">
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                                        <div>
+                                            <label id="time-off-start-date-label" style="display: block; margin-bottom: 5px; font-size: 14px; color: #666;">Start Date</label>
+                                            <input type="date" id="time-off-start-date" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px;">
+                                        </div>
+                                        <div>
+                                            <label id="time-off-start-time-label" style="display: block; margin-bottom: 5px; font-size: 14px; color: #666;">Start Time</label>
+                                            <input type="time" id="time-off-start-time" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px;">
+                                        </div>
+                                    </div>
+
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                                        <div>
+                                            <label id="time-off-end-date-label" style="display: block; margin-bottom: 5px; font-size: 14px; color: #666;">End Date</label>
+                                            <input type="date" id="time-off-end-date" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px;">
+                                        </div>
+                                        <div>
+                                            <label id="time-off-end-time-label" style="display: block; margin-bottom: 5px; font-size: 14px; color: #666;">End Time</label>
+                                            <input type="time" id="time-off-end-time" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px;">
+                                        </div>
+                                    </div>
+
+                                    <div style="margin-bottom: 15px;">
+                                        <label id="time-off-reason-label" style="display: block; margin-bottom: 5px; font-size: 14px; color: #666;">Reason (optional)</label>
+                                        <input type="text" id="time-off-reason" placeholder="e.g., Vacation, Personal time" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px;">
+                                    </div>
+
+                                    <button class="add-button" id="save-time-off-btn" onclick="saveTimeOff()">Save Time Off</button>
+                                    <button class="delete-button" id="clear-time-off-btn" onclick="clearTimeOff()" style="margin-left: 10px; display: none;">Clear Time Off</button>
+                                    <div id="time-off-message" style="margin-top: 10px; padding: 10px; border-radius: 5px; display: none;"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1078,16 +1607,39 @@
                         <span style="color: #999;">›</span>
                     </div>
 
-                    <div class="settings-item" onclick="openNotifications()">
+                    <div class="settings-item" onclick="openEmailSettings()">
                         <div style="display: flex; align-items: center;">
-                            <div class="settings-icon">🔔</div>
+                            <div class="settings-icon">📧</div>
                             <div>
-                                <div style="font-weight: bold;" id="notif-title">Notifications</div>
-                                <div style="font-size: 12px; color: #666;" id="notif-desc">Configure alerts and reminders</div>
+                                <div style="font-weight: bold;" id="email-settings-title">Email Settings</div>
+                                <div style="font-size: 12px; color: #666;" id="email-settings-desc">Configure EmailJS for notifications</div>
                             </div>
                         </div>
                         <span style="color: #999;">›</span>
                     </div>
+
+                    <div class="settings-item" onclick="openBookingLink()">
+                        <div style="display: flex; align-items: center;">
+                            <div class="settings-icon">🔗</div>
+                            <div>
+                                <div style="font-weight: bold;" id="booking-link-title">Booking Link</div>
+                                <div style="font-size: 12px; color: #666;" id="booking-link-desc">Share your custom booking URL</div>
+                            </div>
+                        </div>
+                        <span style="color: #999;">›</span>
+                    </div>
+
+                    <div class="settings-item" onclick="openCancellationPolicy()">
+                        <div style="display: flex; align-items: center;">
+                            <div class="settings-icon">⚠️</div>
+                            <div>
+                                <div style="font-weight: bold;" id="cancel-policy-title">Cancellation Policy</div>
+                                <div style="font-size: 12px; color: #666;" id="cancel-policy-desc">Set minimum notice period for changes</div>
+                            </div>
+                        </div>
+                        <span style="color: #999;">›</span>
+                    </div>
+
 
                     <div class="settings-item" onclick="openPayments()">
                         <div style="display: flex; align-items: center;">
@@ -1100,16 +1652,6 @@
                         <span style="color: #999;">›</span>
                     </div>
 
-                    <div class="settings-item" onclick="openPolicies()">
-                        <div style="display: flex; align-items: center;">
-                            <div class="settings-icon">📋</div>
-                            <div>
-                                <div style="font-weight: bold;" id="policy-title">Policies</div>
-                                <div style="font-size: 12px; color: #666;" id="policy-desc">Cancellation and booking policies</div>
-                            </div>
-                        </div>
-                        <span style="color: #999;">›</span>
-                    </div>
 
                     <div class="settings-item" onclick="openHelp()">
                         <div style="display: flex; align-items: center;">
@@ -1232,7 +1774,86 @@
                     sat: '周六',
                     sun: '周日'
                 },
-                closed: '休息'
+                closed: '休息',
+                ownerBookingTitle: '创建预约',
+                selectService: '选择服务',
+                chooseService: '选择服务...',
+                custom: '自定义',
+                customerName: '客户姓名',
+                customerPhone: '电话（可选）',
+                customerEmail: '邮箱（可选）',
+                bookingDate: '日期',
+                startTime: '开始时间',
+                endTime: '结束时间',
+                startDate: '开始日期',
+                endDate: '结束日期',
+                createBooking: '创建预约',
+                cancel: '取消',
+                timeOffTitle: '休假时间',
+                timeOffLabel: '我需要休假',
+                timeOffStartDate: '开始日期',
+                timeOffStartTime: '开始时间',
+                timeOffEndDate: '结束日期',
+                timeOffEndTime: '结束时间',
+                timeOffReason: '原因（可选）',
+                saveTimeOff: '保存休假',
+                clearTimeOff: '清除休假',
+                bookingLinkTitle: '预约链接',
+                bookingLinkDesc: '分享您的自定义预约网址',
+                bookingLinkModalTitle: '预约链接',
+                bookingLinkIntro: '创建一个自定义网址，客户可以使用它来预约。',
+                cancelPolicyTitle: '取消政策',
+                cancelPolicyDesc: '设置更改的最短通知期',
+                cancelPolicyModalTitle: '取消政策',
+                cancelPolicyIntro: '设置客户取消或重新安排预约所需的最短通知期。',
+                minNoticeLabel: '最短通知期（小时）：',
+                policyHint: '输入0允许随时取消，或最多168小时（1周）',
+                // Email Settings translations
+                emailSettingsTitle: '邮件通知',
+                emailSettingsDesc: '管理客户邮件通知',
+                emailSettingsModalTitle: '邮件通知',
+                emailSettingsIntro: '选择向客户发送哪些邮件通知。',
+                emailMainToggleLabel: '发送邮件通知',
+                emailMainToggleDesc: '自动向客户发送预约相关通知',
+                emailConfirmationLabel: '预约确认',
+                emailConfirmationDesc: '当预约创建时发送',
+                emailRescheduleLabel: '改期通知',
+                emailRescheduleDesc: '当预约改期时发送',
+                emailCancellationLabel: '取消通知',
+                emailCancellationDesc: '当预约取消时发送',
+                saveEmailSettingsBtn: '保存设置',
+                cancelEmailSettingsBtn: '取消',
+                // Profile Modal translations
+                profileModalTitle: '商家资料',
+                profileModalIntro: '管理您的商家信息，这些信息将显示在电子邮件和客户通信中。',
+                labelFirstName: '名字',
+                labelLastName: '姓氏',
+                labelOwnerPhone: '电话号码',
+                labelOwnerEmail: '电子邮件',
+                labelWechat: '微信号',
+                labelStoreName: '店铺名称',
+                labelStoreAddress: '店铺地址',
+                profileSuccessMsg: '资料保存成功！',
+                saveProfileBtn: '保存资料',
+                cancelBtn: '取消',
+                optional: '（可选）',
+                policyPreviewTitle: '政策预览：',
+                policyImportant: '重要提示：',
+                policyNote1: '此政策仅适用于客户发起的更改',
+                policyNote2: '您仍然可以随时修改或取消预约',
+                policyNote3: '客户在预约时会看到此政策',
+                savePolicyBtn: '保存政策',
+                urlLabel: '您的自定义网址',
+                checkAvailability: '检查可用性',
+                yourBookingLink: '您的预约链接：',
+                copyBtn: '复制',
+                qrCodeTitle: '二维码',
+                saveUrl: '保存网址',
+                urlAvailable: '网址可用！',
+                urlTaken: '此网址已被使用',
+                urlSaved: '网址已保存成功！',
+                minChars: '至少需要3个字符',
+                invalidFormat: '只能使用小写字母、数字和连字符'
             },
             en: {
                 appTitle: 'Shop Management',
@@ -1286,7 +1907,86 @@
                     sat: 'Sat',
                     sun: 'Sun'
                 },
-                closed: 'Closed'
+                closed: 'Closed',
+                ownerBookingTitle: 'Create Booking',
+                selectService: 'Select Service',
+                chooseService: 'Choose a service...',
+                custom: 'Custom',
+                customerName: 'Customer Name',
+                customerPhone: 'Phone (Optional)',
+                customerEmail: 'Email (Optional)',
+                bookingDate: 'Date',
+                startTime: 'Start Time',
+                endTime: 'End Time',
+                startDate: 'Start Date',
+                endDate: 'End Date',
+                createBooking: 'Create Booking',
+                cancel: 'Cancel',
+                timeOffTitle: 'Time Off',
+                timeOffLabel: 'I need to take time off',
+                timeOffStartDate: 'Start Date',
+                timeOffStartTime: 'Start Time',
+                timeOffEndDate: 'End Date',
+                timeOffEndTime: 'End Time',
+                timeOffReason: 'Reason (optional)',
+                saveTimeOff: 'Save Time Off',
+                clearTimeOff: 'Clear Time Off',
+                bookingLinkTitle: 'Booking Link',
+                bookingLinkDesc: 'Share your custom booking URL',
+                bookingLinkModalTitle: 'Booking Link',
+                bookingLinkIntro: 'Create a custom URL that customers can use to book appointments with you.',
+                cancelPolicyTitle: 'Cancellation Policy',
+                cancelPolicyDesc: 'Set minimum notice period for changes',
+                cancelPolicyModalTitle: 'Cancellation Policy',
+                cancelPolicyIntro: 'Set the minimum notice period required for customers to cancel or reschedule appointments.',
+                minNoticeLabel: 'Minimum Notice Period (hours):',
+                policyHint: 'Enter 0 to allow cancellations anytime, or up to 168 hours (1 week)',
+                // Email Settings translations
+                emailSettingsTitle: 'Email Notifications',
+                emailSettingsDesc: 'Manage customer email notifications',
+                emailSettingsModalTitle: 'Email Notifications',
+                emailSettingsIntro: 'Choose which email notifications to send to your customers.',
+                emailMainToggleLabel: 'Send email notifications',
+                emailMainToggleDesc: 'Automatically notify customers about their appointments',
+                emailConfirmationLabel: 'Booking confirmations',
+                emailConfirmationDesc: 'Send when appointments are booked',
+                emailRescheduleLabel: 'Reschedule notifications',
+                emailRescheduleDesc: 'Send when appointments are rescheduled',
+                emailCancellationLabel: 'Cancellation notices',
+                emailCancellationDesc: 'Send when appointments are cancelled',
+                saveEmailSettingsBtn: 'Save Settings',
+                cancelEmailSettingsBtn: 'Cancel',
+                // Profile Modal translations
+                profileModalTitle: 'Business Profile',
+                profileModalIntro: 'Manage your business information that will appear in emails and customer communications.',
+                labelFirstName: 'First Name',
+                labelLastName: 'Last Name',
+                labelOwnerPhone: 'Phone Number',
+                labelOwnerEmail: 'Email',
+                labelWechat: 'WeChat ID',
+                labelStoreName: 'Store Name',
+                labelStoreAddress: 'Store Address',
+                profileSuccessMsg: 'Profile saved successfully!',
+                saveProfileBtn: 'Save Profile',
+                cancelBtn: 'Cancel',
+                optional: '(optional)',
+                policyPreviewTitle: 'Policy Preview:',
+                policyImportant: 'Important:',
+                policyNote1: 'This policy applies to customer-initiated changes only',
+                policyNote2: 'You can still modify or cancel appointments at any time',
+                policyNote3: 'Customers will see this policy when booking',
+                savePolicyBtn: 'Save Policy',
+                urlLabel: 'Your Custom URL',
+                checkAvailability: 'Check Availability',
+                yourBookingLink: 'Your Booking Link:',
+                copyBtn: 'Copy',
+                qrCodeTitle: 'QR Code',
+                saveUrl: 'Save URL',
+                urlAvailable: 'URL is available!',
+                urlTaken: 'This URL is already taken',
+                urlSaved: 'URL saved successfully!',
+                minChars: 'Minimum 3 characters required',
+                invalidFormat: 'Only lowercase letters, numbers, and hyphens allowed'
             }
         };
 
@@ -1393,14 +2093,123 @@
             if (headerClose2) headerClose2.textContent = isZh ? '结束' : 'Closes';
             if (headerClosed2) headerClosed2.textContent = t.closed;
 
+            // Owner Booking Modal
+            updateElement('owner-booking-title', t.ownerBookingTitle);
+            updateElement('label-service-selection', t.selectService);
+            updateElement('label-customer-name', t.customerName + (isZh ? ' *' : ' *'));
+            updateElement('label-customer-phone', t.customerPhone);
+            updateElement('label-customer-email', t.customerEmail);
+            updateElement('label-booking-date', t.bookingDate);
+            updateElement('label-start-time', t.startTime);
+            updateElement('label-end-time', t.endTime);
+            updateElement('label-start-date', t.startDate);
+            updateElement('label-end-date', t.endDate);
+
+            // Update button text
+            const createBookingBtn = document.querySelector('#owner-booking-modal .confirm-button');
+            if (createBookingBtn) createBookingBtn.textContent = t.createBooking;
+            const cancelBtn = document.querySelector('#owner-booking-modal .cancel-button');
+            if (cancelBtn) cancelBtn.textContent = t.cancel;
+
+            // Update dropdown placeholder
+            const serviceSelect = document.getElementById('owner-booking-service');
+            if (serviceSelect && serviceSelect.options[0]) {
+                serviceSelect.options[0].textContent = t.chooseService;
+            }
+            // Update Custom option text
+            if (serviceSelect && serviceSelect.options[serviceSelect.options.length - 1]) {
+                serviceSelect.options[serviceSelect.options.length - 1].textContent = t.custom;
+            }
+
             const saveHoursBtn = document.getElementById('save-hours-btn');
             if (saveHoursBtn) saveHoursBtn.textContent = isZh ? '保存时间' : 'Save Hours';
+
+            // Time Off section translations
+            updateElement('time-off-title', t.timeOffTitle);
+            updateElement('time-off-label', t.timeOffLabel);
+            updateElement('time-off-start-date-label', t.timeOffStartDate);
+            updateElement('time-off-start-time-label', t.timeOffStartTime);
+            updateElement('time-off-end-date-label', t.timeOffEndDate);
+            updateElement('time-off-end-time-label', t.timeOffEndTime);
+            updateElement('time-off-reason-label', t.timeOffReason);
+            const saveTimeOffBtn = document.getElementById('save-time-off-btn');
+            if (saveTimeOffBtn) saveTimeOffBtn.textContent = t.saveTimeOff;
+            const clearTimeOffBtn = document.getElementById('clear-time-off-btn');
+            if (clearTimeOffBtn) clearTimeOffBtn.textContent = t.clearTimeOff;
+            const reasonInput = document.getElementById('time-off-reason');
+            if (reasonInput) {
+                reasonInput.placeholder = isZh ? '例如：休假，个人时间' : 'e.g., Vacation, Personal time';
+            }
 
             // Settings items
             updateElement('profile-title', isZh ? '个人资料' : 'Profile');
             updateElement('profile-desc', isZh ? '管理您的商家信息' : 'Manage your business information');
-            updateElement('notif-title', isZh ? '通知' : 'Notifications');
-            updateElement('notif-desc', isZh ? '配置提醒和通知' : 'Configure alerts and reminders');
+            updateElement('email-settings-title', t.emailSettingsTitle);
+            updateElement('email-settings-desc', t.emailSettingsDesc);
+            updateElement('booking-link-title', t.bookingLinkTitle);
+            updateElement('booking-link-desc', t.bookingLinkDesc);
+            updateElement('cancel-policy-title', t.cancelPolicyTitle);
+            updateElement('cancel-policy-desc', t.cancelPolicyDesc);
+            // Booking Link Modal translations
+            updateElement('booking-link-modal-title', t.bookingLinkModalTitle);
+            updateElement('booking-link-intro', t.bookingLinkIntro);
+            updateElement('url-label', t.urlLabel);
+            updateElement('cancel-booking-link-btn', t.cancelBtn);
+
+            // Cancellation Policy Modal translations
+            updateElement('cancel-policy-modal-title', t.cancelPolicyModalTitle);
+            updateElement('cancel-policy-intro', t.cancelPolicyIntro);
+            updateElement('min-notice-label', t.minNoticeLabel);
+            updateElement('policy-hint', t.policyHint);
+            updateElement('policy-preview-title', t.policyPreviewTitle);
+            updateElement('policy-important', t.policyImportant);
+            updateElement('policy-note1', t.policyNote1);
+            updateElement('policy-note2', t.policyNote2);
+            updateElement('policy-note3', t.policyNote3);
+            
+            // Email Settings Modal translations
+            updateElement('email-settings-modal-title', t.emailSettingsModalTitle);
+            updateElement('email-settings-intro', t.emailSettingsIntro);
+            updateElement('email-main-toggle-label', t.emailMainToggleLabel);
+            updateElement('email-main-toggle-desc', t.emailMainToggleDesc);
+            updateElement('email-confirmation-label', t.emailConfirmationLabel);
+            updateElement('email-confirmation-desc', t.emailConfirmationDesc);
+            updateElement('email-reschedule-label', t.emailRescheduleLabel);
+            updateElement('email-reschedule-desc', t.emailRescheduleDesc);
+            updateElement('email-cancellation-label', t.emailCancellationLabel);
+            updateElement('email-cancellation-desc', t.emailCancellationDesc);
+            updateElement('save-email-settings-btn', t.saveEmailSettingsBtn);
+            updateElement('cancel-email-settings-btn', t.cancelEmailSettingsBtn);
+            
+            // Profile Modal translations
+            updateElement('profile-modal-title', t.profileModalTitle);
+            updateElement('profile-modal-intro', t.profileModalIntro);
+            updateElement('label-first-name', t.labelFirstName);
+            updateElement('label-last-name', t.labelLastName);
+            updateElement('label-owner-phone', t.labelOwnerPhone);
+            updateElement('label-owner-email', t.labelOwnerEmail);
+            updateElement('label-wechat', t.labelWechat);
+            updateElement('label-store-name', t.labelStoreName);
+            updateElement('label-store-address', t.labelStoreAddress);
+            updateElement('profile-success-msg', t.profileSuccessMsg);
+            updateElement('save-profile-btn', t.saveProfileBtn);
+            updateElement('cancel-profile-btn', t.cancelBtn);
+            
+            // Update optional labels in profile modal
+            document.querySelectorAll('#profile-modal span').forEach(span => {
+                if (span.style.color === '#999' || span.style.color === 'rgb(153, 153, 153)') {
+                    if (span.textContent.includes('optional') || span.textContent.includes('可选')) {
+                        span.textContent = t.optional;
+                    }
+                }
+            });
+            const savePolicyBtn = document.getElementById('save-policy-btn');
+            if (savePolicyBtn) savePolicyBtn.textContent = t.savePolicyBtn;
+            updateElement('check-availability-btn', t.checkAvailability);
+            updateElement('your-booking-link', t.yourBookingLink);
+            updateElement('copy-btn-text', t.copyBtn);
+            updateElement('qr-code-title', t.qrCodeTitle);
+            updateElement('save-url-btn', t.saveUrl);
             updateElement('payment-title', isZh ? '支付方式' : 'Payment Methods');
             updateElement('payment-desc', isZh ? '管理接受的支付选项' : 'Manage accepted payment options');
             updateElement('policy-title', isZh ? '政策' : 'Policies');
@@ -1448,7 +2257,7 @@
 
             // Update "Add period" buttons
             document.querySelectorAll('.add-period-btn').forEach(btn => {
-                btn.textContent = isZh ? '+ 添加时段' : '+ Add period';
+                btn.textContent = isZh ? '添加时段' : 'Add period';
             });
 
             // Update service names in the Store tab (these are input placeholders)
@@ -1642,6 +2451,13 @@
             const hours = SharedData.getStoreHours();
             const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
+            // Also check for existing time off
+            const timeOff = localStorage.getItem('timeOff');
+            if (timeOff) {
+                document.getElementById('time-off-enabled').checked = true;
+                toggleTimeOff();
+            }
+
             days.forEach(day => {
                 const dayHours = hours[day];
                 const openInput = document.getElementById(`${day}-open`);
@@ -1704,6 +2520,472 @@
 
             SharedData.saveStoreHours(hours);
             showMessage('Store hours saved successfully!', 'success');
+        }
+
+        // Time Off Management Functions
+        function toggleTimeOff() {
+            const checkbox = document.getElementById('time-off-enabled');
+            const fields = document.getElementById('time-off-fields');
+            fields.style.display = checkbox.checked ? 'block' : 'none';
+
+            if (checkbox.checked) {
+                // Load existing time off if any
+                loadTimeOff();
+            }
+        }
+
+        function loadTimeOff() {
+            const timeOff = localStorage.getItem('timeOff');
+            if (timeOff) {
+                const data = JSON.parse(timeOff);
+                document.getElementById('time-off-start-date').value = data.startDate || '';
+                document.getElementById('time-off-start-time').value = data.startTime || '';
+                document.getElementById('time-off-end-date').value = data.endDate || '';
+                document.getElementById('time-off-end-time').value = data.endTime || '';
+                document.getElementById('time-off-reason').value = data.reason || '';
+                document.getElementById('clear-time-off-btn').style.display = 'inline-block';
+            }
+        }
+
+        function saveTimeOff() {
+            const startDate = document.getElementById('time-off-start-date').value;
+            const startTime = document.getElementById('time-off-start-time').value;
+            const endDate = document.getElementById('time-off-end-date').value;
+            const endTime = document.getElementById('time-off-end-time').value;
+            const reason = document.getElementById('time-off-reason').value.trim();
+
+            // Validation
+            if (!startDate || !startTime || !endDate || !endTime) {
+                alert(isZh ? '请填写所有时间字段' : 'Please fill in all time fields');
+                return;
+            }
+
+            // Check end is after start
+            const start = new Date(`${startDate}T${startTime}`);
+            const end = new Date(`${endDate}T${endTime}`);
+
+            if (end <= start) {
+                alert(isZh ? '结束时间必须晚于开始时间' : 'End time must be after start time');
+                return;
+            }
+
+            // Save time off data
+            const timeOffData = {
+                startDate,
+                startTime,
+                endDate,
+                endTime,
+                reason: reason || 'Time Off',
+                createdAt: new Date().toISOString()
+            };
+
+            localStorage.setItem('timeOff', JSON.stringify(timeOffData));
+
+            // Create blocked times for the entire period
+            createTimeOffBlocks(timeOffData);
+
+            // Show success message
+            const messageDiv = document.getElementById('time-off-message');
+            messageDiv.textContent = isZh ? '休假时间已保存' : 'Time off has been saved';
+            messageDiv.style.background = '#e8f5e9';
+            messageDiv.style.color = '#4CAF50';
+            messageDiv.style.display = 'block';
+
+            document.getElementById('clear-time-off-btn').style.display = 'inline-block';
+
+            // Trigger storage event for customer app
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: 'timeOff',
+                newValue: JSON.stringify(timeOffData),
+                url: window.location.href
+            }));
+
+            // Refresh calendar
+            loadAppointments();
+            generateWeeklyCalendar();
+
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        function createTimeOffBlocks(timeOffData) {
+            // Clear existing time off blocks
+            clearExistingTimeOffBlocks();
+
+            const startDate = new Date(timeOffData.startDate + 'T00:00:00');
+            const endDate = new Date(timeOffData.endDate + 'T23:59:59');
+            const currentDate = new Date(startDate);
+
+            const blocks = [];
+            while (currentDate <= endDate) {
+                const dateStr = currentDate.toISOString().split('T')[0];
+
+                // Determine start and end times for this day
+                let dayStartTime = '00:00';
+                let dayEndTime = '23:59';
+
+                // If it's the first day, use the specified start time
+                if (currentDate.toDateString() === startDate.toDateString()) {
+                    dayStartTime = timeOffData.startTime;
+                }
+
+                // If it's the last day, use the specified end time
+                if (currentDate.toDateString() === endDate.toDateString()) {
+                    dayEndTime = timeOffData.endTime;
+                }
+
+                // Create a blocked time for this day
+                blocks.push({
+                    date: dateStr,
+                    startTime: dayStartTime,
+                    endTime: dayEndTime,
+                    reason: timeOffData.reason,
+                    isTimeOff: true
+                });
+
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+
+            // Save all blocks
+            blocks.forEach(block => {
+                SharedData.saveBlockedTime(block);
+            });
+        }
+
+        function clearExistingTimeOffBlocks() {
+            const blockedTimes = SharedData.getBlockedTimes();
+            const nonTimeOffBlocks = blockedTimes.filter(block => !block.isTimeOff);
+            localStorage.setItem('blockedTimes', JSON.stringify(nonTimeOffBlocks));
+        }
+
+        function clearTimeOff() {
+            if (confirm(isZh ? '确定要清除休假时间吗？' : 'Are you sure you want to clear time off?')) {
+                localStorage.removeItem('timeOff');
+                clearExistingTimeOffBlocks();
+
+                // Clear form
+                document.getElementById('time-off-start-date').value = '';
+                document.getElementById('time-off-start-time').value = '';
+                document.getElementById('time-off-end-date').value = '';
+                document.getElementById('time-off-end-time').value = '';
+                document.getElementById('time-off-reason').value = '';
+                document.getElementById('time-off-enabled').checked = false;
+                document.getElementById('time-off-fields').style.display = 'none';
+                document.getElementById('clear-time-off-btn').style.display = 'none';
+
+                // Show message
+                const messageDiv = document.getElementById('time-off-message');
+                messageDiv.textContent = isZh ? '休假时间已清除' : 'Time off has been cleared';
+                messageDiv.style.background = '#fff3cd';
+                messageDiv.style.color = '#856404';
+                messageDiv.style.display = 'block';
+
+                // Trigger storage event
+                window.dispatchEvent(new StorageEvent('storage', {
+                    key: 'timeOff',
+                    newValue: null,
+                    url: window.location.href
+                }));
+
+                // Refresh calendar
+                loadAppointments();
+                generateWeeklyCalendar();
+
+                setTimeout(() => {
+                    messageDiv.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        // Booking Link Management Functions
+        function openBookingLink() {
+            document.getElementById('booking-link-modal').style.display = 'flex';
+
+            // Load existing URL if saved
+            const savedUrl = localStorage.getItem('bookingUrl');
+            if (savedUrl) {
+                const urlData = JSON.parse(savedUrl);
+                document.getElementById('custom-url-slug').value = urlData.slug;
+                document.getElementById('full-url').value = `mycompany.com/${urlData.slug}`;
+                document.getElementById('url-display').style.display = 'block';
+                document.getElementById('qr-code-section').style.display = 'block';
+                document.getElementById('save-url-btn').disabled = false;
+                document.getElementById('url-success').textContent = isZh ? '网址已保存' : 'URL saved';
+                document.getElementById('url-success').style.display = 'block';
+            }
+        }
+
+        function closeBookingLinkModal() {
+            document.getElementById('booking-link-modal').style.display = 'none';
+        }
+
+        function validateUrlSlug() {
+            const slug = document.getElementById('custom-url-slug').value;
+            const errorDiv = document.getElementById('url-error');
+            const successDiv = document.getElementById('url-success');
+            const saveBtn = document.getElementById('save-url-btn');
+
+            // Reset messages
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+
+            if (!slug) {
+                saveBtn.disabled = true;
+                return;
+            }
+
+            // Validate format (lowercase letters, numbers, hyphens only)
+            const validFormat = /^[a-z0-9-]+$/.test(slug);
+
+            if (!validFormat) {
+                errorDiv.textContent = isZh ? '只能使用小写字母、数字和连字符' : 'Only lowercase letters, numbers, and hyphens allowed';
+                errorDiv.style.display = 'block';
+                saveBtn.disabled = true;
+                return;
+            }
+
+            if (slug.length < 3) {
+                errorDiv.textContent = isZh ? '至少需要3个字符' : 'Minimum 3 characters required';
+                errorDiv.style.display = 'block';
+                saveBtn.disabled = true;
+                return;
+            }
+
+            // Enable check availability button if valid
+            document.getElementById('check-availability-btn').disabled = false;
+        }
+
+        function checkUrlAvailability() {
+            const slug = document.getElementById('custom-url-slug').value;
+            const errorDiv = document.getElementById('url-error');
+            const successDiv = document.getElementById('url-success');
+            const saveBtn = document.getElementById('save-url-btn');
+
+            // Simulate checking availability (in production, this would be an API call)
+            // For demo, check against a mock list of taken URLs
+            const takenUrls = JSON.parse(localStorage.getItem('takenUrls') || '["example", "test", "demo"]');
+
+            if (takenUrls.includes(slug)) {
+                errorDiv.textContent = isZh ? '此网址已被使用' : 'This URL is already taken';
+                errorDiv.style.display = 'block';
+                successDiv.style.display = 'none';
+                saveBtn.disabled = true;
+            } else {
+                successDiv.textContent = isZh ? '网址可用！' : 'URL is available!';
+                successDiv.style.display = 'block';
+                errorDiv.style.display = 'none';
+                saveBtn.disabled = false;
+
+                // Show the full URL preview
+                const fullUrl = `mycompany.com/${slug}`;
+                document.getElementById('full-url').value = fullUrl;
+                document.getElementById('url-display').style.display = 'block';
+                document.getElementById('qr-code-section').style.display = 'block';
+            }
+        }
+
+        function saveBookingUrl() {
+            const slug = document.getElementById('custom-url-slug').value;
+
+            // Save to localStorage
+            const urlData = {
+                slug: slug,
+                createdAt: new Date().toISOString()
+            };
+            localStorage.setItem('bookingUrl', JSON.stringify(urlData));
+
+            // Add to taken URLs list
+            const takenUrls = JSON.parse(localStorage.getItem('takenUrls') || '[]');
+            if (!takenUrls.includes(slug)) {
+                takenUrls.push(slug);
+                localStorage.setItem('takenUrls', JSON.stringify(takenUrls));
+            }
+
+            // Show success message
+            const successDiv = document.getElementById('url-success');
+            successDiv.textContent = isZh ? '网址已保存成功！' : 'URL saved successfully!';
+            successDiv.style.display = 'block';
+
+            setTimeout(() => {
+                closeBookingLinkModal();
+            }, 1500);
+        }
+
+        function copyToClipboard() {
+            const urlInput = document.getElementById('full-url');
+            urlInput.select();
+            document.execCommand('copy');
+
+            // Show feedback
+            const feedback = document.getElementById('copy-feedback');
+            const btnText = document.getElementById('copy-btn-text');
+
+            feedback.style.display = 'block';
+            btnText.textContent = isZh ? '已复制' : 'Copied';
+
+            setTimeout(() => {
+                feedback.style.display = 'none';
+                btnText.textContent = isZh ? '复制' : 'Copy';
+            }, 2000);
+        }
+
+        // Cancellation Policy Functions
+        function openCancellationPolicy() {
+            document.getElementById('cancellation-policy-modal').style.display = 'flex';
+
+            // Load existing policy
+            const policy = JSON.parse(localStorage.getItem('cancellationPolicy') || '{}');
+            const hoursInput = document.getElementById('min-notice-hours');
+
+            if (policy.minNoticeHours !== undefined) {
+                hoursInput.value = policy.minNoticeHours;
+                updatePolicyPreview();
+            }
+
+            // Add event listener for live preview
+            hoursInput.addEventListener('input', updatePolicyPreview);
+        }
+
+        function closeCancellationPolicy() {
+            document.getElementById('cancellation-policy-modal').style.display = 'none';
+        }
+
+        function updatePolicyPreview() {
+            const hours = parseInt(document.getElementById('min-notice-hours').value) || 0;
+            const previewDiv = document.getElementById('policy-preview');
+            const previewText = document.getElementById('policy-preview-text');
+
+            if (hours > 0) {
+                previewDiv.style.display = 'block';
+                let text;
+                if (hours === 1) {
+                    text = isZh ? '客户必须在预约前至少1小时取消或更改' : 'Customers must cancel or reschedule at least 1 hour before their appointment';
+                } else if (hours < 24) {
+                    text = isZh ? `客户必须在预约前至少${hours}小时取消或更改` : `Customers must cancel or reschedule at least ${hours} hours before their appointment`;
+                } else if (hours === 24) {
+                    text = isZh ? '客户必须在预约前至少1天取消或更改' : 'Customers must cancel or reschedule at least 1 day before their appointment';
+                } else {
+                    const days = Math.floor(hours / 24);
+                    const remainingHours = hours % 24;
+                    if (remainingHours === 0) {
+                        text = isZh ? `客户必须在预约前至少${days}天取消或更改` : `Customers must cancel or reschedule at least ${days} days before their appointment`;
+                    } else {
+                        text = isZh ? `客户必须在预约前至少${days}天${remainingHours}小时取消或更改` : `Customers must cancel or reschedule at least ${days} days and ${remainingHours} hours before their appointment`;
+                    }
+                }
+                previewText.textContent = text;
+            } else {
+                previewDiv.style.display = 'block';
+                previewText.textContent = isZh ? '客户可以随时取消或更改预约' : 'Customers can cancel or reschedule appointments at any time';
+            }
+        }
+
+        function saveCancellationPolicy() {
+            const hours = parseInt(document.getElementById('min-notice-hours').value) || 0;
+
+            // Save policy
+            const policy = {
+                minNoticeHours: hours,
+                updatedAt: new Date().toISOString()
+            };
+            localStorage.setItem('cancellationPolicy', JSON.stringify(policy));
+
+            // Show success message
+            const messageDiv = document.getElementById('policy-message');
+            messageDiv.textContent = isZh ? '取消政策已保存！' : 'Cancellation policy saved!';
+            messageDiv.style.display = 'block';
+            messageDiv.style.background = '#4CAF50';
+            messageDiv.style.color = 'white';
+
+            setTimeout(() => {
+                closeCancellationPolicy();
+            }, 1500);
+        }
+
+        // Email Configuration Functions
+        function openEmailConfig() {
+            document.getElementById('email-config-modal').style.display = 'flex';
+
+            // Load existing configuration
+            const emailConfig = JSON.parse(localStorage.getItem('emailConfig') || '{}');
+            document.getElementById('email-business-name').value = emailConfig.businessName || '';
+            document.getElementById('emailjs-service-id').value = emailConfig.serviceId || '';
+            document.getElementById('emailjs-template-id').value = emailConfig.templateId || '';
+            document.getElementById('emailjs-public-key').value = emailConfig.publicKey || '';
+        }
+
+        function closeEmailConfig() {
+            document.getElementById('email-config-modal').style.display = 'none';
+        }
+
+        function saveEmailConfig() {
+            const businessName = document.getElementById('email-business-name').value.trim();
+            const serviceId = document.getElementById('emailjs-service-id').value.trim();
+            const templateId = document.getElementById('emailjs-template-id').value.trim();
+            const publicKey = document.getElementById('emailjs-public-key').value.trim();
+
+            // Save configuration
+            const emailConfig = {
+                businessName: businessName,
+                serviceId: serviceId,
+                templateId: templateId,
+                publicKey: publicKey,
+                configuredAt: new Date().toISOString()
+            };
+
+            localStorage.setItem('emailConfig', JSON.stringify(emailConfig));
+
+            // Update EmailJS initialization in customer app
+            if (publicKey) {
+                // Store for customer app to use
+                localStorage.setItem('emailjsPublicKey', publicKey);
+            }
+
+            alert(isZh ? '邮件配置已保存！' : 'Email configuration saved!');
+            closeEmailConfig();
+        }
+
+        function testEmailConfig() {
+            const testEmail = prompt(isZh ? '输入测试邮箱地址:' : 'Enter test email address:');
+            if (!testEmail) return;
+
+            const serviceId = document.getElementById('emailjs-service-id').value.trim();
+            const templateId = document.getElementById('emailjs-template-id').value.trim();
+            const publicKey = document.getElementById('emailjs-public-key').value.trim();
+            const businessName = document.getElementById('email-business-name').value.trim() || 'Your Hair Salon';
+
+            if (!serviceId || !templateId || !publicKey) {
+                alert(isZh ? '请先填写所有EmailJS配置' : 'Please fill in all EmailJS configuration first');
+                return;
+            }
+
+            // Create test appointment data
+            const testAppointment = {
+                id: 'TEST123',
+                customerName: 'Test Customer',
+                customerEmail: testEmail,
+                customerPhone: '(555) 123-4567',
+                services: ['test-service'],
+                serviceNames: ['Test Service'],
+                date: '2025-09-25',
+                time: '14:00',
+                totalDuration: 30,
+                totalPrice: 50
+            };
+
+            // Test send
+            const resultSpan = document.getElementById('test-result');
+            resultSpan.textContent = isZh ? '发送中...' : 'Sending...';
+            resultSpan.style.color = '#2196F3';
+
+            // Try to send test email
+            SharedData.sendConfirmationEmail(testAppointment);
+
+            setTimeout(() => {
+                resultSpan.textContent = isZh ? '测试邮件已发送！请检查收件箱。' : 'Test email sent! Check your inbox.';
+                resultSpan.style.color = '#4CAF50';
+            }, 2000);
         }
 
         function validateActivePeriods(periods, duration) {
@@ -1972,7 +3254,199 @@
 
         // Settings page functions
         function openProfile() {
-            alert(isZh ? '个人资料页面' : 'Profile page');
+            // Load existing profile data
+            const profile = JSON.parse(localStorage.getItem('ownerProfile') || '{}');
+            
+            // Populate form fields
+            document.getElementById('owner-first-name').value = profile.firstName || '';
+            document.getElementById('owner-last-name').value = profile.lastName || '';
+            document.getElementById('owner-phone').value = profile.phone || '';
+            document.getElementById('owner-email').value = profile.email || '';
+            document.getElementById('owner-wechat').value = profile.wechatId || '';
+            document.getElementById('store-name').value = profile.storeName || 'Premium Cuts Barbershop';
+            document.getElementById('store-address').value = profile.storeAddress || '';
+            
+            // Show modal
+            document.getElementById('profile-modal').style.display = 'flex';
+        }
+
+        function closeProfileModal() {
+            document.getElementById('profile-modal').style.display = 'none';
+            document.getElementById('profile-success').style.display = 'none';
+        }
+
+        // Phone formatting for owner profile
+        function formatOwnerPhone(value) {
+            // Remove all non-digits
+            const cleaned = value.replace(/\D/g, '');
+            
+            // Format as (XXX) XXX-XXXX
+            if (cleaned.length <= 3) {
+                return cleaned;
+            } else if (cleaned.length <= 6) {
+                return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+            } else {
+                return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+            }
+        }
+
+        // Email validation for owner profile
+        function validateOwnerEmail() {
+            const emailInput = document.getElementById('owner-email');
+            const errorDiv = document.getElementById('owner-email-error');
+            
+            if (emailInput.value && !isValidEmail(emailInput.value)) {
+                errorDiv.textContent = isZh ? '请输入有效的电子邮件地址' : 'Please enter a valid email address';
+                errorDiv.style.display = 'block';
+                return false;
+            } else {
+                errorDiv.style.display = 'none';
+                return true;
+            }
+        }
+
+        function isValidEmail(email) {
+            return email.includes('@') && email.indexOf('@') > 0 && email.indexOf('@') < email.length - 1;
+        }
+
+        function isValidPhone(phone) {
+            const cleaned = phone.replace(/\D/g, '');
+            return cleaned.length === 10;
+        }
+
+        function saveOwnerProfile() {
+            const firstName = document.getElementById('owner-first-name').value.trim();
+            const lastName = document.getElementById('owner-last-name').value.trim();
+            const phone = document.getElementById('owner-phone').value.trim();
+            const email = document.getElementById('owner-email').value.trim();
+            const wechatId = document.getElementById('owner-wechat').value.trim();
+            const storeName = document.getElementById('store-name').value.trim();
+            const storeAddress = document.getElementById('store-address').value.trim();
+
+            // Validation
+            if (!firstName) {
+                alert(isZh ? '请输入名字' : 'Please enter first name');
+                return;
+            }
+            if (!lastName) {
+                alert(isZh ? '请输入姓氏' : 'Please enter last name');
+                return;
+            }
+            if (!storeName) {
+                alert(isZh ? '请输入店铺名称' : 'Please enter store name');
+                return;
+            }
+            if (!storeAddress) {
+                alert(isZh ? '请输入店铺地址' : 'Please enter store address');
+                return;
+            }
+            
+            // Validate phone if provided
+            if (phone && !isValidPhone(phone)) {
+                document.getElementById('owner-phone-error').textContent = 
+                    isZh ? '请输入有效的10位电话号码' : 'Please enter a valid 10-digit phone number';
+                document.getElementById('owner-phone-error').style.display = 'block';
+                return;
+            }
+            
+            // Validate email if provided
+            if (email && !isValidEmail(email)) {
+                document.getElementById('owner-email-error').textContent = 
+                    isZh ? '请输入有效的电子邮件地址' : 'Please enter a valid email address';
+                document.getElementById('owner-email-error').style.display = 'block';
+                return;
+            }
+
+            // Save profile
+            const profile = {
+                firstName,
+                lastName,
+                phone,
+                email,
+                wechatId,
+                storeName,
+                storeAddress,
+                updatedAt: new Date().toISOString()
+            };
+            
+            localStorage.setItem('ownerProfile', JSON.stringify(profile));
+            
+            // Show success message
+            document.getElementById('profile-success').style.display = 'block';
+            
+            // Hide success message after 2 seconds and close modal
+            setTimeout(() => {
+                closeProfileModal();
+            }, 2000);
+        }
+
+        function openEmailSettings() {
+            // Load owner's email preferences
+            const emailPrefs = JSON.parse(localStorage.getItem('emailPreferences') || '{}');
+            const adminConfig = JSON.parse(localStorage.getItem('emailConfig') || '{}');
+
+            // Set main toggle state
+            const isEnabled = emailPrefs.enabled !== false; // Default to true
+            document.getElementById('email-notifications-enabled').checked = isEnabled;
+
+            // Set sub-option states (default all to true if not set)
+            document.getElementById('email-confirmations').checked = emailPrefs.confirmations !== false;
+            document.getElementById('email-reschedules').checked = emailPrefs.reschedules !== false;
+            document.getElementById('email-cancellations').checked = emailPrefs.cancellations !== false;
+
+            // Show/hide sub-options based on main toggle
+            toggleEmailNotifications();
+
+            // Check admin configuration status
+            const statusDiv = document.getElementById('email-config-status');
+            if (adminConfig.serviceId && adminConfig.publicKey && adminConfig.templateId) {
+                statusDiv.innerHTML = `
+                    <div style="background: #E8F5E9; color: #2E7D32; padding: 10px; border-radius: 6px;">
+                        ✅ <span id="email-status-ready">${isZh ? '邮件服务已配置并就绪' : 'Email service is configured and ready'}</span>
+                    </div>
+                `;
+            } else {
+                statusDiv.innerHTML = `
+                    <div style="background: #FFF3E0; color: #E65100; padding: 10px; border-radius: 6px;">
+                        ⚠️ <span id="email-status-not-configured">${isZh ? '邮件服务未配置。请联系管理员设置EmailJS。' : 'Email service not configured. Contact your administrator to set up EmailJS.'}</span>
+                    </div>
+                `;
+            }
+
+            // Show modal
+            document.getElementById('email-settings-modal').style.display = 'flex';
+        }
+
+        function toggleEmailNotifications() {
+            const isEnabled = document.getElementById('email-notifications-enabled').checked;
+            const subOptions = document.getElementById('email-sub-options');
+            subOptions.style.display = isEnabled ? 'block' : 'none';
+        }
+
+        function closeEmailSettings() {
+            document.getElementById('email-settings-modal').style.display = 'none';
+            document.getElementById('email-settings-success').style.display = 'none';
+        }
+
+        function saveEmailSettings() {
+            // Save owner's preferences
+            const emailPrefs = {
+                enabled: document.getElementById('email-notifications-enabled').checked,
+                confirmations: document.getElementById('email-confirmations').checked,
+                reschedules: document.getElementById('email-reschedules').checked,
+                cancellations: document.getElementById('email-cancellations').checked,
+                updatedAt: new Date().toISOString()
+            };
+
+            localStorage.setItem('emailPreferences', JSON.stringify(emailPrefs));
+
+            // Show success message
+            document.getElementById('email-settings-success').style.display = 'block';
+
+            // Hide success message after 2 seconds and close modal
+            setTimeout(() => {
+                closeEmailSettings();
+            }, 2000);
         }
 
         function openNotifications() {
@@ -2292,7 +3766,7 @@
                             <div class="active-periods-list" id="periods-${serviceId}">
                                 ${activePeriodsHtml}
                             </div>
-                            <button onclick="addPeriodToService('${serviceId}')" style="margin-top: 5px; padding: 3px 8px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">+ Add period</button>
+                            <button onclick="addPeriodToService('${serviceId}')" style="margin-top: 5px; padding: 3px 8px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">Add period</button>
                         </div>
                     </div>
                 </div>
@@ -2403,6 +3877,27 @@
                     slot.className = 'time-slot';
                     slot.dataset.hour = hour;
                     slot.dataset.day = day;
+
+                    // Create 4 sub-slots for 15-minute intervals
+                    for (let quarter = 0; quarter < 4; quarter++) {
+                        const subSlot = document.createElement('div');
+                        subSlot.style.cssText = 'position: absolute; left: 0; right: 0; height: 25%; cursor: pointer;';
+                        subSlot.style.top = `${quarter * 25}%`;
+                        subSlot.dataset.minutes = quarter * 15;
+
+                        // Add click handler for creating bookings at 15-minute intervals
+                        subSlot.addEventListener('click', function(e) {
+                            // Don't open if clicking on an existing appointment or blocked time
+                            if (!e.target.closest('.appointment-block') && !e.target.closest('.blocked-time-block')) {
+                                e.stopPropagation();
+                                const startMinutes = hour * 60 + quarter * 15;
+                                openOwnerBookingModal(day, Math.floor(startMinutes / 60), startMinutes % 60);
+                            }
+                        });
+
+                        slot.appendChild(subSlot);
+                    }
+
                     timeSlotsContainer.appendChild(slot);
                 }
             }
@@ -2501,14 +3996,16 @@
                         const blockHeight = (apt.totalDuration / 60) * heightPerHour;
                         block.style.height = `${blockHeight - 4}px`;
                         block.style.top = `${baseTopOffset + 2}px`;
-                        block.style.background = apt.activePeriods ? 'transparent' : serviceColor;
-                        block.style.color = apt.activePeriods ? serviceColor : 'white';
+                        block.style.background = (apt.activePeriods && apt.activePeriods.length > 0) ? 'transparent' : serviceColor;
+                        block.style.color = (apt.activePeriods && apt.activePeriods.length > 0) ? serviceColor : 'white';
 
-                        const translatedServices = apt.serviceNames.map(name => translateServiceName(name));
-                        block.innerHTML = `
-                            <div class="customer-name">${apt.customerName || 'Guest'}</div>
-                            <div class="service-name">${translatedServices.join(', ')}</div>
-                        `;
+                        // Set specific z-index for regular appointments to be above multi-period ones
+                        if (!apt.activePeriods || apt.activePeriods.length === 0) {
+                            block.style.zIndex = '6';
+                        }
+
+                        // Remove text from calendar blocks for cleaner appearance
+                        block.innerHTML = '';
 
                         // Make draggable
                         block.draggable = true;
@@ -2540,7 +4037,8 @@
             generateServiceLegend();
 
             // Setup blocking selection for the new time slots
-            setupBlockingSelection();
+            // Removed block time creation feature
+            // setupBlockingSelection();
 
             // Setup drag and drop for appointments
             setupDragAndDrop();
@@ -2579,26 +4077,33 @@
 
                         const startTimeStr = block.startTime;
                         const endTimeStr = block.endTime;
-                        blockedDiv.innerHTML = `<span style="font-size: 10px;">Blocked</span>`;
-                        blockedDiv.title = `${startTimeStr} - ${endTimeStr}\nClick to remove`;
+                        blockedDiv.innerHTML = '';
+                        blockedDiv.title = `${startTimeStr} - ${endTimeStr}`;
 
-                        // Add right-click to delete
-                        blockedDiv.addEventListener('contextmenu', (e) => {
-                            e.preventDefault();
-                            if (confirm(isZh ? '删除此屏蔽时间？' : 'Remove this blocked time?')) {
-                                SharedData.deleteBlockedTime(block.id);
-                                generateWeeklyCalendar();
-                            }
-                        });
+                        // Make draggable
+                        blockedDiv.draggable = true;
+                        blockedDiv.dataset.blockDate = block.date;
+                        blockedDiv.dataset.blockStart = block.startTime;
+                        blockedDiv.dataset.blockEnd = block.endTime;
+                        blockedDiv.dataset.blockReason = block.reason || 'Blocked by owner';
 
-                        // Add click to delete
+                        // Add click to show details
                         blockedDiv.addEventListener('click', (e) => {
                             e.stopPropagation();
-                            if (confirm(isZh ? '删除此屏蔽时间？' : 'Remove this blocked time?')) {
-                                SharedData.deleteBlockedTime(block.id);
-                                generateWeeklyCalendar();
-                            }
+                            showBlockedTimeDetails(block);
                         });
+
+                        // Add drag handlers
+                        blockedDiv.ondragstart = (e) => {
+                            e.dataTransfer.effectAllowed = 'move';
+                            e.dataTransfer.setData('blockId', block.id);
+                            e.dataTransfer.setData('blockType', 'blocked');
+                            blockedDiv.classList.add('dragging');
+                        };
+
+                        blockedDiv.ondragend = () => {
+                            blockedDiv.classList.remove('dragging');
+                        };
 
                         targetSlot.appendChild(blockedDiv);
                     }
@@ -2641,6 +4146,184 @@
 
                 touchStartX = null;
             });
+        }
+
+        // Check if creating a new appointment would create a conflict
+        function checkNewAppointmentConflict(newDate, newTime, duration, activePeriods = null) {
+            const appointments = SharedData.getAppointments();
+
+            // Parse the new time
+            const [newHour, newMin] = newTime.split(':').map(Number);
+            const newStartMinutes = newHour * 60 + newMin;
+            const newEndMinutes = newStartMinutes + duration;
+
+            // Check for conflicts with existing appointments
+            for (const apt of appointments) {
+                // Skip if different date
+                if (apt.date !== newDate) continue;
+
+                // Parse existing appointment time
+                const [aptHour, aptMin] = apt.time.split(':').map(Number);
+                const aptStartMinutes = aptHour * 60 + aptMin;
+                const aptEndMinutes = aptStartMinutes + apt.totalDuration;
+
+                // Check if there's an overlap in active time
+                if (apt.activePeriods && apt.activePeriods.length > 0) {
+                    // Check each active period for conflicts
+                    for (const period of apt.activePeriods) {
+                        const periodStart = aptStartMinutes + period.start;
+                        const periodEnd = aptStartMinutes + period.end;
+
+                        // Check if new appointment's active periods would overlap
+                        if (activePeriods && activePeriods.length > 0) {
+                            for (const newPeriod of activePeriods) {
+                                const newPeriodStart = newStartMinutes + newPeriod.start;
+                                const newPeriodEnd = newStartMinutes + newPeriod.end;
+
+                                // Check for overlap
+                                if (newPeriodStart < periodEnd && newPeriodEnd > periodStart) {
+                                    return true; // Conflict detected
+                                }
+                            }
+                        } else {
+                            // New appointment has no active periods, check full duration
+                            if (newStartMinutes < periodEnd && newEndMinutes > periodStart) {
+                                return true; // Conflict detected
+                            }
+                        }
+                    }
+                } else {
+                    // Existing appointment has no active periods, check full duration
+                    if (activePeriods && activePeriods.length > 0) {
+                        for (const newPeriod of activePeriods) {
+                            const newPeriodStart = newStartMinutes + newPeriod.start;
+                            const newPeriodEnd = newStartMinutes + newPeriod.end;
+
+                            // Check for overlap with full appointment
+                            if (newPeriodStart < aptEndMinutes && newPeriodEnd > aptStartMinutes) {
+                                return true; // Conflict detected
+                            }
+                        }
+                    } else {
+                        // Neither has active periods, check full duration overlap
+                        if (newStartMinutes < aptEndMinutes && newEndMinutes > aptStartMinutes) {
+                            return true; // Conflict detected
+                        }
+                    }
+                }
+            }
+
+            // Also check for conflicts with blocked times
+            const blockedTimes = SharedData.getBlockedTimesByDate(new Date(newDate));
+            for (const block of blockedTimes) {
+                const blockStartMinutes = SharedData.timeToMinutes(block.startTime);
+                const blockEndMinutes = SharedData.timeToMinutes(block.endTime);
+
+                // Check if new appointment overlaps with blocked time
+                if (newStartMinutes < blockEndMinutes && newEndMinutes > blockStartMinutes) {
+                    return true; // Conflict with blocked time
+                }
+            }
+
+            return false; // No conflict
+        }
+
+        // Check if moving an appointment would create a conflict
+        function checkAppointmentConflict(appointmentId, newDate, newTime, duration) {
+            const appointments = SharedData.getAppointments();
+            const movingAppointment = appointments.find(apt => apt.id === appointmentId);
+            if (!movingAppointment) return false;
+
+            // Parse the new time
+            const [newHour, newMin] = newTime.split(':').map(Number);
+            const newStartMinutes = newHour * 60 + newMin;
+            const newEndMinutes = newStartMinutes + duration;
+
+            // Check for conflicts with other appointments
+            for (const apt of appointments) {
+                // Skip the appointment being moved
+                if (apt.id === appointmentId) continue;
+
+                // Skip if different date
+                if (apt.date !== newDate) continue;
+
+                // Parse existing appointment time
+                const [aptHour, aptMin] = apt.time.split(':').map(Number);
+                const aptStartMinutes = aptHour * 60 + aptMin;
+                const aptEndMinutes = aptStartMinutes + apt.totalDuration;
+
+                // Check if there's an overlap in active time
+                if (apt.activePeriods && apt.activePeriods.length > 0) {
+                    // Check each active period for conflicts
+                    for (const period of apt.activePeriods) {
+                        const periodStart = aptStartMinutes + period.start;
+                        const periodEnd = aptStartMinutes + period.end;
+
+                        // Check if new appointment's active periods would overlap
+                        if (movingAppointment.activePeriods && movingAppointment.activePeriods.length > 0) {
+                            for (const movingPeriod of movingAppointment.activePeriods) {
+                                const movingPeriodStart = newStartMinutes + movingPeriod.start;
+                                const movingPeriodEnd = newStartMinutes + movingPeriod.end;
+
+                                // Check for overlap
+                                if (movingPeriodStart < periodEnd && movingPeriodEnd > periodStart) {
+                                    return true; // Conflict detected
+                                }
+                            }
+                        } else {
+                            // Moving appointment has no active periods, check full duration
+                            if (newStartMinutes < periodEnd && newEndMinutes > periodStart) {
+                                return true; // Conflict detected
+                            }
+                        }
+                    }
+                } else {
+                    // Existing appointment has no active periods, check full duration
+                    // Only check if moving appointment also has active time
+                    if (movingAppointment.activePeriods && movingAppointment.activePeriods.length > 0) {
+                        for (const movingPeriod of movingAppointment.activePeriods) {
+                            const movingPeriodStart = newStartMinutes + movingPeriod.start;
+                            const movingPeriodEnd = newStartMinutes + movingPeriod.end;
+
+                            // Check for overlap with full appointment
+                            if (movingPeriodStart < aptEndMinutes && movingPeriodEnd > aptStartMinutes) {
+                                return true; // Conflict detected
+                            }
+                        }
+                    } else {
+                        // Neither has active periods, check full duration overlap
+                        if (newStartMinutes < aptEndMinutes && newEndMinutes > aptStartMinutes) {
+                            return true; // Conflict detected
+                        }
+                    }
+                }
+            }
+
+            // Also check for conflicts with blocked times when moving appointments
+            const blockedTimes = SharedData.getBlockedTimesByDate(new Date(newDate));
+            for (const block of blockedTimes) {
+                const blockStartMinutes = SharedData.timeToMinutes(block.startTime);
+                const blockEndMinutes = SharedData.timeToMinutes(block.endTime);
+
+                // Check if moving appointment's active periods overlap with blocked time
+                if (movingAppointment.activePeriods && movingAppointment.activePeriods.length > 0) {
+                    for (const period of movingAppointment.activePeriods) {
+                        const periodStart = newStartMinutes + period.start;
+                        const periodEnd = newStartMinutes + period.end;
+
+                        if (periodStart < blockEndMinutes && periodEnd > blockStartMinutes) {
+                            return true; // Conflict with blocked time
+                        }
+                    }
+                } else {
+                    // Check full appointment duration against blocked time
+                    if (newStartMinutes < blockEndMinutes && newEndMinutes > blockStartMinutes) {
+                        return true; // Conflict with blocked time
+                    }
+                }
+            }
+
+            return false; // No conflict
         }
 
         // Setup drag and drop for time slots
@@ -2691,6 +4374,8 @@
                     const minutes = quarter * 15;
 
                     const appointmentId = e.dataTransfer.getData('appointmentId');
+                    const blockId = e.dataTransfer.getData('blockId');
+                    const blockType = e.dataTransfer.getData('blockType');
                     const newHour = parseInt(slot.dataset.hour);
                     const newDay = parseInt(slot.dataset.day);
 
@@ -2707,11 +4392,75 @@
                     // Format time as HH:MM with calculated minutes
                     const timeStr = `${String(newHour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 
+                    // Handle blocked time drag and drop
+                    if (blockType === 'blocked' && blockId) {
+                        const blockedTimes = SharedData.getBlockedTimes();
+                        const block = blockedTimes.find(b => b.id === blockId);
+
+                        if (block) {
+                            // Calculate duration
+                            const startMinutes = SharedData.timeToMinutes(block.startTime);
+                            const endMinutes = SharedData.timeToMinutes(block.endTime);
+                            const duration = endMinutes - startMinutes;
+
+                            // Calculate new end time
+                            const newStartMinutes = newHour * 60 + minutes;
+                            const newEndMinutes = newStartMinutes + duration;
+                            const newEndHour = Math.floor(newEndMinutes / 60);
+                            const newEndMinute = newEndMinutes % 60;
+                            const newEndTimeStr = `${newEndHour.toString().padStart(2, '0')}:${newEndMinute.toString().padStart(2, '0')}`;
+
+                            // Check for conflicts with appointments and other blocked times
+                            const hasConflict = checkNewAppointmentConflict(dateStr, timeStr, duration, null);
+                            if (hasConflict) {
+                                alert(isZh ? '无法移动：该时间段与现有预约冲突' : 'Cannot move: This time conflicts with an existing appointment');
+                                return;
+                            }
+
+                            // Also check for conflicts with other blocked times (excluding self)
+                            const otherBlockedTimes = SharedData.getBlockedTimesByDate(new Date(dateStr))
+                                .filter(b => b.id !== blockId);
+                            for (const otherBlock of otherBlockedTimes) {
+                                const otherStartMinutes = SharedData.timeToMinutes(otherBlock.startTime);
+                                const otherEndMinutes = SharedData.timeToMinutes(otherBlock.endTime);
+
+                                if (newStartMinutes < otherEndMinutes && newEndMinutes > otherStartMinutes) {
+                                    alert(isZh ? '无法移动：该时间段与另一个屏蔽时间冲突' : 'Cannot move: This time conflicts with another blocked time');
+                                    return;
+                                }
+                            }
+
+                            // Update the blocked time
+                            SharedData.deleteBlockedTime(blockId);
+                            SharedData.saveBlockedTime({
+                                date: dateStr,
+                                startTime: timeStr,
+                                endTime: newEndTimeStr,
+                                reason: block.reason
+                            });
+
+                            // Refresh calendar
+                            generateWeeklyCalendar();
+                        }
+                        return;
+                    }
+
                     // Update appointment
                     const appointments = SharedData.getAppointments();
                     const appointment = appointments.find(apt => apt.id === appointmentId);
 
                     if (appointment) {
+                        // Check for conflicts before allowing the drop
+                        if (checkAppointmentConflict(appointmentId, dateStr, timeStr, appointment.totalDuration)) {
+                            // Show error message
+                            const errorMsg = isZh ?
+                                '无法移动：该时间段与另一个预约的活动时间冲突' :
+                                'Cannot move: This time conflicts with another appointment\'s active time';
+                            alert(errorMsg);
+                            return;
+                        }
+
+                        // No conflict, proceed with the move
                         appointment.date = dateStr;
                         appointment.time = timeStr;
 
@@ -3177,8 +4926,10 @@
                 const bar = document.createElement('div');
                 bar.className = 'bar';
                 bar.style.height = height + '%';
+                // Adjust label position for Chinese to prevent overlap
+                const labelBottom = isZh ? '-28px' : '-20px';
                 bar.innerHTML = `
-                    <div class="bar-label">${dayNames[index]}</div>
+                    <div class="bar-label" style="bottom: ${labelBottom};">${dayNames[index]}</div>
                     <div style="position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 10px; white-space: nowrap;">
                         ${revenue > 0 ? '$' + revenue : ''}
                     </div>
@@ -3280,6 +5031,348 @@
         }
 
         let currentAppointment = null;
+        let ownerBookingData = {
+            day: 0,
+            hour: 0,
+            date: null
+        };
+
+        function openOwnerBookingModal(day, hour, minutes = 0) {
+            // Calculate the date based on current week and day
+            const date = new Date(currentWeekStart);
+            date.setDate(currentWeekStart.getDate() + day);
+
+            ownerBookingData.day = day;
+            ownerBookingData.hour = hour;
+            ownerBookingData.date = date;
+
+            // Set date field(s) - no limits for owners
+            const dateStr = date.toISOString().split('T')[0];
+
+            document.getElementById('owner-booking-date').value = dateStr;
+            document.getElementById('owner-booking-start-date').value = dateStr;
+            document.getElementById('owner-booking-end-date').value = dateStr;
+
+            // Reset date sections visibility
+            document.getElementById('date-single-section').style.display = 'block';
+            document.getElementById('date-range-section').style.display = 'none';
+
+            // Set start time (clicked slot time with minutes)
+            const startHour = hour.toString().padStart(2, '0');
+            const startMinutes = minutes.toString().padStart(2, '0');
+            document.getElementById('owner-booking-start').value = `${startHour}:${startMinutes}`;
+
+            // Set default end time (15 minutes later)
+            const totalMinutes = hour * 60 + minutes + 15;
+            const endHour = Math.floor(totalMinutes / 60);
+            const endMinutes = totalMinutes % 60;
+            document.getElementById('owner-booking-end').value =
+                `${endHour.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
+
+            // Reset form
+            document.getElementById('owner-booking-service').value = '';
+            document.getElementById('owner-booking-name').value = '';
+            document.getElementById('owner-booking-phone').value = '';
+            document.getElementById('owner-booking-email').value = '';
+            document.getElementById('booking-summary').style.display = 'none';
+
+            // Populate services dropdown
+            populateOwnerServiceDropdown();
+
+            // Show modal
+            document.getElementById('owner-booking-modal').style.display = 'flex';
+        }
+
+        function populateOwnerServiceDropdown() {
+            const select = document.getElementById('owner-booking-service');
+            const services = SharedData.getServices();
+
+            // Clear existing options except first and last
+            while (select.options.length > 2) {
+                select.remove(1);
+            }
+
+            // Add service options
+            Object.keys(services).forEach(serviceId => {
+                if (services[serviceId].enabled) {
+                    const option = document.createElement('option');
+                    option.value = serviceId;
+                    option.textContent = translateServiceName(services[serviceId].name);
+                    select.insertBefore(option, select.lastElementChild);
+                }
+            });
+        }
+
+        function onOwnerServiceChange() {
+            const serviceId = document.getElementById('owner-booking-service').value;
+            const endTimeInput = document.getElementById('owner-booking-end');
+            const summaryDiv = document.getElementById('booking-summary');
+            const customerSection = document.getElementById('customer-info-section');
+            const singleDateSection = document.getElementById('date-single-section');
+            const dateRangeSection = document.getElementById('date-range-section');
+
+            if (serviceId === 'custom') {
+                // Custom booking - show date range and allow manual end time entry
+                singleDateSection.style.display = 'none';
+                dateRangeSection.style.display = 'block';
+
+                // Copy single date to start date if switching to custom
+                const singleDate = document.getElementById('owner-booking-date').value;
+                if (singleDate) {
+                    document.getElementById('owner-booking-start-date').value = singleDate;
+                    document.getElementById('owner-booking-end-date').value = singleDate;
+                }
+
+                endTimeInput.removeAttribute('readonly');
+                summaryDiv.style.display = 'none';
+                // For custom bookings, name field becomes optional
+                document.getElementById('label-customer-name').textContent = isZh ? '客户姓名（可选）' : 'Customer Name (Optional)';
+            } else if (serviceId) {
+                // Regular service selected - show single date
+                singleDateSection.style.display = 'block';
+                dateRangeSection.style.display = 'none';
+
+                const services = SharedData.getServices();
+                const service = services[serviceId];
+
+                if (service) {
+                    // Calculate end time based on service duration
+                    updateEndTimeForService(service.duration);
+                    endTimeInput.setAttribute('readonly', 'readonly');
+
+                    // Show summary
+                    document.getElementById('summary-service').textContent = translateServiceName(service.name);
+                    document.getElementById('summary-duration').textContent = `${service.duration} ${isZh ? '分钟' : 'minutes'}`;
+                    summaryDiv.style.display = 'block';
+                }
+
+                // Make name required for regular bookings
+                document.getElementById('label-customer-name').textContent = isZh ? '客户姓名 *' : 'Customer Name *';
+            } else {
+                // No service selected - show single date
+                singleDateSection.style.display = 'block';
+                dateRangeSection.style.display = 'none';
+                endTimeInput.setAttribute('readonly', 'readonly');
+                summaryDiv.style.display = 'none';
+            }
+        }
+
+        // formatTimeWithAMPM removed - using native HTML5 time input display
+
+        // Time display function removed - using native HTML5 time input display
+
+        function updateEndTimeForService(duration) {
+            const startTime = document.getElementById('owner-booking-start').value;
+            if (startTime && duration) {
+                const [startHour, startMinute] = startTime.split(':').map(Number);
+                const totalMinutes = startHour * 60 + startMinute + duration;
+                const endHour = Math.floor(totalMinutes / 60);
+                const endMinute = totalMinutes % 60;
+                document.getElementById('owner-booking-end').value =
+                    `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
+            }
+        }
+
+        function onOwnerStartTimeChange() {
+            const serviceId = document.getElementById('owner-booking-service').value;
+
+            // If a regular service is selected, update the end time
+            if (serviceId && serviceId !== 'custom') {
+                const services = SharedData.getServices();
+                const service = services[serviceId];
+                if (service) {
+                    updateEndTimeForService(service.duration);
+                }
+            }
+        }
+
+        function closeOwnerBookingModal() {
+            document.getElementById('owner-booking-modal').style.display = 'none';
+        }
+
+        function confirmOwnerBooking() {
+            const serviceId = document.getElementById('owner-booking-service').value;
+            const customerName = document.getElementById('owner-booking-name').value.trim();
+            const phone = document.getElementById('owner-booking-phone').value.trim();
+            const email = document.getElementById('owner-booking-email').value.trim();
+            const date = document.getElementById('owner-booking-date').value;
+            const startTime = document.getElementById('owner-booking-start').value;
+            const endTime = document.getElementById('owner-booking-end').value;
+
+            // Validation
+            if (!serviceId) {
+                alert(isZh ? '请选择服务' : 'Please select a service');
+                return;
+            }
+
+            if (serviceId !== 'custom' && !customerName) {
+                alert(isZh ? '请输入客户姓名' : 'Please enter customer name');
+                return;
+            }
+
+            if (serviceId !== 'custom' && (!date || !startTime || !endTime)) {
+                alert(isZh ? '请填写日期和时间' : 'Please fill in date and time');
+                return;
+            }
+
+            // No booking limits for owners - they can book any date
+
+            // Check for conflicts
+            const [startHour, startMinute] = startTime.split(':').map(Number);
+            const [endHour, endMinute] = endTime.split(':').map(Number);
+            const startMinutes = startHour * 60 + startMinute;
+            const endMinutes = endHour * 60 + endMinute;
+
+            if (endMinutes <= startMinutes) {
+                alert(isZh ? '结束时间必须晚于开始时间' : 'End time must be after start time');
+                return;
+            }
+
+            if (serviceId === 'custom') {
+                // Get date range for custom bookings
+                const startDate = document.getElementById('owner-booking-start-date').value;
+                const endDate = document.getElementById('owner-booking-end-date').value;
+
+                if (!startDate || !endDate) {
+                    alert(isZh ? '请选择开始和结束日期' : 'Please select start and end dates');
+                    return;
+                }
+
+                // Check that end date is not before start date
+                if (new Date(endDate) < new Date(startDate)) {
+                    alert(isZh ? '结束日期不能早于开始日期' : 'End date cannot be before start date');
+                    return;
+                }
+
+                // Create blocked time entries for the date range
+                const currentDate = new Date(startDate);
+                const lastDate = new Date(endDate);
+                const duration = endMinutes - startMinutes;
+                let hasAnyConflict = false;
+                const blocksToCreate = [];
+
+                // Check each day in the range for conflicts
+                while (currentDate <= lastDate) {
+                    const dateStr = currentDate.toISOString().split('T')[0];
+
+                    // Check for conflicts
+                    const hasConflict = checkNewAppointmentConflict(dateStr, startTime, duration, null);
+                    if (hasConflict) {
+                        hasAnyConflict = true;
+                        const conflictDateStr = currentDate.toLocaleDateString();
+                        alert(isZh ? `${conflictDateStr} 的时间段与现有预约或屏蔽时间冲突` : `Time slot on ${conflictDateStr} conflicts with an existing appointment or blocked time`);
+                        break;
+                    }
+
+                    blocksToCreate.push({
+                        date: dateStr,
+                        startTime: startTime,
+                        endTime: endTime,
+                        reason: customerName || 'Blocked by owner'
+                    });
+
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+
+                // If no conflicts, save all blocked times
+                if (!hasAnyConflict) {
+                    blocksToCreate.forEach(block => {
+                        SharedData.saveBlockedTime(block);
+                    });
+                }
+            } else {
+                // Create a regular appointment
+                const services = SharedData.getServices();
+                const service = services[serviceId];
+
+                if (!service) {
+                    alert(isZh ? '无效的服务' : 'Invalid service');
+                    return;
+                }
+
+                // Check for conflicts with existing appointments
+                const duration = (endMinutes - startMinutes);
+                const hasConflict = checkNewAppointmentConflict(date, startTime, duration, service.activePeriods || null);
+                if (hasConflict) {
+                    alert(isZh ? '该时间段与现有预约冲突' : 'This time slot conflicts with an existing appointment');
+                    return;
+                }
+
+                // Create appointment object
+                // Use actual duration from the time range selected, not service duration
+                const actualDuration = endMinutes - startMinutes;
+                const appointment = {
+                    id: 'APT' + Date.now(),
+                    customerName: customerName,
+                    customerPhone: phone,
+                    customerEmail: email,
+                    date: date,
+                    time: startTime,
+                    services: [serviceId],
+                    serviceNames: [service.name],
+                    totalDuration: actualDuration, // Use the actual duration based on start/end times
+                    totalPrice: service.price,
+                    createdBy: 'owner',
+                    createdAt: new Date().toISOString()
+                };
+
+                // Only add activePeriods if they exist and have content
+                if (service.activePeriods && service.activePeriods.length > 0) {
+                    appointment.activePeriods = service.activePeriods;
+                }
+
+                SharedData.saveAppointment(appointment);
+            }
+
+            // Close modal and refresh calendar
+            closeOwnerBookingModal();
+            generateWeeklyCalendar();
+            loadAppointments();
+            updateDashboardMetrics();
+        }
+
+        function showBlockedTimeDetails(block) {
+            // Create a temporary appointment-like object for the modal
+            const blockAsAppointment = {
+                id: block.id,
+                customerName: block.reason || 'Blocked Time',
+                customerPhone: '',
+                customerEmail: '',
+                date: block.date,
+                time: block.startTime,
+                endTime: block.endTime,
+                services: [],
+                serviceNames: ['Blocked'],
+                totalDuration: SharedData.timeToMinutes(block.endTime) - SharedData.timeToMinutes(block.startTime),
+                totalPrice: 0,
+                isBlocked: true
+            };
+
+            currentAppointment = blockAsAppointment;
+
+            // Populate modal with blocked time details
+            document.getElementById('modal-customer-name').textContent = block.reason || (isZh ? '屏蔽时间' : 'Blocked Time');
+            document.getElementById('modal-services').textContent = isZh ? '屏蔽时间' : 'Blocked Time';
+
+            // Format date and time
+            const [year, month, day] = block.date.split('-').map(Number);
+            const aptDate = new Date(year, month - 1, day);
+            const dateStr = isZh ?
+                `${aptDate.getFullYear()}年${aptDate.getMonth() + 1}月${aptDate.getDate()}日` :
+                aptDate.toLocaleDateString();
+            document.getElementById('modal-datetime').textContent = `${dateStr} ${block.startTime} - ${block.endTime}`;
+
+            // Calculate and display duration
+            const duration = SharedData.timeToMinutes(block.endTime) - SharedData.timeToMinutes(block.startTime);
+            document.getElementById('modal-duration').textContent = `${duration} ${isZh ? '分钟' : 'minutes'}`;
+
+            document.getElementById('modal-price').textContent = '-';
+            document.getElementById('modal-phone').textContent = '-';
+            document.getElementById('modal-email').textContent = '-';
+
+            // Show modal (use the same method as regular appointments)
+            document.getElementById('appointment-modal').classList.add('active');
+        }
 
         function showAppointmentDetails(apt) {
             currentAppointment = apt;
@@ -3435,6 +5528,50 @@
             }
 
             if (currentAppointment) {
+                // Handle blocked time rescheduling
+                if (currentAppointment.isBlocked) {
+                    // Calculate duration
+                    const startMinutes = SharedData.timeToMinutes(currentAppointment.time);
+                    const endMinutes = SharedData.timeToMinutes(currentAppointment.endTime);
+                    const duration = endMinutes - startMinutes;
+
+                    // Calculate new end time
+                    const [newHour, newMin] = newTime.split(':').map(Number);
+                    const newStartMinutes = newHour * 60 + newMin;
+                    const newEndMinutes = newStartMinutes + duration;
+                    const newEndHour = Math.floor(newEndMinutes / 60);
+                    const newEndMinute = newEndMinutes % 60;
+                    const newEndTime = `${newEndHour.toString().padStart(2, '0')}:${newEndMinute.toString().padStart(2, '0')}`;
+
+                    // Check for conflicts
+                    const hasConflict = checkNewAppointmentConflict(newDate, newTime, duration, null);
+                    if (hasConflict) {
+                        alert(isZh ? '该时间段与现有预约或屏蔽时间冲突' : 'This time conflicts with an existing appointment or blocked time');
+                        return;
+                    }
+
+                    // Update blocked time
+                    SharedData.deleteBlockedTime(currentAppointment.id);
+                    SharedData.saveBlockedTime({
+                        date: newDate,
+                        startTime: newTime,
+                        endTime: newEndTime,
+                        reason: currentAppointment.customerName === 'Blocked Time' ? 'Blocked by owner' : currentAppointment.customerName
+                    });
+
+                    alert(isZh ? '屏蔽时间已重新安排' : 'Blocked time has been rescheduled');
+                    closeModal();
+                    generateWeeklyCalendar();
+                    loadAppointments();
+                    return;
+                }
+                // Check for conflicts when rescheduling appointments
+                const hasConflict = checkAppointmentConflict(currentAppointment.id, newDate, newTime, currentAppointment.totalDuration);
+                if (hasConflict) {
+                    alert(isZh ? '该时间段与现有预约或屏蔽时间冲突' : 'This time conflicts with an existing appointment or blocked time');
+                    return;
+                }
+
                 // Update appointment
                 const appointments = SharedData.getAppointments();
                 const index = appointments.findIndex(apt => apt.id === currentAppointment.id);
@@ -3460,11 +5597,23 @@
         }
 
         function cancelAppointment() {
-            if (currentAppointment && confirm(isZh ? '确定要取消这个预约吗？' : 'Are you sure you want to cancel this appointment?')) {
-                SharedData.deleteAppointment(currentAppointment.id);
-                closeModal();
-                generateWeeklyCalendar();
-                loadAppointments();
+            if (!currentAppointment) return;
+
+            // Handle blocked time
+            if (currentAppointment.isBlocked) {
+                if (confirm(isZh ? '确定要删除这个屏蔽时间吗？' : 'Are you sure you want to delete this blocked time?')) {
+                    SharedData.deleteBlockedTime(currentAppointment.id);
+                    closeModal();
+                    generateWeeklyCalendar();
+                    loadAppointments();
+                }
+            } else {
+                if (confirm(isZh ? '确定要取消这个预约吗？' : 'Are you sure you want to cancel this appointment?')) {
+                    SharedData.deleteAppointment(currentAppointment.id);
+                    closeModal();
+                    generateWeeklyCalendar();
+                    loadAppointments();
+                }
             }
         }
 
@@ -3480,7 +5629,7 @@
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', function() {
                 updateLanguage();
-                generateWeeklyCalendar();
+                // Don't generate calendar on page load - only when calendar tab is clicked
                 setupSwipeNavigation();
                 loadStoreHours();
                 loadServices();
@@ -3494,7 +5643,7 @@
         } else {
             // DOM is already loaded
             updateLanguage();
-            generateWeeklyCalendar();
+            // Don't generate calendar on page load - only when calendar tab is clicked
             setupSwipeNavigation();
             loadStoreHours();
             loadServices();

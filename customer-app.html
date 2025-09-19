@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Book Your Haircut</title>
     <script src="shared-data.js"></script>
+    <!-- EmailJS SDK -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script type="text/javascript">
+        (function(){
+            // Initialize EmailJS with the configured public key
+            const emailConfig = JSON.parse(localStorage.getItem('emailConfig') || '{}');
+            if (emailConfig.publicKey) {
+                emailjs.init(emailConfig.publicKey);
+            }
+        })();
+    </script>
     <style>
         * {
             margin: 0;
@@ -105,12 +116,7 @@
             background: #ccc;
             cursor: not-allowed;
         }
-        .date-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-top: 20px;
-        }
+        /* Date picker styles now handled inline */
         .date-card {
             border: 1px solid #e0e0e0;
             border-radius: 10px;
@@ -213,6 +219,17 @@
         </div>
 
         <div class="content">
+            <!-- Time Off Notice -->
+            <div id="time-off-notice" style="display: none; background: #fff3cd; color: #856404; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #ffeaa7;">
+                <div style="display: flex; align-items: start;">
+                    <span style="margin-right: 8px;">⚠️</span>
+                    <div>
+                        <div style="font-weight: 600; margin-bottom: 4px;" id="time-off-title">Owner Unavailable</div>
+                        <div id="time-off-message" style="font-size: 14px;"></div>
+                    </div>
+                </div>
+            </div>
+
             <div class="progress-bar">
                 <div class="progress-fill" id="progress"></div>
             </div>
@@ -232,7 +249,18 @@
                 <h2 id="select-datetime">Select Date & Time</h2>
 
                 <h3 style="margin-top: 20px;" id="available-dates">Available Dates</h3>
-                <div class="date-grid" id="date-grid"></div>
+                <div class="date-picker-container" style="padding: 20px; background: #f9f9f9; border-radius: 8px; margin-bottom: 20px;">
+                    <div style="margin-bottom: 15px;">
+                        <input type="date" id="appointment-date" style="width: 100%; padding: 12px; font-size: 16px; border: 2px solid #e0e0e0; border-radius: 5px; cursor: pointer;" onchange="onDateSelected()">
+                    </div>
+                    <div id="date-info" style="padding: 10px; border-radius: 5px; display: none;">
+                        <!-- Will show availability info -->
+                    </div>
+                    <div id="selected-date-display" style="margin-top: 15px; padding: 15px; background: white; border-radius: 5px; display: none;">
+                        <div style="font-size: 14px; color: #666; margin-bottom: 5px;" id="selected-label">Selected Date:</div>
+                        <div id="selected-date-text" style="font-size: 18px; font-weight: 500; color: #333;"></div>
+                    </div>
+                </div>
 
                 <h3 style="margin-top: 30px;" id="available-times">Available Times</h3>
                 <div class="time-slots" id="time-slots"></div>
@@ -571,15 +599,46 @@
         }
 
         function generateDates() {
-            const dateGrid = document.getElementById('date-grid');
-            dateGrid.innerHTML = '';
+            // Initialize date picker with limits
+            const datePicker = document.getElementById('appointment-date');
+            const today = new Date();
+            const maxDate = new Date();
+            maxDate.setMonth(maxDate.getMonth() + 2); // 2 months in advance
 
-            // Try to get store hours, use defaults if not available
+            // Set min and max dates on the picker
+            datePicker.min = today.toISOString().split('T')[0];
+            datePicker.max = maxDate.toISOString().split('T')[0];
+
+            // Clear any previous selection
+            datePicker.value = '';
+            selectedDate = null;
+            selectedTime = null;
+
+            // Hide date info initially
+            const dateInfo = document.getElementById('date-info');
+            if (dateInfo) {
+                dateInfo.style.display = 'none';
+            }
+        }
+
+        function onDateSelected() {
+            const datePicker = document.getElementById('appointment-date');
+            const dateInfo = document.getElementById('date-info');
+
+            if (!datePicker.value) {
+                selectedDate = null;
+                if (dateInfo) dateInfo.style.display = 'none';
+                return;
+            }
+
+            // Parse the selected date
+            selectedDate = new Date(datePicker.value + 'T00:00:00');
+
+            // Check if the store is open on this day
             let storeHours;
             try {
                 storeHours = SharedData.getStoreHours();
             } catch (e) {
-                // Use default hours if SharedData isn't available
                 storeHours = {
                     monday: { open: '09:00', close: '18:00', closed: false },
                     tuesday: { open: '09:00', close: '18:00', closed: false },
@@ -591,48 +650,101 @@
                 };
             }
 
-            const today = new Date();
-            for (let i = 0; i < 14; i++) {  // Show 2 weeks
-                const date = new Date(today);
-                date.setDate(today.getDate() + i);
+            const dayName = selectedDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+            const dayHours = storeHours[dayName];
+            const isClosed = !dayHours || dayHours.closed;
 
-                const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-                const dayHours = storeHours[dayName];
-                const isClosed = !dayHours || dayHours.closed;
+            // Show date info
+            if (dateInfo) {
+                const dayDisplay = isZh ?
+                    ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][selectedDate.getDay()] :
+                    selectedDate.toLocaleDateString('en', { weekday: 'long' });
+                const dateDisplay = isZh ?
+                    `${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日` :
+                    selectedDate.toLocaleDateString('en', { month: 'long', day: 'numeric' });
 
-                const dateCard = document.createElement('div');
-                dateCard.className = 'date-card';
                 if (isClosed) {
-                    dateCard.style.opacity = '0.5';
-                    dateCard.style.cursor = 'not-allowed';
+                    dateInfo.innerHTML = `
+                        <div style="color: #f44336; font-weight: bold;">
+                            ${isZh ? '该日店铺休息' : 'Store is closed on this day'}
+                        </div>
+                    `;
+                    dateInfo.style.background = '#ffebee';
+                    selectedDate = null; // Clear selection if closed
+                } else {
+                    dateInfo.innerHTML = `
+                        <div style="color: #4CAF50; font-weight: bold;">
+                            ${dayDisplay}, ${dateDisplay}
+                        </div>
+                        <div style="color: #666; margin-top: 5px;">
+                            ${isZh ? '营业时间' : 'Store Hours'}: ${dayHours.open} - ${dayHours.close}
+                        </div>
+                    `;
+                    dateInfo.style.background = '#e8f5e9';
                 }
-                // Get localized day and month names
-                const weekdayShort = isZh ?
-                    ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()] :
-                    date.toLocaleDateString('en', { weekday: 'short' });
-                const monthShort = isZh ?
-                    (date.getMonth() + 1) + '月' :
-                    date.toLocaleDateString('en', { month: 'short' });
+                dateInfo.style.display = 'block';
+            }
 
-                dateCard.innerHTML = `
-                    <div style="font-size: 14px; color: #666;">${weekdayShort}</div>
-                    <div style="font-size: 20px; margin: 5px 0;">${date.getDate()}</div>
-                    <div style="font-size: 12px; color: ${isClosed ? '#f44336' : '#666'};">${isClosed ? (isZh ? '休息' : 'Closed') : monthShort}</div>
-                `;
-                if (!isClosed) {
-                    dateCard.onclick = () => selectDate(dateCard, date);
+            // Generate time slots if date is valid
+            if (!isClosed) {
+                selectedTime = null; // Reset time when date changes
+                generateTimeSlots();
+                checkDateTimeComplete();
+            } else {
+                // Clear time slots if store is closed
+                const timeSlots = document.getElementById('time-slots');
+                if (timeSlots) {
+                    timeSlots.innerHTML = `<div style="text-align: center; padding: 20px; color: #f44336; background: #ffebee; border-radius: 10px;">${isZh ? '该日店铺休息，请选择其他日期' : 'Store is closed on this day. Please select another date.'}</div>`;
                 }
-                dateGrid.appendChild(dateCard);
             }
         }
 
-        function selectDate(element, date) {
-            document.querySelectorAll('.date-card').forEach(d => d.classList.remove('selected'));
-            element.classList.add('selected');
-            selectedDate = date;
-            selectedTime = null; // Reset time when date changes
-            generateTimeSlots();
-            checkDateTimeComplete();
+        function displayCancellationPolicy() {
+            const policy = JSON.parse(localStorage.getItem('cancellationPolicy') || '{}');
+            const minNoticeHours = policy.minNoticeHours || 0;
+            const policyNotice = document.getElementById('policy-notice');
+
+            if (minNoticeHours > 0) {
+                let policyText;
+                if (minNoticeHours === 1) {
+                    policyText = isZh ?
+                        '需要至少提前1小时取消或更改预约' :
+                        'Cancellations and changes require at least 1 hour notice';
+                } else if (minNoticeHours < 24) {
+                    policyText = isZh ?
+                        `需要至少提前${minNoticeHours}小时取消或更改预约` :
+                        `Cancellations and changes require at least ${minNoticeHours} hours notice`;
+                } else {
+                    const days = Math.floor(minNoticeHours / 24);
+                    policyText = isZh ?
+                        `需要至少提前${days}天取消或更改预约` :
+                        `Cancellations and changes require at least ${days} day${days > 1 ? 's' : ''} notice`;
+                }
+
+                // Add the policy notice div if it doesn't exist
+                if (!policyNotice) {
+                    const timeSlotsDiv = document.getElementById('time-slots');
+                    const noticeDiv = document.createElement('div');
+                    noticeDiv.id = 'policy-notice';
+                    noticeDiv.style = 'margin-bottom: 15px; padding: 12px; background: #fff3e0; border: 1px solid #ffb74d; border-radius: 5px;';
+                    noticeDiv.innerHTML = `
+                        <div style="display: flex; align-items: center;">
+                            <span style="font-size: 16px; margin-right: 8px;">⚠️</span>
+                            <div>
+                                <div style="font-weight: bold; color: #f57c00; margin-bottom: 4px;">${isZh ? '取消政策' : 'Cancellation Policy'}</div>
+                                <div style="font-size: 13px; color: #666;">${policyText}</div>
+                            </div>
+                        </div>
+                    `;
+                    timeSlotsDiv.parentNode.insertBefore(noticeDiv, timeSlotsDiv);
+                } else {
+                    const policyTextDiv = policyNotice.querySelector('div[style*="font-size: 13px"]');
+                    if (policyTextDiv) {
+                        policyTextDiv.textContent = policyText;
+                    }
+                    policyNotice.style.display = 'block';
+                }
+            }
         }
 
         function generateTimeSlots() {
@@ -644,6 +756,9 @@
                 timeSlots.innerHTML = `<div style="text-align: center; color: #666;">${selectDateMsg}</div>`;
                 return;
             }
+
+            // Display cancellation policy
+            displayCancellationPolicy();
 
             // Calculate total service duration
             const totalDuration = selectedServices.reduce((sum, serviceId) => {
@@ -853,8 +968,9 @@
             return email.includes('@') && email.indexOf('@') > 0 && email.indexOf('@') < email.length - 1;
         }
 
-        // Make formatPhoneNumber available globally for inline event handlers
+        // Make functions available globally for inline event handlers
         window.formatPhoneNumber = formatPhoneNumber;
+        window.confirmCancellation = confirmCancellation;
 
         function confirmBooking() {
             // Gather booking information
@@ -914,11 +1030,18 @@
                 customerEmail: email,
                 notes: ''
             };
+            
+            // Store customer's language preference for email purposes
+            if (email) {
+                localStorage.setItem(`customerLang_${email}`, isZh ? 'zh' : 'en');
+            }
 
             // Save appointment
             let bookingId;
             try {
                 bookingId = SharedData.saveAppointment(appointment);
+                // Send confirmation email
+                SharedData.sendConfirmationEmail(appointment);
             } catch (e) {
                 // Fallback booking ID if SharedData not available
                 bookingId = 'BK' + Math.random().toString(36).substr(2, 9).toUpperCase();
@@ -937,6 +1060,263 @@
 
         function goBack(screenId) {
             showScreen(screenId);
+        }
+
+        function handleBookingAction(action, bookingId) {
+            // Get the appointment
+            const appointment = SharedData.getAppointmentById(bookingId);
+
+            if (!appointment) {
+                alert(isZh ? '预约未找到' : 'Appointment not found');
+                // Redirect to normal booking flow
+                loadAvailableServices();
+                updateLanguage();
+                updateProgress();
+                return;
+            }
+
+            if (action === 'modify') {
+                handleModification(appointment);
+            } else if (action === 'cancel') {
+                handleCancellation(appointment);
+            }
+        }
+
+        function checkCancellationPolicy(appointment) {
+            const policy = JSON.parse(localStorage.getItem('cancellationPolicy') || '{}');
+            const minNoticeHours = policy.minNoticeHours || 0;
+
+            if (minNoticeHours === 0) {
+                return { allowed: true };
+            }
+
+            // Calculate hours until appointment
+            const appointmentDateTime = new Date(appointment.date + 'T' + appointment.time);
+            const now = new Date();
+            const hoursUntilAppointment = (appointmentDateTime - now) / (1000 * 60 * 60);
+
+            if (hoursUntilAppointment < minNoticeHours) {
+                let message;
+                if (minNoticeHours === 1) {
+                    message = isZh ?
+                        '预约必须在开始前至少1小时取消或更改' :
+                        'Appointments must be cancelled or rescheduled at least 1 hour in advance';
+                } else if (minNoticeHours < 24) {
+                    message = isZh ?
+                        `预约必须在开始前至少${minNoticeHours}小时取消或更改` :
+                        `Appointments must be cancelled or rescheduled at least ${minNoticeHours} hours in advance`;
+                } else {
+                    const days = Math.floor(minNoticeHours / 24);
+                    message = isZh ?
+                        `预约必须在开始前至少${days}天取消或更改` :
+                        `Appointments must be cancelled or rescheduled at least ${days} day${days > 1 ? 's' : ''} in advance`;
+                }
+                return { allowed: false, message };
+            }
+
+            return { allowed: true };
+        }
+
+        function handleModification(appointment) {
+            // Check cancellation policy
+            const policyCheck = checkCancellationPolicy(appointment);
+            if (!policyCheck.allowed) {
+                alert(policyCheck.message);
+                window.location.href = window.location.pathname;
+                return;
+            }
+
+            // Show a modification header
+            const headerTitle = document.getElementById('app-title');
+            headerTitle.textContent = isZh ? '修改预约' : 'Modify Appointment';
+
+            // Add current appointment info banner
+            const contentDiv = document.querySelector('.content');
+            const currentBookingBanner = document.createElement('div');
+            currentBookingBanner.style = 'background: #e3f2fd; padding: 15px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #2196F3;';
+            currentBookingBanner.innerHTML = `
+                <div style="font-weight: bold; margin-bottom: 8px;">${isZh ? '当前预约' : 'Current Appointment'}</div>
+                <div style="font-size: 14px;">
+                    <div>${isZh ? '预约ID' : 'Booking ID'}: ${appointment.id}</div>
+                    <div>${isZh ? '服务' : 'Services'}: ${appointment.serviceNames.join(', ')}</div>
+                    <div>${isZh ? '日期' : 'Date'}: ${appointment.date}</div>
+                    <div>${isZh ? '时间' : 'Time'}: ${SharedData.formatTime(appointment.time)}</div>
+                </div>
+            `;
+            contentDiv.insertBefore(currentBookingBanner, contentDiv.firstChild);
+
+            // Pre-select services
+            selectedServices = appointment.services || [];
+
+            // Pre-fill customer information
+            setTimeout(() => {
+                document.getElementById('name').value = appointment.customerName || '';
+                document.getElementById('phone').value = appointment.customerPhone || '';
+                document.getElementById('email').value = appointment.customerEmail || '';
+            }, 100);
+
+            // Modify the confirm booking function to update instead of create
+            window.originalConfirmBooking = window.confirmBooking;
+            window.confirmBooking = function() {
+                modifyAppointment(appointment.id);
+            };
+
+            // Load services and start normal flow
+            loadAvailableServices();
+            updateLanguage();
+            updateProgress();
+        }
+
+        function modifyAppointment(appointmentId) {
+            // Gather updated information
+            const name = document.getElementById('name').value;
+            const phone = document.getElementById('phone').value;
+            const email = document.getElementById('email').value;
+
+            const t = isZh ? translations.zh : translations.en;
+            const serviceNames = selectedServices.map(s => t.services[serviceData[s].name] || serviceData[s].name);
+            const totalDuration = selectedServices.reduce((sum, s) => sum + serviceData[s].duration, 0);
+            const totalPrice = selectedServices.reduce((sum, s) => sum + serviceData[s].price, 0);
+
+            // Format date
+            const year = selectedDate.getFullYear();
+            const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+            const day = String(selectedDate.getDate()).padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
+
+            // Update appointment
+            const updates = {
+                services: selectedServices,
+                serviceNames: serviceNames,
+                date: dateStr,
+                time: selectedTime,
+                totalDuration: totalDuration,
+                totalPrice: totalPrice,
+                customerName: name,
+                customerPhone: phone,
+                customerEmail: email
+            };
+
+            // Get the old appointment before updating
+            const oldAppointment = SharedData.getAppointmentById(appointmentId);
+
+            const success = SharedData.updateAppointment(appointmentId, updates);
+
+            if (success) {
+                // Send rescheduled email with both old and new details
+                const updatedAppointment = SharedData.getAppointmentById(appointmentId);
+                SharedData.sendRescheduledEmail(updatedAppointment, oldAppointment);
+
+                // Show success
+                document.getElementById('booking-id').textContent = appointmentId;
+                document.getElementById('final-services').textContent = serviceNames.join(', ');
+                const finalDateStr = isZh ?
+                    `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日` :
+                    selectedDate.toLocaleDateString();
+                const finalTime = SharedData.formatTime ? SharedData.formatTime(selectedTime) : selectedTime;
+                document.getElementById('final-datetime').textContent = `${finalDateStr} ${finalTime}`;
+
+                // Update success message
+                const successTitle = document.getElementById('booking-confirmed');
+                successTitle.textContent = isZh ? '预约已更新！' : 'Appointment Updated!';
+
+                showScreen('success-screen');
+            } else {
+                alert(isZh ? '更新失败' : 'Update failed');
+            }
+        }
+
+        function handleCancellation(appointment) {
+            // Check cancellation policy
+            const policyCheck = checkCancellationPolicy(appointment);
+            if (!policyCheck.allowed) {
+                alert(policyCheck.message);
+                window.location.href = window.location.pathname;
+                return;
+            }
+
+            // Create cancellation screen
+            const contentDiv = document.querySelector('.content');
+            contentDiv.innerHTML = `
+                <div style="padding: 20px;">
+                    <h2 style="text-align: center; color: #f44336;">${isZh ? '取消预约' : 'Cancel Appointment'}</h2>
+
+                    <div style="background: #ffebee; padding: 15px; margin: 20px 0; border-radius: 8px; border: 1px solid #f44336;">
+                        <div style="font-weight: bold; margin-bottom: 10px;">${isZh ? '预约详情' : 'Appointment Details'}</div>
+                        <div style="font-size: 14px;">
+                            <div style="margin: 5px 0;">${isZh ? '预约ID' : 'Booking ID'}: ${appointment.id}</div>
+                            <div style="margin: 5px 0;">${isZh ? '客户' : 'Customer'}: ${appointment.customerName}</div>
+                            <div style="margin: 5px 0;">${isZh ? '服务' : 'Services'}: ${appointment.serviceNames.join(', ')}</div>
+                            <div style="margin: 5px 0;">${isZh ? '日期' : 'Date'}: ${appointment.date}</div>
+                            <div style="margin: 5px 0;">${isZh ? '时间' : 'Time'}: ${SharedData.formatTime(appointment.time)}</div>
+                            <div style="margin: 5px 0;">${isZh ? '时长' : 'Duration'}: ${appointment.totalDuration} ${isZh ? '分钟' : 'minutes'}</div>
+                            <div style="margin: 5px 0;">${isZh ? '价格' : 'Price'}: $${appointment.totalPrice}</div>
+                        </div>
+                    </div>
+
+                    <div style="margin: 20px 0;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold;">
+                            ${isZh ? '取消原因（可选）' : 'Reason for cancellation (optional)'}
+                        </label>
+                        <textarea id="cancel-reason"
+                                  style="width: 100%; padding: 10px; border: 1px solid #e0e0e0; border-radius: 5px; min-height: 80px;"
+                                  placeholder="${isZh ? '请告诉我们取消的原因...' : 'Please tell us why you are cancelling...'}"></textarea>
+                    </div>
+
+                    <div style="text-align: center; margin-top: 30px;">
+                        <button onclick="confirmCancellation('${appointment.id}')"
+                                style="background: #f44336; color: white; padding: 12px 30px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; margin: 0 10px;">
+                            ${isZh ? '确认取消' : 'Confirm Cancellation'}
+                        </button>
+                        <button onclick="window.location.href = window.location.pathname"
+                                style="background: #e0e0e0; color: #333; padding: 12px 30px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; margin: 0 10px;">
+                            ${isZh ? '返回' : 'Go Back'}
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function confirmCancellation(appointmentId) {
+            if (confirm(isZh ? '确定要取消此预约吗？' : 'Are you sure you want to cancel this appointment?')) {
+                const reason = document.getElementById('cancel-reason').value;
+
+                // Get the appointment details before deleting
+                const appointment = SharedData.getAppointmentById(appointmentId);
+
+                // Delete the appointment
+                SharedData.deleteAppointment(appointmentId);
+
+                // Send cancellation email
+                if (appointment) {
+                    SharedData.sendCancellationEmail(appointment);
+                }
+
+                // Store cancellation record
+                const cancellations = JSON.parse(localStorage.getItem('cancellations') || '[]');
+                cancellations.push({
+                    appointmentId: appointmentId,
+                    reason: reason,
+                    cancelledAt: new Date().toISOString()
+                });
+                localStorage.setItem('cancellations', JSON.stringify(cancellations));
+
+                // Show success message
+                const contentDiv = document.querySelector('.content');
+                contentDiv.innerHTML = `
+                    <div style="padding: 40px; text-align: center;">
+                        <div style="font-size: 48px; color: #4CAF50; margin-bottom: 20px;">✓</div>
+                        <h2>${isZh ? '预约已取消' : 'Appointment Cancelled'}</h2>
+                        <p style="color: #666; margin: 20px 0;">
+                            ${isZh ? '您的预约已成功取消。' : 'Your appointment has been successfully cancelled.'}
+                        </p>
+                        <button onclick="window.location.href = window.location.pathname"
+                                style="background: #2196F3; color: white; padding: 12px 30px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; margin-top: 20px;">
+                            ${isZh ? '预约新服务' : 'Book New Service'}
+                        </button>
+                    </div>
+                `;
+            }
         }
 
         function startNew() {
@@ -961,10 +1341,69 @@
             showScreen('service-screen');
         }
 
+        function checkTimeOff() {
+            const timeOff = localStorage.getItem('timeOff');
+            const notice = document.getElementById('time-off-notice');
+
+            if (timeOff) {
+                const data = JSON.parse(timeOff);
+                const startDate = new Date(data.startDate + 'T' + data.startTime);
+                const endDate = new Date(data.endDate + 'T' + data.endTime);
+                const now = new Date();
+
+                // Format dates for display
+                const formatDate = (date) => {
+                    if (isZh) {
+                        return `${date.getMonth() + 1}月${date.getDate()}日`;
+                    }
+                    return date.toLocaleDateString('en', { month: 'short', day: 'numeric' });
+                };
+
+                const formatTime = (timeStr) => {
+                    const [hour, minute] = timeStr.split(':').map(Number);
+                    if (isZh) {
+                        return `${hour}:${minute.toString().padStart(2, '0')}`;
+                    }
+                    const ampm = hour >= 12 ? 'PM' : 'AM';
+                    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+                    return `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`;
+                };
+
+                // Update notice text
+                const titleElement = document.getElementById('time-off-title');
+                const messageElement = document.getElementById('time-off-message');
+
+                titleElement.textContent = isZh ? '店主休假通知' : 'Owner Unavailable';
+
+                if (data.startDate === data.endDate) {
+                    // Single day
+                    messageElement.textContent = isZh ?
+                        `店主将在${formatDate(startDate)} ${formatTime(data.startTime)}至${formatTime(data.endTime)}期间休假。` :
+                        `The owner will be unavailable on ${formatDate(startDate)} from ${formatTime(data.startTime)} to ${formatTime(data.endTime)}.`;
+                } else {
+                    // Multiple days
+                    messageElement.textContent = isZh ?
+                        `店主将在${formatDate(startDate)} ${formatTime(data.startTime)}至${formatDate(endDate)} ${formatTime(data.endTime)}期间休假。` :
+                        `The owner will be unavailable from ${formatDate(startDate)} ${formatTime(data.startTime)} to ${formatDate(endDate)} ${formatTime(data.endTime)}.`;
+                }
+
+                if (data.reason && data.reason !== 'Time Off') {
+                    messageElement.textContent += isZh ? ` (${data.reason})` : ` (${data.reason})`;
+                }
+
+                notice.style.display = 'block';
+            } else {
+                notice.style.display = 'none';
+            }
+        }
+
         function loadAvailableServices() {
             const services = SharedData.getServices();
             const container = document.getElementById('services-container');
             container.innerHTML = '';
+
+            // Check for time off notice
+            checkTimeOff();
 
             Object.keys(services).forEach(serviceId => {
                 const service = services[serviceId];
@@ -994,10 +1433,19 @@
             }
         }
 
-        // Initialize
-        loadAvailableServices();
-        updateLanguage();
-        updateProgress();
+        // Check for URL parameters (modification or cancellation)
+        const urlParams = new URLSearchParams(window.location.search);
+        const action = urlParams.get('action');
+        const bookingId = urlParams.get('bookingId');
+
+        if (action && bookingId) {
+            handleBookingAction(action, bookingId);
+        } else {
+            // Normal initialization
+            loadAvailableServices();
+            updateLanguage();
+            updateProgress();
+        }
 
         // Setup input event listeners when DOM is ready
         function setupInputListeners() {
@@ -1065,6 +1513,13 @@
                     if (selectedDate) {
                         generateTimeSlots();
                     }
+                }
+            } else if (e.key === 'timeOff') {
+                // Update time off notice
+                checkTimeOff();
+                // Regenerate time slots if on date selection screen
+                if (currentScreen === 'datetime-screen' && selectedDate) {
+                    generateTimeSlots();
                 }
             }
         });
