@@ -120,13 +120,6 @@
             font-size: 12px;
             font-weight: bold;
         }
-        .calendar-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            flex: 0 0 auto; /* Don't grow or shrink */
-        }
         .calendar-nav {
             display: flex;
             gap: 10px;
@@ -211,6 +204,7 @@
             border-right: 1px solid #f0f0f0;
             border-bottom: 1px solid #f0f0f0;
             position: relative;
+            overflow: visible;
         }
         .appointment-block {
             position: absolute;
@@ -600,6 +594,25 @@
         .settings-item:hover {
             background: #f9f9f9;
         }
+        .staff-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .staff-item:hover {
+            background: #f9f9f9;
+            border-color: #2196F3;
+        }
+        .staff-item.active {
+            background: #e3f2fd;
+            border-color: #2196F3;
+        }
         .settings-icon {
             width: 40px;
             height: 40px;
@@ -680,6 +693,14 @@
             <div class="modal-header">
                 <h3 id="owner-booking-title">Create Booking</h3>
                 <button class="modal-close" onclick="closeOwnerBookingModal()">×</button>
+            </div>
+
+            <!-- Barber Selection -->
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label id="label-barber-selection" style="display: block; margin-bottom: 5px; font-size: 14px; color: #333;">Select Barber</label>
+                <select id="owner-booking-barber" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 14px;">
+                    <!-- Barbers will be populated dynamically -->
+                </select>
             </div>
 
             <!-- Service Selection -->
@@ -777,6 +798,11 @@
             <div class="detail-group">
                 <div class="detail-label" id="label-services">Services</div>
                 <div class="detail-value" id="modal-services"></div>
+            </div>
+
+            <div class="detail-group">
+                <div class="detail-label" id="label-barber">Barber</div>
+                <div class="detail-value" id="modal-barber"></div>
             </div>
 
             <div class="detail-group">
@@ -928,8 +954,100 @@
                     <label for="store-address" id="label-store-address" style="display: block; margin-bottom: 5px; font-weight: 500;">
                         Store Address <span style="color: red;">*</span>
                     </label>
-                    <textarea id="store-address" placeholder="123 Main Street, City, State 12345" 
+                    <textarea id="store-address" placeholder="123 Main Street, City, State 12345"
                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; min-height: 60px; resize: vertical;"></textarea>
+                </div>
+
+                <!-- Store Hours Section -->
+                <div style="border-top: 1px solid #e0e0e0; margin-top: 20px; padding-top: 15px;">
+                    <h4 id="store-hours-heading" style="margin-bottom: 10px;">Store Hours</h4>
+
+                    <div style="background: #f9f9f9; padding: 10px; border-radius: 5px;">
+                        <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 5px; font-size: 12px; font-weight: 600; color: #666;">
+                            <div id="store-hours-label-day">Day</div>
+                            <div id="store-hours-label-opens" style="text-align: center;">Opens</div>
+                            <div></div>
+                            <div id="store-hours-label-closes" style="text-align: center;">Closes</div>
+                            <div id="store-hours-label-closed" style="text-align: center;">Closed</div>
+                        </div>
+
+                        <!-- Sunday -->
+                        <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
+                            <div id="store-day-sunday" style="font-size: 14px;">Sunday</div>
+                            <input type="time" id="store-sunday-open" value="09:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <span style="text-align: center;">–</span>
+                            <input type="time" id="store-sunday-close" value="18:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <div style="text-align: center;">
+                                <input type="checkbox" id="store-sunday-closed" onchange="toggleStoreDayClosed('sunday')">
+                            </div>
+                        </div>
+
+                        <!-- Monday -->
+                        <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
+                            <div id="store-day-monday" style="font-size: 14px;">Monday</div>
+                            <input type="time" id="store-monday-open" value="09:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <span style="text-align: center;">–</span>
+                            <input type="time" id="store-monday-close" value="18:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <div style="text-align: center;">
+                                <input type="checkbox" id="store-monday-closed" onchange="toggleStoreDayClosed('monday')">
+                            </div>
+                        </div>
+
+                        <!-- Tuesday -->
+                        <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
+                            <div id="store-day-tuesday" style="font-size: 14px;">Tuesday</div>
+                            <input type="time" id="store-tuesday-open" value="09:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <span style="text-align: center;">–</span>
+                            <input type="time" id="store-tuesday-close" value="18:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <div style="text-align: center;">
+                                <input type="checkbox" id="store-tuesday-closed" onchange="toggleStoreDayClosed('tuesday')">
+                            </div>
+                        </div>
+
+                        <!-- Wednesday -->
+                        <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
+                            <div id="store-day-wednesday" style="font-size: 14px;">Wednesday</div>
+                            <input type="time" id="store-wednesday-open" value="09:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <span style="text-align: center;">–</span>
+                            <input type="time" id="store-wednesday-close" value="18:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <div style="text-align: center;">
+                                <input type="checkbox" id="store-wednesday-closed" onchange="toggleStoreDayClosed('wednesday')">
+                            </div>
+                        </div>
+
+                        <!-- Thursday -->
+                        <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
+                            <div id="store-day-thursday" style="font-size: 14px;">Thursday</div>
+                            <input type="time" id="store-thursday-open" value="09:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <span style="text-align: center;">–</span>
+                            <input type="time" id="store-thursday-close" value="18:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <div style="text-align: center;">
+                                <input type="checkbox" id="store-thursday-closed" onchange="toggleStoreDayClosed('thursday')">
+                            </div>
+                        </div>
+
+                        <!-- Friday -->
+                        <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
+                            <div id="store-day-friday" style="font-size: 14px;">Friday</div>
+                            <input type="time" id="store-friday-open" value="09:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <span style="text-align: center;">–</span>
+                            <input type="time" id="store-friday-close" value="18:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <div style="text-align: center;">
+                                <input type="checkbox" id="store-friday-closed" onchange="toggleStoreDayClosed('friday')">
+                            </div>
+                        </div>
+
+                        <!-- Saturday -->
+                        <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
+                            <div id="store-day-saturday" style="font-size: 14px;">Saturday</div>
+                            <input type="time" id="store-saturday-open" value="09:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <span style="text-align: center;">–</span>
+                            <input type="time" id="store-saturday-close" value="18:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <div style="text-align: center;">
+                                <input type="checkbox" id="store-saturday-closed" onchange="toggleStoreDayClosed('saturday')">
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="profile-success" style="display: none; background: #E8F5E9; color: #2E7D32; padding: 10px; border-radius: 4px; margin-top: 15px; text-align: center;">
@@ -1183,7 +1301,13 @@
         <div class="content">
             <!-- Dashboard Section -->
             <div id="dashboard-section" class="section active">
-                <h2 id="dashboard-title">Dashboard</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 id="dashboard-title" style="margin: 0;">Dashboard</h2>
+                    <!-- Barber selector for dashboard -->
+                    <select id="dashboard-barber-select" onchange="selectDashboardBarber(this.value)" style="padding: 8px; border-radius: 5px; border: 1px solid #ddd;">
+                        <option value="" id="dashboard-allstaff-option">All Staff</option>
+                    </select>
+                </div>
 
                 <div class="stats-grid" style="margin-top: 20px;">
                     <div class="dashboard-card">
@@ -1225,8 +1349,14 @@
 
             <!-- Calendar Section -->
             <div id="calendar-section" class="section">
-                <div class="calendar-header">
-                    <h2 id="calendar-title">Calendar</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <div>
+                        <h2 id="calendar-title" style="margin: 0;">Calendar</h2>
+                        <!-- Barber selector for calendar -->
+                        <select id="calendar-barber-select" onchange="selectCalendarBarber(this.value)" style="margin-top: 10px; padding: 8px; border-radius: 5px; border: 1px solid #ddd;">
+                            <option value="" id="calendar-allstaff-option">All Staff</option>
+                        </select>
+                    </div>
                     <div class="calendar-nav">
                         <button onclick="prevWeek()">←</button>
                         <span id="current-week">Week of Sep 16</span>
@@ -1251,9 +1381,30 @@
                 </div>
             </div>
 
-            <!-- Services Section with Store Hours -->
+            <!-- Staff Section -->
             <div id="services-section" class="section">
-                <div style="overflow: hidden; position: relative;">
+                <!-- Staff List Section -->
+                <div id="staff-list-section" style="margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h2 id="staff-title">Staff Members</h2>
+                        <button onclick="addNewStaff()" style="padding: 8px 15px; background: #2196F3; color: white; border: none; border-radius: 5px; cursor: pointer;">Add Staff</button>
+                    </div>
+
+                    <!-- Staff list as clickable items -->
+                    <div id="staff-list" style="display: flex; flex-direction: column; gap: 10px;">
+                        <!-- Staff items will be generated here -->
+                    </div>
+                </div>
+
+                <!-- Current Staff Configuration (hidden by default, shown when staff member selected) -->
+                <div id="current-staff-config" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0;"><span id="config-for-text">Configuration for:</span> <span id="selected-staff-name">Owner</span></h3>
+                        <button id="back-to-staff-btn" onclick="backToStaffList()" style="padding: 8px 15px; background: #666; color: white; border: none; border-radius: 5px; cursor: pointer;">← Back to Staff List</button>
+                    </div>
+                </div>
+
+                <div id="services-config-container" style="overflow: hidden; position: relative; display: none;">
                     <div class="services-pages" id="services-pages">
                         <!-- Page 1: Services -->
                         <div class="services-page">
@@ -1461,13 +1612,22 @@
 
                         <!-- Page 2: Store Hours -->
                         <div class="services-page">
-                            <h2 id="store-hours-title-2">Store Hours</h2>
+                            <h2 id="staff-hours-title">Staff Hours</h2>
+
+                            <!-- Same as store hours checkbox (only show for non-owner staff) -->
+                            <div id="same-as-store-hours-container" style="margin: 15px 0; display: none;">
+                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                    <input type="checkbox" id="same-as-store-hours" onchange="toggleSameAsStoreHours()" style="width: 18px; height: 18px; cursor: pointer;">
+                                    <span id="same-as-store-hours-text" style="font-size: 16px;">Same as store hours</span>
+                                </label>
+                            </div>
+
                             <div class="store-hours" style="margin-top: 20px; padding: 15px; overflow: visible;">
                                 <div class="hours-header">
                                     <div id="header-day-2">Day</div>
-                                    <div id="header-open-2">Opens</div>
+                                    <div id="header-open-2">Start</div>
                                     <div></div>
-                                    <div id="header-close-2">Closes</div>
+                                    <div id="header-close-2">End</div>
                                     <div id="header-closed-2">Closed</div>
                                 </div>
                                 <div class="hours-row">
@@ -1688,8 +1848,8 @@
                 <div id="nav-calendar">Calendar</div>
             </div>
             <div class="nav-item" onclick="showSection('services')">
-                <span>🏪</span>
-                <div id="nav-services">Store</div>
+                <span>👥</span>
+                <div id="nav-services">Staff</div>
             </div>
             <div class="nav-item" onclick="showSection('settings')">
                 <span>⚙️</span>
@@ -1732,17 +1892,37 @@
                 upcomingAppointments: '即将到来的预约',
                 weeklyRevenue: '每周收入',
                 serviceBreakdown: '服务时间分布',
+                allStaff: '所有员工',
                 calendarTitle: '日历',
                 selectedDateAppointments: '今日日程',
                 servicesTitle: '服务项目',
+                storeTitle: '服务项目',
                 settingsTitle: '设置',
                 storeHoursTitle: '营业时间',
+                staffHoursTitle: '员工时间',
+                sameAsStoreHours: '与店铺营业时间相同',
+                storeOpenTime: '开店时间',
+                storeCloseTime: '关店时间',
+                businessDays: '营业日',
+                storeHoursDay: '日期',
+                storeHoursOpens: '开始',
+                storeHoursCloses: '结束',
+                storeHoursClosed: '休息',
+                storeDaySunday: '周日',
+                storeDayMonday: '周一',
+                storeDayTuesday: '周二',
+                storeDayWednesday: '周三',
+                storeDayThursday: '周四',
+                storeDayFriday: '周五',
+                storeDaySaturday: '周六',
                 navDashboard: '仪表盘',
                 navCalendar: '日历',
-                navServices: '店铺',
+                navServices: '员工',
                 navSettings: '设置',
                 addService: '添加新服务',
                 saveSettings: '保存设置',
+                configurationFor: '配置：',
+                backToStaffList: '← 返回员工列表',
                 services: {
                     mensCut: '男士理发',
                     womensCut: '女士理发',
@@ -1865,17 +2045,37 @@
                 upcomingAppointments: 'Upcoming Appointments',
                 weeklyRevenue: 'Weekly Revenue',
                 serviceBreakdown: 'Service Time Breakdown',
+                allStaff: 'All Staff',
                 calendarTitle: 'Calendar',
                 selectedDateAppointments: "Today's Schedule",
                 servicesTitle: 'Services',
+                storeTitle: 'Services',
                 settingsTitle: 'Settings',
-                storeHoursTitle: 'Hours',
+                storeHoursTitle: 'Store Hours',
+                staffHoursTitle: 'Staff Hours',
+                sameAsStoreHours: 'Same as store hours',
+                storeOpenTime: 'Opening Time',
+                storeCloseTime: 'Closing Time',
+                businessDays: 'Business Days',
+                storeHoursDay: 'Day',
+                storeHoursOpens: 'Start',
+                storeHoursCloses: 'End',
+                storeHoursClosed: 'Closed',
+                storeDaySunday: 'Sunday',
+                storeDayMonday: 'Monday',
+                storeDayTuesday: 'Tuesday',
+                storeDayWednesday: 'Wednesday',
+                storeDayThursday: 'Thursday',
+                storeDayFriday: 'Friday',
+                storeDaySaturday: 'Saturday',
                 navDashboard: 'Dashboard',
                 navCalendar: 'Calendar',
-                navServices: 'Store',
+                navServices: 'Staff',
                 navSettings: 'Settings',
                 addService: 'Add New Service',
                 saveSettings: 'Save Settings',
+                configurationFor: 'Configuration for:',
+                backToStaffList: '← Back to Staff List',
                 services: {
                     mensCut: "Men's Cut",
                     womensCut: "Women's Cut",
@@ -1993,6 +2193,21 @@
         function toggleLang() {
             isZh = !isZh;
             updateLanguage();
+
+            // Force update of dropdown text for "All Staff"
+            const t = isZh ? translations.zh : translations.en;
+
+            // Update calendar dropdown
+            const calendarSelect = document.getElementById('calendar-barber-select');
+            if (calendarSelect && calendarSelect.options[0] && calendarSelect.options[0].value === '') {
+                calendarSelect.options[0].text = t.allStaff;
+            }
+
+            // Update dashboard dropdown
+            const dashboardSelect = document.getElementById('dashboard-barber-select');
+            if (dashboardSelect && dashboardSelect.options[0] && dashboardSelect.options[0].value === '') {
+                dashboardSelect.options[0].text = t.allStaff;
+            }
         }
 
         // Helper function to translate service names
@@ -2024,6 +2239,10 @@
             updateElement('app-title', t.appTitle);
             const langToggle = document.querySelector('.lang-toggle');
             if (langToggle) langToggle.textContent = isZh ? 'EN' : '中文';
+
+            // Update All Staff options in dropdowns
+            updateElement('dashboard-allstaff-option', t.allStaff);
+            updateElement('calendar-allstaff-option', t.allStaff);
 
             // Dashboard
             updateElement('dashboard-title', t.dashboardTitle);
@@ -2071,9 +2290,35 @@
             // Settings
             updateElement('settings-title', t.settingsTitle);
 
-            // Store Hours (now in Services tab)
-            const storeHoursEl = document.getElementById('store-hours-title-2');
-            if (storeHoursEl) storeHoursEl.textContent = t.storeHoursTitle;
+            // Staff Hours (in Staff > Services tab)
+            const staffHoursEl = document.getElementById('staff-hours-title');
+            if (staffHoursEl) staffHoursEl.textContent = t.staffHoursTitle;
+
+            // Same as store hours checkbox
+            const sameAsStoreHoursText = document.getElementById('same-as-store-hours-text');
+            if (sameAsStoreHoursText) sameAsStoreHoursText.textContent = t.sameAsStoreHours;
+
+            // Configuration for text
+            updateElement('config-for-text', t.configurationFor);
+
+            // Back to Staff List button
+            updateElement('back-to-staff-btn', t.backToStaffList);
+
+            // Store hours labels in Profile modal
+            updateElement('store-hours-heading', t.storeHoursTitle);
+            updateElement('store-hours-label-day', t.storeHoursDay);
+            updateElement('store-hours-label-opens', t.storeHoursOpens);
+            updateElement('store-hours-label-closes', t.storeHoursCloses);
+            updateElement('store-hours-label-closed', t.storeHoursClosed);
+
+            // Store hours day names
+            updateElement('store-day-sunday', t.storeDaySunday);
+            updateElement('store-day-monday', t.storeDayMonday);
+            updateElement('store-day-tuesday', t.storeDayTuesday);
+            updateElement('store-day-wednesday', t.storeDayWednesday);
+            updateElement('store-day-thursday', t.storeDayThursday);
+            updateElement('store-day-friday', t.storeDayFriday);
+            updateElement('store-day-saturday', t.storeDaySaturday);
 
             // Update day labels in store hours
             const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -2089,8 +2334,8 @@
             const headerClosed2 = document.getElementById('header-closed-2');
 
             if (headerDay2) headerDay2.textContent = isZh ? '日期' : 'Day';
-            if (headerOpen2) headerOpen2.textContent = isZh ? '开始' : 'Opens';
-            if (headerClose2) headerClose2.textContent = isZh ? '结束' : 'Closes';
+            if (headerOpen2) headerOpen2.textContent = isZh ? '开始' : 'Start';
+            if (headerClose2) headerClose2.textContent = isZh ? '结束' : 'End';
             if (headerClosed2) headerClosed2.textContent = t.closed;
 
             // Owner Booking Modal
@@ -2293,13 +2538,23 @@
 
             // Generate calendar if showing calendar section
             if (section === 'calendar') {
-                generateWeeklyCalendar();
+                // Generate appropriate view based on selected barber
+                if (calendarBarberId === '') {
+                    calendarViewMode = 'day';
+                    generateDayViewCalendar();
+                } else {
+                    calendarViewMode = 'week';
+                    generateWeeklyCalendar();
+                }
             }
 
             // Update dashboard metrics if showing dashboard section
             if (section === 'dashboard') {
                 updateDashboardMetrics();
             }
+
+            // Re-populate barber selectors with translated "All Staff" option
+            populateBarberSelectors();
         }
 
         function toggleService(element) {
@@ -2447,8 +2702,104 @@
             }
         }
 
+        function toggleStoreDayClosed(day) {
+            const checkbox = document.getElementById(`store-${day}-closed`);
+            const openInput = document.getElementById(`store-${day}-open`);
+            const closeInput = document.getElementById(`store-${day}-close`);
+
+            if (checkbox.checked) {
+                openInput.disabled = true;
+                closeInput.disabled = true;
+                openInput.value = '';
+                closeInput.value = '';
+            } else {
+                openInput.disabled = false;
+                closeInput.disabled = false;
+                openInput.value = '09:00';
+                closeInput.value = '18:00';
+            }
+        }
+
+        // Helper function to convert time string to minutes for comparison
+        function timeToMinutes(timeStr) {
+            if (!timeStr) return 0;
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            return hours * 60 + minutes;
+        }
+
+        function toggleSameAsStoreHours() {
+            const checkbox = document.getElementById('same-as-store-hours');
+            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+            if (checkbox.checked) {
+                // Get store hours from owner profile
+                const ownerProfile = JSON.parse(localStorage.getItem('ownerProfile') || '{}');
+                const storeHours = ownerProfile.storeHours;
+
+                if (storeHours) {
+                    // Apply store hours to employee
+                    days.forEach(day => {
+                        const dayCheckbox = document.getElementById(`${day}-closed`);
+                        const openInput = document.getElementById(`${day}-open`);
+                        const closeInput = document.getElementById(`${day}-close`);
+
+                        // Check if store has hours for this day
+                        const dayHours = storeHours[day];
+                        if (dayHours) {
+                            if (dayHours.closed) {
+                                // Store is closed this day
+                                dayCheckbox.checked = true;
+                                openInput.disabled = true;
+                                closeInput.disabled = true;
+                                openInput.value = '';
+                                closeInput.value = '';
+                            } else {
+                                // Store is open this day
+                                dayCheckbox.checked = false;
+                                openInput.disabled = true; // Disabled because using store hours
+                                closeInput.disabled = true; // Disabled because using store hours
+                                openInput.value = dayHours.open || '09:00';
+                                closeInput.value = dayHours.close || '18:00';
+                            }
+                        } else {
+                            // No specific hours for this day, use defaults
+                            dayCheckbox.checked = false;
+                            openInput.disabled = true;
+                            closeInput.disabled = true;
+                            openInput.value = '09:00';
+                            closeInput.value = '18:00';
+                        }
+
+                        // Disable checkbox when using store hours
+                        dayCheckbox.disabled = true;
+                    });
+
+                    // Save immediately
+                    saveStoreHours();
+                } else {
+                    // No store hours set, use defaults
+                    alert('Store hours not set. Please configure store hours in Settings > Profile first.');
+                    checkbox.checked = false;
+                }
+            } else {
+                // Enable all inputs when not using store hours
+                days.forEach(day => {
+                    const dayCheckbox = document.getElementById(`${day}-closed`);
+                    const openInput = document.getElementById(`${day}-open`);
+                    const closeInput = document.getElementById(`${day}-close`);
+                    dayCheckbox.disabled = false;
+                    if (!dayCheckbox.checked) {
+                        openInput.disabled = false;
+                        closeInput.disabled = false;
+                    }
+                });
+            }
+        }
+
         function loadStoreHours() {
-            const hours = SharedData.getStoreHours();
+            // Get hours for current barber
+            const barber = SharedData.getBarberById(window.currentBarberId || 'owner');
+            const hours = barber ? (barber.hours || SharedData.getStoreHours()) : SharedData.getStoreHours();
             const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
             // Also check for existing time off
@@ -2485,41 +2836,266 @@
             const hours = {};
             let hasError = false;
 
+
+            // Get store hours for validation
+            const ownerProfile = JSON.parse(localStorage.getItem('ownerProfile') || '{}');
+            const storeHours = ownerProfile.storeHours;
+
+            // Process and validate hours for ALL staff (including owner)
+            if (storeHours) {
+                // Validate everyone's hours against store hours
+                const sameAsStoreCheckbox = document.getElementById('same-as-store-hours');
+
+                if (sameAsStoreCheckbox && sameAsStoreCheckbox.checked) {
+                    // Using store hours - no validation needed
+                    days.forEach(day => {
+                        const openInput = document.getElementById(`${day}-open`);
+                        const closeInput = document.getElementById(`${day}-close`);
+                        const closedCheckbox = document.getElementById(`${day}-closed`);
+
+                        if (closedCheckbox.checked) {
+                            hours[day] = { open: '', close: '', closed: true };
+                        } else {
+                            hours[day] = { open: openInput.value, close: closeInput.value, closed: false };
+                        }
+                    });
+                } else {
+                    // Not using store hours - validate each day
+                    days.forEach(day => {
+                        const openInput = document.getElementById(`${day}-open`);
+                        const closeInput = document.getElementById(`${day}-close`);
+                        const closedCheckbox = document.getElementById(`${day}-closed`);
+
+                        if (closedCheckbox.checked) {
+                            hours[day] = { open: '', close: '', closed: true };
+                        } else {
+                            const openTime = openInput.value;
+                            const closeTime = closeInput.value;
+
+                            // Validate times are provided
+                            if (!openTime || !closeTime) {
+                                hasError = true;
+                                openInput.style.borderColor = '#f44336';
+                                closeInput.style.borderColor = '#f44336';
+                            } else if (storeHours && storeHours[day]) {
+                                // Check if store has hours for this day
+                                const storeDayHours = storeHours[day];
+                                if (storeDayHours.closed) {
+                                    hasError = true;
+                                    openInput.style.borderColor = '#f44336';
+                                    closeInput.style.borderColor = '#f44336';
+
+                                    const messageDiv = document.getElementById('hours-message');
+                                    if (messageDiv) {
+                                        const dayName = day.charAt(0).toUpperCase() + day.slice(1);
+                                        messageDiv.textContent = `${dayName}: Cannot set hours - store is closed this day`;
+                                        messageDiv.style.display = 'block';
+                                        messageDiv.style.background = '#ff9800';
+                                        messageDiv.style.color = 'white';
+                                    }
+                                } else {
+                                    // Validate employee hours are within store hours
+                                    const storeOpen = storeDayHours.open;
+                                    const storeClose = storeDayHours.close;
+
+                                    if (!storeOpen || !storeClose) {
+                                        // Store hours incomplete for this day, allow any hours
+                                        hours[day] = { open: openTime, close: closeTime, closed: false };
+                                        return; // Skip to next iteration in forEach
+                                    }
+
+                                    // Convert times to minutes for proper comparison
+                                    const empOpenMinutes = timeToMinutes(openTime);
+                                    const empCloseMinutes = timeToMinutes(closeTime);
+                                    const storeOpenMinutes = timeToMinutes(storeOpen);
+                                    const storeCloseMinutes = timeToMinutes(storeClose);
+
+                                    // Check if end time is before start time
+                                    if (empCloseMinutes <= empOpenMinutes) {
+                                        hasError = true;
+                                        openInput.style.borderColor = '#f44336';
+                                        closeInput.style.borderColor = '#f44336';
+
+                                        const messageDiv = document.getElementById('hours-message');
+                                        if (messageDiv) {
+                                            const dayName = day.charAt(0).toUpperCase() + day.slice(1);
+                                            messageDiv.textContent = `${dayName}: End time (${closeTime}) must be after start time (${openTime})`;
+                                            messageDiv.style.display = 'block';
+                                            messageDiv.style.background = '#f44336';
+                                            messageDiv.style.color = 'white';
+                                        }
+                                    } else if (empOpenMinutes < storeOpenMinutes || empCloseMinutes > storeCloseMinutes) {
+                                        hasError = true;
+                                        openInput.style.borderColor = '#f44336';
+                                        closeInput.style.borderColor = '#f44336';
+
+                                        const messageDiv = document.getElementById('hours-message');
+                                        if (messageDiv) {
+                                            const dayName = day.charAt(0).toUpperCase() + day.slice(1);
+                                            let errorMsg = '';
+                                            if (empOpenMinutes < storeOpenMinutes && empCloseMinutes > storeCloseMinutes) {
+                                                errorMsg = `${dayName}: Hours (${openTime}-${closeTime}) must be within store hours (${storeOpen}-${storeClose})`;
+                                            } else if (empOpenMinutes < storeOpenMinutes) {
+                                                errorMsg = `${dayName}: Start time (${openTime}) cannot be before store opening (${storeOpen})`;
+                                            } else if (empCloseMinutes > storeCloseMinutes) {
+                                                errorMsg = `${dayName}: End time (${closeTime}) cannot be after store closing (${storeClose})`;
+                                            }
+                                            messageDiv.textContent = errorMsg;
+                                            messageDiv.style.display = 'block';
+                                            messageDiv.style.background = '#f44336';
+                                            messageDiv.style.color = 'white';
+                                        }
+                                        // Don't add to hours object when validation fails
+                                    } else {
+                                        openInput.style.borderColor = '';
+                                        closeInput.style.borderColor = '';
+                                        hours[day] = { open: openTime, close: closeTime, closed: false };
+                                    }
+                                }
+                            } else {
+                                // No store hours set for this day or no store hours at all
+                                // No store hours to validate against, but still check start/end time logic
+                                const openMinutes = timeToMinutes(openTime);
+                                const closeMinutes = timeToMinutes(closeTime);
+
+                                if (closeMinutes <= openMinutes) {
+                                    hasError = true;
+                                    openInput.style.borderColor = '#f44336';
+                                    closeInput.style.borderColor = '#f44336';
+
+                                    const messageDiv = document.getElementById('hours-message');
+                                    if (messageDiv) {
+                                        const dayName = day.charAt(0).toUpperCase() + day.slice(1);
+                                        messageDiv.textContent = `${dayName}: End time (${closeTime}) must be after start time (${openTime})`;
+                                        messageDiv.style.display = 'block';
+                                        messageDiv.style.background = '#f44336';
+                                        messageDiv.style.color = 'white';
+                                    }
+                                } else {
+                                    if (!storeHours) {
+                                        // Show warning once
+                                        const messageDiv = document.getElementById('hours-message');
+                                        if (messageDiv && messageDiv.textContent === '') {
+                                            messageDiv.textContent = 'Warning: Store hours not set. Please configure in Settings > Profile';
+                                            messageDiv.style.display = 'block';
+                                            messageDiv.style.background = '#ff9800';
+                                            messageDiv.style.color = 'white';
+                                        }
+                                    }
+                                    hours[day] = { open: openTime, close: closeTime, closed: false };
+                                }
+                            }
+                        }
+                    });
+                }
+            } else {
+                // No store hours set - allow any hours but show warning
+                const messageDiv = document.getElementById('hours-message');
+                if (messageDiv) {
+                    messageDiv.textContent = isZh ? '警告：未设置商店时间' : 'Warning: Store hours not set. Please configure in Settings > Profile';
+                    messageDiv.style.display = 'block';
+                    messageDiv.style.background = '#ff9800';
+                    messageDiv.style.color = 'white';
+                }
+
+                days.forEach(day => {
+                    const openInput = document.getElementById(`${day}-open`);
+                    const closeInput = document.getElementById(`${day}-close`);
+                    const closedCheckbox = document.getElementById(`${day}-closed`);
+
+                    if (closedCheckbox.checked) {
+                        hours[day] = { open: '', close: '', closed: true };
+                    } else {
+                        const openTime = openInput.value;
+                        const closeTime = closeInput.value;
+
+                        // Validate times - check if times are provided and in correct format
+                        if (!openTime || !closeTime) {
+                            hasError = true;
+                            openInput.style.borderColor = '#f44336';
+                            closeInput.style.borderColor = '#f44336';
+                        } else if (!/^\d{2}:\d{2}$/.test(openTime) || !/^\d{2}:\d{2}$/.test(closeTime)) {
+                            // Basic time format validation (HH:MM)
+                            hasError = true;
+                            if (!/^\d{2}:\d{2}$/.test(openTime)) openInput.style.borderColor = '#f44336';
+                            if (!/^\d{2}:\d{2}$/.test(closeTime)) closeInput.style.borderColor = '#f44336';
+                        } else {
+                            // Check if end time is before or equal to start time
+                            const openMinutes = timeToMinutes(openTime);
+                            const closeMinutes = timeToMinutes(closeTime);
+
+                            if (closeMinutes <= openMinutes) {
+                                hasError = true;
+                                openInput.style.borderColor = '#f44336';
+                                closeInput.style.borderColor = '#f44336';
+
+                                const messageDiv = document.getElementById('hours-message');
+                                if (messageDiv) {
+                                    const dayName = day.charAt(0).toUpperCase() + day.slice(1);
+                                    messageDiv.textContent = `${dayName}: End time (${closeTime}) must be after start time (${openTime})`;
+                                    messageDiv.style.display = 'block';
+                                    messageDiv.style.background = '#f44336';
+                                    messageDiv.style.color = 'white';
+                                }
+                            } else {
+                                openInput.style.borderColor = '';
+                                closeInput.style.borderColor = '';
+                                hours[day] = { open: openTime, close: closeTime, closed: false };
+                            }
+                        }
+                    }
+                });
+            }
+
+            if (hasError) {
+                const messageDiv = document.getElementById('hours-message');
+                if (messageDiv && !messageDiv.textContent) {
+                    messageDiv.textContent = isZh ? '请检查输入的时间' : 'Please check the time inputs';
+                    messageDiv.style.display = 'block';
+                    messageDiv.style.background = '#f44336';
+                    messageDiv.style.color = 'white';
+                }
+                setTimeout(() => {
+                    const msg = document.getElementById('hours-message');
+                    if (msg) msg.style.display = 'none';
+                }, 5000);
+                return; // EXIT HERE - DO NOT SAVE
+            }
+
+
+
+            // Save hours for current barber
+            if (window.currentBarberId) {
+                // Check if using store hours (only for non-owner staff)
+                const sameAsStoreCheckbox = document.getElementById('same-as-store-hours');
+                const usesStoreHours = sameAsStoreCheckbox ? sameAsStoreCheckbox.checked : false;
+                SharedData.updateBarber(window.currentBarberId, { hours, usesStoreHours });
+
+                // If this is the owner, also save as store hours
+                if (window.currentBarberId === 'owner') {
+                    SharedData.saveStoreHours(hours);
+                }
+            }
+
+            // Clear any error borders on successful save
             days.forEach(day => {
                 const openInput = document.getElementById(`${day}-open`);
                 const closeInput = document.getElementById(`${day}-close`);
-                const closedCheckbox = document.getElementById(`${day}-closed`);
-
-                if (closedCheckbox.checked) {
-                    hours[day] = { open: '', close: '', closed: true };
-                } else {
-                    const openTime = openInput.value;
-                    const closeTime = closeInput.value;
-
-                    // Validate times
-                    if (!openTime || !closeTime) {
-                        hasError = true;
-                        openInput.style.borderColor = '#f44336';
-                        closeInput.style.borderColor = '#f44336';
-                    } else if (!SharedData.validateTime(openTime) || !SharedData.validateTime(closeTime)) {
-                        hasError = true;
-                        if (!SharedData.validateTime(openTime)) openInput.style.borderColor = '#f44336';
-                        if (!SharedData.validateTime(closeTime)) closeInput.style.borderColor = '#f44336';
-                    } else {
-                        openInput.style.borderColor = '';
-                        closeInput.style.borderColor = '';
-                        hours[day] = { open: openTime, close: closeTime, closed: false };
-                    }
-                }
+                if (openInput) openInput.style.borderColor = '';
+                if (closeInput) closeInput.style.borderColor = '';
             });
 
-            if (hasError) {
-                showMessage('Please enter valid times (HH:MM format, 00:00-23:59)', 'error');
-                return;
+            // Show success message
+            const messageDiv = document.getElementById('hours-message');
+            if (messageDiv) {
+                messageDiv.textContent = isZh ? '时间已保存！' : 'Hours saved successfully!';
+                messageDiv.style.display = 'block';
+                messageDiv.style.background = '#4CAF50';
+                messageDiv.style.color = 'white';
+                setTimeout(() => {
+                    messageDiv.style.display = 'none';
+                }, 3000);
             }
-
-            SharedData.saveStoreHours(hours);
-            showMessage('Store hours saved successfully!', 'success');
         }
 
         // Time Off Management Functions
@@ -3018,7 +3594,9 @@
         }
 
         function saveServices() {
-            const services = SharedData.getServices();
+            // Get services for current barber
+            const barber = SharedData.getBarberById(window.currentBarberId || 'owner');
+            const services = barber ? barber.services : SharedData.getServices();
             let hasErrors = false;
 
             // Get all service items
@@ -3130,6 +3708,12 @@
                 document.body.appendChild(messageDiv);
             }
 
+            // Save services for current barber
+            if (window.currentBarberId && window.currentBarberId !== 'owner') {
+                SharedData.updateBarber(window.currentBarberId, { services });
+            } else {
+                SharedData.saveServices(services);
+            }
             messageDiv.textContent = isZh ? '服务已保存' : 'Services saved';
             messageDiv.style.display = 'block';
 
@@ -3139,7 +3723,9 @@
         }
 
         function loadServices() {
-            const services = SharedData.getServices();
+            // Get services for current barber
+            const barber = SharedData.getBarberById(window.currentBarberId || 'owner');
+            const services = barber ? (barber.services || SharedData.getServices()) : SharedData.getServices();
 
             // Load service data for each item
             document.querySelectorAll('.service-item[data-service]').forEach(item => {
@@ -3265,7 +3851,32 @@
             document.getElementById('owner-wechat').value = profile.wechatId || '';
             document.getElementById('store-name').value = profile.storeName || 'Premium Cuts Barbershop';
             document.getElementById('store-address').value = profile.storeAddress || '';
-            
+
+            // Load store hours (new per-day format)
+            const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+            const storeHours = profile.storeHours || {};
+
+            days.forEach(day => {
+                const dayHours = storeHours[day] || { open: '09:00', close: '18:00', closed: false };
+                const openInput = document.getElementById(`store-${day}-open`);
+                const closeInput = document.getElementById(`store-${day}-close`);
+                const closedCheckbox = document.getElementById(`store-${day}-closed`);
+
+                if (dayHours.closed) {
+                    closedCheckbox.checked = true;
+                    openInput.disabled = true;
+                    closeInput.disabled = true;
+                    openInput.value = '';
+                    closeInput.value = '';
+                } else {
+                    closedCheckbox.checked = false;
+                    openInput.disabled = false;
+                    closeInput.disabled = false;
+                    openInput.value = dayHours.open || '09:00';
+                    closeInput.value = dayHours.close || '18:00';
+                }
+            });
+
             // Show modal
             document.getElementById('profile-modal').style.display = 'flex';
         }
@@ -3358,6 +3969,26 @@
             }
 
             // Save profile
+            // Save store hours in new per-day format
+            const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+            const storeHours = {};
+
+            days.forEach(day => {
+                const openInput = document.getElementById(`store-${day}-open`);
+                const closeInput = document.getElementById(`store-${day}-close`);
+                const closedCheckbox = document.getElementById(`store-${day}-closed`);
+
+                if (closedCheckbox.checked) {
+                    storeHours[day] = { open: '', close: '', closed: true };
+                } else {
+                    storeHours[day] = {
+                        open: openInput.value || '09:00',
+                        close: closeInput.value || '18:00',
+                        closed: false
+                    };
+                }
+            });
+
             const profile = {
                 firstName,
                 lastName,
@@ -3366,14 +3997,23 @@
                 wechatId,
                 storeName,
                 storeAddress,
+                storeHours,
                 updatedAt: new Date().toISOString()
             };
-            
+
             localStorage.setItem('ownerProfile', JSON.stringify(profile));
-            
+
+            // If there's only the owner (no other staff), sync their hours with store hours
+            const barbers = SharedData.getBarbers();
+            if (barbers.length === 1 && barbers[0].id === 'owner') {
+                // Store hours are already in the correct format
+                SharedData.updateBarber('owner', { hours: storeHours });
+                SharedData.saveStoreHours(storeHours);
+            }
+
             // Show success message
             document.getElementById('profile-success').style.display = 'block';
-            
+
             // Hide success message after 2 seconds and close modal
             setTimeout(() => {
                 closeProfileModal();
@@ -3807,12 +4447,503 @@
             });
         }
 
+        // Day view calendar with staff columns for "All Staff" view
+        function generateDayViewCalendar() {
+            const weekHeader = document.getElementById('week-header');
+            const timeSlotsContainer = document.getElementById('time-slots');
+
+            weekHeader.innerHTML = '';
+            timeSlotsContainer.innerHTML = '';
+
+            // Generate service color legend first
+            generateServiceLegend();
+
+            // Update display to show current day (using currentWeekStart as the selected date)
+            const currentDay = new Date(currentWeekStart);
+            const dayNames = isZh ? ['周日', '周一', '周二', '周三', '周四', '周五', '周六'] :
+                                    ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const monthNames = isZh ?
+                ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'] :
+                ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+            document.getElementById('current-week').textContent =
+                `${monthNames[currentDay.getMonth()]} ${currentDay.getDate()}, ${currentDay.getFullYear()} - ${dayNames[currentDay.getDay()]}`;
+
+            // Set up grid template for header
+            const numBarbers = barbers.length || 1;
+            weekHeader.style.display = 'grid';
+            weekHeader.style.gridTemplateColumns = `40px repeat(${numBarbers}, 1fr)`;
+            weekHeader.style.gap = '0';
+            weekHeader.style.marginBottom = '0';
+
+            // Add empty corner cell
+            const cornerCell = document.createElement('div');
+            cornerCell.style.cssText = 'background: #f5f5f5; padding: 5px; border-right: 1px solid #ddd;';
+            weekHeader.appendChild(cornerCell);
+
+            // Add barber headers with proper alignment
+            barbers.forEach((barber, index) => {
+                const barberHeader = document.createElement('div');
+                barberHeader.className = 'week-day';
+                barberHeader.style.cssText = `
+                    background: #4A90E2;
+                    color: white;
+                    text-align: center;
+                    padding: 8px 5px;
+                    font-weight: bold;
+                    font-size: 12px;
+                    border-right: ${index < barbers.length - 1 ? '1px solid #3a7bc8' : 'none'};
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                `;
+                barberHeader.textContent = barber.name;
+                weekHeader.appendChild(barberHeader);
+            });
+
+            // Create time slots grid
+            const startHour = 7;
+            const endHour = 21;
+
+            // Set up time slots container with proper grid matching header
+            timeSlotsContainer.style.display = 'grid';
+            timeSlotsContainer.style.gridTemplateColumns = `40px repeat(${numBarbers}, 1fr)`;
+            timeSlotsContainer.style.gap = '0';
+
+            // Generate time slots
+            for (let hour = startHour; hour <= endHour; hour++) {
+                // Time label
+                const timeLabel = document.createElement('div');
+                timeLabel.className = 'time-label';
+                const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+                const ampm = hour >= 12 ? 'PM' : 'AM';
+                timeLabel.textContent = `${displayHour} ${ampm}`;
+                timeLabel.style.cssText = `
+                    background: #f5f5f5;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 11px;
+                    height: 50px;
+                    border-right: 1px solid #ddd;
+                    border-bottom: 1px solid #e0e0e0;
+                `;
+                timeSlotsContainer.appendChild(timeLabel);
+
+                // Barber slots for this hour
+                barbers.forEach((barber, barberIndex) => {
+                    const slot = document.createElement('div');
+                    slot.className = 'time-slot';
+                    slot.dataset.hour = hour;
+                    slot.dataset.barberId = barber.id;
+                    slot.dataset.barberIndex = barberIndex;
+                    slot.style.cssText = `
+                        position: relative;
+                        background: white;
+                        border-right: ${barberIndex < barbers.length - 1 ? '1px solid #e0e0e0' : 'none'};
+                        border-bottom: 1px solid #e0e0e0;
+                        cursor: pointer;
+                        height: 50px;
+                        z-index: 0;
+                    `;
+
+                    // Create 4 sub-slots for 15-minute intervals
+                    for (let quarter = 0; quarter < 4; quarter++) {
+                        const subSlot = document.createElement('div');
+                        subSlot.style.cssText = 'position: absolute; left: 0; right: 0; height: 25%; cursor: pointer;';
+                        subSlot.style.top = `${quarter * 25}%`;
+                        subSlot.dataset.minutes = quarter * 15;
+
+                        subSlot.addEventListener('click', function(e) {
+                            if (!e.target.closest('.appointment-block') && !e.target.closest('.appointment-period') && !e.target.closest('.appointment-clickable') && !e.target.closest('.blocked-time-block')) {
+                                e.stopPropagation();
+                                const startMinutes = hour * 60 + quarter * 15;
+                                // Open booking modal with specific barber selected
+                                openOwnerBookingModalForBarber(currentDay.getDay(), Math.floor(startMinutes / 60), startMinutes % 60, barber.id);
+                            }
+                        });
+
+                        slot.appendChild(subSlot);
+                    }
+
+                    // Add drag and drop handlers for moving appointments
+                    slot.ondragover = (e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+
+                        // Calculate which 15-minute interval is being hovered
+                        const rect = slot.getBoundingClientRect();
+                        const relativeY = e.clientY - rect.top;
+                        const slotHeight = rect.height;
+                        const quarterHeight = slotHeight / 4;
+
+                        // Determine which quarter we're in
+                        const quarter = Math.floor(relativeY / quarterHeight);
+                        const boundedQuarter = Math.max(0, Math.min(3, quarter));
+
+                        // Visual feedback - highlight the quarter
+                        slot.style.background = `linear-gradient(to bottom,
+                            transparent ${boundedQuarter * 25}%,
+                            rgba(33, 150, 243, 0.1) ${boundedQuarter * 25}%,
+                            rgba(33, 150, 243, 0.1) ${(boundedQuarter + 1) * 25}%,
+                            transparent ${(boundedQuarter + 1) * 25}%)`;
+                    };
+
+                    slot.ondragleave = () => {
+                        slot.style.background = '';
+                    };
+
+                    slot.ondrop = (e) => {
+                        e.preventDefault();
+                        slot.style.background = '';
+
+                        // Calculate which 15-minute interval was dropped on
+                        const rect = slot.getBoundingClientRect();
+                        const relativeY = e.clientY - rect.top;
+                        const slotHeight = rect.height;
+                        const quarterHeight = slotHeight / 4;
+
+                        // Determine which quarter (0-3) for minutes (00, 15, 30, 45)
+                        let quarter = Math.floor(relativeY / quarterHeight);
+                        quarter = Math.max(0, Math.min(3, quarter));
+                        const minutes = quarter * 15;
+
+                        const appointmentId = e.dataTransfer.getData('appointmentId');
+                        const blockId = e.dataTransfer.getData('blockId');
+
+                        const targetDate = new Date(currentWeekStart);
+                        targetDate.setDate(currentWeekStart.getDate()); // Day view is always current day
+                        const dateStr = targetDate.toISOString().split('T')[0];
+                        const newTime = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
+                        if (appointmentId) {
+                            // Handle appointment drop
+                            const appointments = SharedData.getAppointments();
+                            const appointment = appointments.find(apt => apt.id === appointmentId);
+
+                            if (appointment) {
+                                // Create a temporary appointment object with new values to check conflicts
+                                const tempAppointment = {
+                                    ...appointment,
+                                    date: dateStr,
+                                    time: newTime,
+                                    barberId: barber.id
+                                };
+
+                                // Check for conflicts at the new time and barber
+                                // We need to check if moving this appointment to the new barber/time would cause a conflict
+                                let hasConflict = false;
+
+                                const [newHour, newMin] = newTime.split(':').map(Number);
+                                const newStartMinutes = newHour * 60 + newMin;
+                                const newEndMinutes = newStartMinutes + appointment.totalDuration;
+
+                                for (const apt of appointments) {
+                                    // Skip the appointment being moved
+                                    if (apt.id === appointmentId) continue;
+
+                                    // Skip if different date
+                                    if (apt.date !== dateStr) continue;
+
+                                    // Skip if different barber
+                                    if (apt.barberId && barber.id && apt.barberId !== barber.id) continue;
+
+                                    const [aptHour, aptMin] = apt.time.split(':').map(Number);
+                                    const aptStartMinutes = aptHour * 60 + aptMin;
+
+                                    // Check if appointments overlap at all
+                                    const aptEndMinutes = aptStartMinutes + apt.totalDuration;
+                                    if (newStartMinutes >= aptEndMinutes || newEndMinutes <= aptStartMinutes) {
+                                        // No overlap at all, skip this appointment
+                                        continue;
+                                    }
+
+                                    // They overlap in time, now check active periods
+                                    if (apt.activePeriods && apt.activePeriods.length > 0) {
+                                        // Check if the new appointment conflicts with any active period
+                                        for (const period of apt.activePeriods) {
+                                            const periodStart = aptStartMinutes + period.start;
+                                            const periodEnd = aptStartMinutes + period.end;
+
+                                            // Check if new appointment overlaps with this active period
+                                            if (newStartMinutes < periodEnd && newEndMinutes > periodStart) {
+                                                console.log('Conflict with active period:', period);
+                                                hasConflict = true;
+                                                break;
+                                            }
+                                        }
+                                    } else {
+                                        // No active periods means the entire appointment is active
+                                        console.log('Conflict with full appointment (no active periods)');
+                                        hasConflict = true;
+                                    }
+
+                                    if (hasConflict) break;
+                                }
+
+                                if (!hasConflict) {
+                                    // Update appointment
+                                    appointment.date = dateStr;
+                                    appointment.time = newTime;
+                                    appointment.barberId = barber.id; // Update to the target barber
+
+                                    // Save and refresh
+                                    localStorage.setItem('appointments', JSON.stringify(appointments));
+
+                                    // Reload the day view appointments
+                                    setTimeout(() => {
+                                        loadDayAppointments();
+                                        loadAppointments(); // Refresh dashboard
+                                        updateDashboardMetrics();
+                                    }, 100);
+                                } else {
+                                    alert(isZh ? '该时间段与现有预约冲突' : 'This time slot conflicts with an existing appointment');
+                                }
+                            }
+                        }
+                    };
+
+                    timeSlotsContainer.appendChild(slot);
+                });
+            }
+
+            // Load appointments for the day
+            loadDayAppointments();
+        }
+
+        // Load appointments for day view (all staff)
+        function loadDayAppointments() {
+            const appointments = SharedData.getAppointments();
+            const selectedDate = new Date(currentWeekStart);
+            const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+
+            // Clear existing appointments and periods
+            document.querySelectorAll('.appointment-block, .appointment-period').forEach(block => block.remove());
+
+            // Filter appointments for selected date
+            const todayAppointments = appointments.filter(apt => apt.date === dateStr);
+            const heightPerHour = 50;
+
+            todayAppointments.forEach(apt => {
+                // Find the barber
+                const barberIndex = barbers.findIndex(b => b.id === (apt.barberId || 'owner'));
+                if (barberIndex === -1) return;
+
+                // Parse appointment start time
+                const [startHour, startMinutes] = apt.time.split(':').map(Number);
+
+                // Get service color
+                const services = SharedData.getServicesWithColors();
+                const firstServiceId = apt.services ? apt.services[0] : null;
+                let serviceColor = '#4A90E2'; // Default color
+                if (firstServiceId && services[firstServiceId]) {
+                    serviceColor = services[firstServiceId].color || '#4A90E2';
+                }
+
+                // Helper function to render a block that may span multiple hours
+                const renderPeriod = (periodStart, periodEnd, isActive, showText) => {
+                    let currentMin = periodStart;
+                    let isFirstBlock = true;
+
+                    while (currentMin < periodEnd) {
+                        // Calculate which hour this block belongs to
+                        const totalMinutes = startHour * 60 + startMinutes + currentMin;
+                        const currentHour = Math.floor(totalMinutes / 60);
+                        const minuteInHour = totalMinutes % 60;
+
+                        // Calculate how much of this period fits in the current hour
+                        const remainingInHour = 60 - minuteInHour;
+                        const periodRemaining = periodEnd - currentMin;
+                        const blockDuration = Math.min(remainingInHour, periodRemaining);
+
+                        // Check if this is the last segment
+                        const isLastBlock = (currentMin + blockDuration >= periodEnd);
+
+                        // Check if block extends to hour boundary
+                        const extendsToHourBoundary = (blockDuration === remainingInHour && !isLastBlock);
+
+                        // Find the target slot
+                        const targetSlot = document.querySelector(`.time-slot[data-hour="${currentHour}"][data-barber-id="${apt.barberId || 'owner'}"]`);
+                        if (targetSlot) {
+                            const block = document.createElement('div');
+                            block.className = isActive ? 'appointment-period active appointment-clickable' : 'appointment-period inactive';
+
+                            const topOffset = (minuteInHour / 60) * heightPerHour;
+                            let blockHeight = (blockDuration / 60) * heightPerHour;
+
+                            // Determine border radius based on position
+                            let borderRadius = '0';
+                            if (isFirstBlock && isLastBlock) {
+                                borderRadius = '4px'; // Single block gets full radius
+                            } else if (isFirstBlock) {
+                                borderRadius = '4px 4px 0 0'; // First block: top rounded
+                            } else if (isLastBlock) {
+                                borderRadius = '0 0 4px 4px'; // Last block: bottom rounded
+                            }
+
+                            if (isActive) {
+                                // Adjust for seamless connection
+                                let adjustedHeight = blockHeight;
+                                let adjustedTop = topOffset;
+
+                                if (isFirstBlock && !isLastBlock) {
+                                    adjustedTop = topOffset + 1;
+                                    adjustedHeight = extendsToHourBoundary ? blockHeight + 10 : blockHeight - 1;
+                                } else if (!isFirstBlock && !isLastBlock) {
+                                    adjustedTop = topOffset - 10;
+                                    adjustedHeight = extendsToHourBoundary ? blockHeight + 20 : blockHeight + 10;
+                                } else if (!isFirstBlock && isLastBlock) {
+                                    adjustedTop = topOffset - 10;
+                                    adjustedHeight = blockHeight + 8;
+                                } else {
+                                    // Single block within hour
+                                    adjustedTop = topOffset + 1;
+                                    adjustedHeight = blockHeight - 2;
+                                }
+
+                                // Always allow text overflow for blocks with text
+                                const overflowStyle = (isFirstBlock && showText) ? 'visible' : 'hidden';
+                                const zIndex = isFirstBlock && showText ? 12 : 10; // Text blocks on top
+
+                                block.style.cssText = `
+                                    position: absolute;
+                                    left: 2px;
+                                    right: 2px;
+                                    height: ${adjustedHeight}px;
+                                    top: ${adjustedTop}px;
+                                    background: ${serviceColor};
+                                    color: white;
+                                    border-radius: ${borderRadius};
+                                    padding: 2px 5px;
+                                    font-size: 11px;
+                                    overflow: ${overflowStyle};
+                                    cursor: pointer;
+                                    z-index: ${zIndex};
+                                    pointer-events: auto;
+                                `;
+
+                                // Remove customer names from calendar blocks for consistency
+                                // Names are visible when clicking on appointments
+
+                                // Add click handler
+                                (function(appointment) {
+                                    block.addEventListener('click', function(e) {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        showAppointmentDetails(appointment);
+                                    }, false);
+                                })(apt);
+
+                                // Make draggable
+                                block.draggable = true;
+                                block.dataset.appointmentId = apt.id;
+                                block.ondragstart = (e) => {
+                                    e.dataTransfer.effectAllowed = 'move';
+                                    e.dataTransfer.setData('appointmentId', apt.id);
+                                    block.classList.add('dragging');
+                                };
+                                block.ondragend = () => {
+                                    block.classList.remove('dragging');
+                                };
+                            } else {
+                                // Inactive block - use same overlap logic as active blocks
+                                let adjustedHeight = blockHeight;
+                                let adjustedTop = topOffset;
+
+                                if (isFirstBlock && !isLastBlock) {
+                                    adjustedTop = topOffset + 1;
+                                    adjustedHeight = extendsToHourBoundary ? blockHeight + 10 : blockHeight - 1;
+                                } else if (!isFirstBlock && !isLastBlock) {
+                                    adjustedTop = topOffset - 10;
+                                    adjustedHeight = extendsToHourBoundary ? blockHeight + 20 : blockHeight + 10;
+                                } else if (!isFirstBlock && isLastBlock) {
+                                    adjustedTop = topOffset - 10;
+                                    adjustedHeight = blockHeight + 8;
+                                } else {
+                                    // Single block within hour
+                                    adjustedTop = topOffset + 1;
+                                    adjustedHeight = blockHeight - 2;
+                                }
+
+                                // For inactive blocks, handle borders to avoid double lines at boundaries
+                                let borderLeft = `1px solid ${serviceColor}`;
+                                let borderRight = `1px solid ${serviceColor}`;
+                                let borderTop = isFirstBlock ? `1px solid ${serviceColor}` : 'none';
+                                let borderBottom = isLastBlock ? `1px solid ${serviceColor}` : 'none';
+
+                                block.style.cssText = `
+                                    position: absolute;
+                                    left: 2px;
+                                    right: 2px;
+                                    height: ${adjustedHeight}px;
+                                    top: ${adjustedTop}px;
+                                    background: repeating-linear-gradient(45deg, ${serviceColor}33, ${serviceColor}33 10px, transparent 10px, transparent 20px);
+                                    border-left: ${borderLeft};
+                                    border-right: ${borderRight};
+                                    border-top: ${borderTop};
+                                    border-bottom: ${borderBottom};
+                                    border-radius: ${borderRadius};
+                                    opacity: 0.7;
+                                    z-index: 4;
+                                    pointer-events: none;
+                                `;
+                            }
+
+                            targetSlot.appendChild(block);
+                        }
+
+                        currentMin += blockDuration;
+                        isFirstBlock = false;
+                    }
+                };
+
+
+                // Render appointment based on whether it has active periods
+                // Note: Only use active periods if they exist AND have content
+                if (apt.activePeriods && Array.isArray(apt.activePeriods) && apt.activePeriods.length > 0) {
+                    let lastEnd = 0;
+                    let isFirstActive = true;
+
+                    apt.activePeriods.forEach((period) => {
+                        // Render inactive gap before this active period
+                        if (period.start > lastEnd) {
+                            renderPeriod(lastEnd, period.start, false, false);
+                        }
+
+                        // Render active period
+                        renderPeriod(period.start, period.end, true, isFirstActive);
+
+                        lastEnd = period.end;
+                        isFirstActive = false;
+                    });
+
+                    // Render inactive period after last active period if needed
+                    if (lastEnd < apt.totalDuration) {
+                        renderPeriod(lastEnd, apt.totalDuration, false, false);
+                    }
+                } else {
+                    // No active periods - render as a single continuous appointment
+                    renderPeriod(0, apt.totalDuration, true, true);
+                }
+            });
+        }
+
+        // Helper function for opening booking modal with specific barber
+        function openOwnerBookingModalForBarber(day, hour, minutes, barberId) {
+            // Pass the barberId to the modal
+            openOwnerBookingModal(day, hour, minutes, barberId);
+        }
+
         function generateWeeklyCalendar() {
             const weekHeader = document.getElementById('week-header');
             const timeSlotsContainer = document.getElementById('time-slots');
 
             weekHeader.innerHTML = '';
             timeSlotsContainer.innerHTML = '';
+
+            // Reset any inline styles from day view
+            weekHeader.style = '';
+            timeSlotsContainer.style = '';
 
             // Update week display
             const weekEnd = new Date(currentWeekStart);
@@ -3910,7 +5041,12 @@
         }
 
         function loadWeekAppointments() {
-            const appointments = SharedData.getAppointments();
+            let appointments = SharedData.getAppointments();
+
+            // Filter by selected barber if one is selected
+            if (calendarBarberId) {
+                appointments = appointments.filter(apt => apt.barberId === calendarBarberId);
+            }
 
             // Clear existing appointments
             document.querySelectorAll('.appointment-block').forEach(block => block.remove());
@@ -3996,16 +5132,20 @@
                         const blockHeight = (apt.totalDuration / 60) * heightPerHour;
                         block.style.height = `${blockHeight - 4}px`;
                         block.style.top = `${baseTopOffset + 2}px`;
-                        block.style.background = (apt.activePeriods && apt.activePeriods.length > 0) ? 'transparent' : serviceColor;
-                        block.style.color = (apt.activePeriods && apt.activePeriods.length > 0) ? serviceColor : 'white';
+
+                        // Fix: Ensure Men's Cut and other non-active period appointments have solid background
+                        const hasActivePeriods = apt.activePeriods && apt.activePeriods.length > 0;
+                        block.style.background = hasActivePeriods ? 'transparent' : serviceColor;
+                        block.style.color = hasActivePeriods ? serviceColor : 'white';
 
                         // Set specific z-index for regular appointments to be above multi-period ones
                         if (!apt.activePeriods || apt.activePeriods.length === 0) {
                             block.style.zIndex = '6';
                         }
 
-                        // Remove text from calendar blocks for cleaner appearance
-                        block.innerHTML = '';
+
+                        // Remove all customer names from calendar blocks for consistency
+                        // Names are visible when clicking on appointments
 
                         // Make draggable
                         block.draggable = true;
@@ -4112,13 +5252,27 @@
         }
 
         function prevWeek() {
-            currentWeekStart.setDate(currentWeekStart.getDate() - 7);
-            generateWeeklyCalendar();
+            if (calendarViewMode === 'day') {
+                // Navigate by day in day view
+                currentWeekStart.setDate(currentWeekStart.getDate() - 1);
+                generateDayViewCalendar();
+            } else {
+                // Navigate by week in week view
+                currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+                generateWeeklyCalendar();
+            }
         }
 
         function nextWeek() {
-            currentWeekStart.setDate(currentWeekStart.getDate() + 7);
-            generateWeeklyCalendar();
+            if (calendarViewMode === 'day') {
+                // Navigate by day in day view
+                currentWeekStart.setDate(currentWeekStart.getDate() + 1);
+                generateDayViewCalendar();
+            } else {
+                // Navigate by week in week view
+                currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+                generateWeeklyCalendar();
+            }
         }
 
         // Add swipe support for week navigation
@@ -4149,8 +5303,10 @@
         }
 
         // Check if creating a new appointment would create a conflict
-        function checkNewAppointmentConflict(newDate, newTime, duration, activePeriods = null) {
+        function checkNewAppointmentConflict(newDate, newTime, duration, activePeriods = null, barberId = null) {
             const appointments = SharedData.getAppointments();
+
+            console.log('Checking conflict for:', { newDate, newTime, duration, barberId });
 
             // Parse the new time
             const [newHour, newMin] = newTime.split(':').map(Number);
@@ -4161,6 +5317,21 @@
             for (const apt of appointments) {
                 // Skip if different date
                 if (apt.date !== newDate) continue;
+
+                console.log('Checking against appointment:', { aptDate: apt.date, aptBarberId: apt.barberId, newBarberId: barberId });
+
+                // Skip if different barber (when barberId is specified)
+                // If appointment has no barberId (old data), don't skip it as it might conflict
+                if (barberId && apt.barberId) {
+                    if (apt.barberId !== barberId) {
+                        console.log('  -> Skipping: different barber');
+                        continue;
+                    }
+                } else if (!barberId && apt.barberId) {
+                    // If we're not checking for a specific barber but the appointment has one,
+                    // we should still check for conflict
+                    console.log('  -> Checking: no specific barber requested, checking all');
+                }
 
                 // Parse existing appointment time
                 const [aptHour, aptMin] = apt.time.split(':').map(Number);
@@ -4182,12 +5353,14 @@
 
                                 // Check for overlap
                                 if (newPeriodStart < periodEnd && newPeriodEnd > periodStart) {
+                                    console.log('  -> CONFLICT: active periods overlap');
                                     return true; // Conflict detected
                                 }
                             }
                         } else {
                             // New appointment has no active periods, check full duration
                             if (newStartMinutes < periodEnd && newEndMinutes > periodStart) {
+                                console.log('  -> CONFLICT: new appointment overlaps with active period');
                                 return true; // Conflict detected
                             }
                         }
@@ -4201,12 +5374,14 @@
 
                             // Check for overlap with full appointment
                             if (newPeriodStart < aptEndMinutes && newPeriodEnd > aptStartMinutes) {
+                                console.log('  -> CONFLICT: new active period overlaps with appointment');
                                 return true; // Conflict detected
                             }
                         }
                     } else {
                         // Neither has active periods, check full duration overlap
                         if (newStartMinutes < aptEndMinutes && newEndMinutes > aptStartMinutes) {
+                            console.log('  -> CONFLICT: appointments overlap', { newStart: newStartMinutes, newEnd: newEndMinutes, aptStart: aptStartMinutes, aptEnd: aptEndMinutes });
                             return true; // Conflict detected
                         }
                     }
@@ -4216,15 +5391,20 @@
             // Also check for conflicts with blocked times
             const blockedTimes = SharedData.getBlockedTimesByDate(new Date(newDate));
             for (const block of blockedTimes) {
+                // Skip if different barber (when barberId is specified)
+                if (barberId && block.barberId && block.barberId !== barberId) continue;
+
                 const blockStartMinutes = SharedData.timeToMinutes(block.startTime);
                 const blockEndMinutes = SharedData.timeToMinutes(block.endTime);
 
                 // Check if new appointment overlaps with blocked time
                 if (newStartMinutes < blockEndMinutes && newEndMinutes > blockStartMinutes) {
+                    console.log('  -> CONFLICT: overlaps with blocked time');
                     return true; // Conflict with blocked time
                 }
             }
 
+            console.log('  -> No conflict found');
             return false; // No conflict
         }
 
@@ -4247,14 +5427,25 @@
                 // Skip if different date
                 if (apt.date !== newDate) continue;
 
+                // Skip if different barber (when both have barberId)
+                if (movingAppointment.barberId && apt.barberId && movingAppointment.barberId !== apt.barberId) {
+                    continue;
+                }
+
                 // Parse existing appointment time
                 const [aptHour, aptMin] = apt.time.split(':').map(Number);
                 const aptStartMinutes = aptHour * 60 + aptMin;
                 const aptEndMinutes = aptStartMinutes + apt.totalDuration;
 
-                // Check if there's an overlap in active time
+                // First check if they overlap in time at all
+                if (newStartMinutes >= aptEndMinutes || newEndMinutes <= aptStartMinutes) {
+                    // No overlap, skip this appointment
+                    continue;
+                }
+
+                // They overlap in time, now check active periods
                 if (apt.activePeriods && apt.activePeriods.length > 0) {
-                    // Check each active period for conflicts
+                    // The existing appointment has active periods - check if we conflict with any
                     for (const period of apt.activePeriods) {
                         const periodStart = aptStartMinutes + period.start;
                         const periodEnd = aptStartMinutes + period.end;
@@ -4293,6 +5484,7 @@
                     } else {
                         // Neither has active periods, check full duration overlap
                         if (newStartMinutes < aptEndMinutes && newEndMinutes > aptStartMinutes) {
+                            console.log('  -> CONFLICT: appointments overlap', { newStart: newStartMinutes, newEnd: newEndMinutes, aptStart: aptStartMinutes, aptEnd: aptEndMinutes });
                             return true; // Conflict detected
                         }
                     }
@@ -4461,10 +5653,18 @@
                         }
 
                         // No conflict, proceed with the move
+                        // Store old appointment details for the email
+                        const oldAppointment = {...appointment};
+
                         appointment.date = dateStr;
                         appointment.time = timeStr;
 
                         localStorage.setItem('appointments', JSON.stringify(appointments));
+
+                        // Send reschedule email if customer has email
+                        if (appointment.customerEmail) {
+                            SharedData.sendRescheduledEmail(appointment, oldAppointment);
+                        }
 
                         // Trigger storage event
                         window.dispatchEvent(new StorageEvent('storage', {
@@ -4734,7 +5934,7 @@
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <div>
                                     <div style="font-weight: bold;">${apt.customerName || 'Guest'}</div>
-                                    <div style="font-size: 14px; color: #666; margin-top: 4px;">
+                                    <div style="display: none;">
                                         <span style="display: inline-block; width: 12px; height: 12px; background: ${serviceColor}; border-radius: 2px; margin-right: 5px; vertical-align: middle;"></span>
                                         ${apt.serviceNames.join(', ')}
                                     </div>
@@ -4761,14 +5961,23 @@
         function updateDashboardMetrics() {
             try {
                 const today = new Date();
-                const appointments = SharedData.getAppointments();
+                let appointments = SharedData.getAppointments();
+
+                // Filter by selected barber if one is selected
+                if (dashboardBarberId) {
+                    appointments = appointments.filter(apt => apt.barberId === dashboardBarberId);
+                }
 
                 console.log('Updating dashboard metrics...');
                 console.log('Total appointments:', appointments.length);
                 console.log('Today:', today.toDateString());
 
                 // Update Today's Appointments
-                const todayAppointments = SharedData.getAppointmentsByDate(today);
+                let todayAppointments = SharedData.getAppointmentsByDate(today);
+                // Filter by selected barber if needed
+                if (dashboardBarberId) {
+                    todayAppointments = todayAppointments.filter(apt => apt.barberId === dashboardBarberId);
+                }
                 const todayAppointmentsEl = document.getElementById('today-appointments');
                 if (todayAppointmentsEl) {
                     todayAppointmentsEl.textContent = todayAppointments.length;
@@ -4828,7 +6037,13 @@
         }
 
         function calculateWeekRevenue(startDate, endDate) {
-            const appointments = SharedData.getAppointments();
+            let appointments = SharedData.getAppointments();
+
+            // Filter by selected barber if one is selected
+            if (dashboardBarberId) {
+                appointments = appointments.filter(apt => apt.barberId === dashboardBarberId);
+            }
+
             let totalRevenue = 0;
 
             console.log(`Calculating revenue from ${startDate.toDateString()} to ${endDate.toDateString()}`);
@@ -4856,7 +6071,13 @@
             const today = new Date();
             const startOfWeek = getWeekStart(today);
             const endOfWeek = getWeekEnd(today);
-            const appointments = SharedData.getAppointments();
+            let appointments = SharedData.getAppointments();
+
+            // Filter by selected barber if one is selected
+            if (dashboardBarberId) {
+                appointments = appointments.filter(apt => apt.barberId === dashboardBarberId);
+            }
+
             const storeHours = SharedData.getStoreHours();
 
             let totalAvailableMinutes = 0;
@@ -4909,7 +6130,13 @@
                 const currentDay = new Date(startOfWeek);
                 currentDay.setDate(startOfWeek.getDate() + i);
 
-                const dayAppointments = SharedData.getAppointmentsByDate(currentDay);
+                let dayAppointments = SharedData.getAppointmentsByDate(currentDay);
+
+                // Filter by selected barber if one is selected
+                if (dashboardBarberId) {
+                    dayAppointments = dayAppointments.filter(apt => apt.barberId === dashboardBarberId);
+                }
+
                 const dayRevenue = dayAppointments.reduce((sum, apt) => sum + (apt.totalPrice || 0), 0);
                 dailyRevenues.push(dayRevenue);
                 maxRevenue = Math.max(maxRevenue, dayRevenue);
@@ -4944,7 +6171,13 @@
             if (!canvas || !legendContainer) return;
 
             const ctx = canvas.getContext('2d');
-            const appointments = SharedData.getAppointments();
+            let appointments = SharedData.getAppointments();
+
+            // Filter by selected barber if one is selected
+            if (dashboardBarberId) {
+                appointments = appointments.filter(apt => apt.barberId === dashboardBarberId);
+            }
+
             const services = SharedData.getServicesWithColors();
 
             // Calculate total active time per service
@@ -5037,7 +6270,7 @@
             date: null
         };
 
-        function openOwnerBookingModal(day, hour, minutes = 0) {
+        function openOwnerBookingModal(day, hour, minutes = 0, barberId = null) {
             // Calculate the date based on current week and day
             const date = new Date(currentWeekStart);
             date.setDate(currentWeekStart.getDate() + day);
@@ -5076,11 +6309,59 @@
             document.getElementById('owner-booking-email').value = '';
             document.getElementById('booking-summary').style.display = 'none';
 
-            // Populate services dropdown
+            // Populate dropdowns
+            populateOwnerBarberDropdown(barberId);
             populateOwnerServiceDropdown();
 
             // Show modal
             document.getElementById('owner-booking-modal').style.display = 'flex';
+        }
+
+        function populateOwnerBarberDropdown(barberId = null) {
+            const select = document.getElementById('owner-booking-barber');
+            const barbers = SharedData.getBarbers();
+
+            // Clear existing options
+            select.innerHTML = '';
+
+            // Determine which barber to pre-select
+            let selectedBarberId = barberId || calendarBarberId;
+
+            // If in weekly view with a specific barber, don't show dropdown at all - just use that barber
+            if (calendarBarberId && calendarViewMode === 'week') {
+                // Only show the current barber as the only option
+                const currentBarber = barbers.find(b => b.id === calendarBarberId);
+                if (currentBarber) {
+                    const option = document.createElement('option');
+                    option.value = currentBarber.id;
+                    option.textContent = currentBarber.name;
+                    option.selected = true;
+                    select.appendChild(option);
+                    select.value = currentBarber.id; // Explicitly set the value
+                    select.disabled = true; // Disable the dropdown since there's only one option
+                }
+            } else {
+                // Add "Select barber" option for day view
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = isZh ? '选择理发师...' : 'Choose a barber...';
+                select.appendChild(defaultOption);
+
+                // Add all barber options
+                barbers.forEach(barber => {
+                    const option = document.createElement('option');
+                    option.value = barber.id;
+                    option.textContent = barber.name;
+                    select.appendChild(option);
+                });
+
+                select.disabled = false; // Enable the dropdown
+
+                // Pre-select if we have a barberId (from clicking on a specific barber's column in day view)
+                if (selectedBarberId) {
+                    select.value = selectedBarberId;
+                }
+            }
         }
 
         function populateOwnerServiceDropdown() {
@@ -5191,6 +6472,7 @@
         }
 
         function confirmOwnerBooking() {
+            const barberId = document.getElementById('owner-booking-barber').value;
             const serviceId = document.getElementById('owner-booking-service').value;
             const customerName = document.getElementById('owner-booking-name').value.trim();
             const phone = document.getElementById('owner-booking-phone').value.trim();
@@ -5200,6 +6482,11 @@
             const endTime = document.getElementById('owner-booking-end').value;
 
             // Validation
+            if (!barberId) {
+                alert(isZh ? '请选择理发师' : 'Please select a barber');
+                return;
+            }
+
             if (!serviceId) {
                 alert(isZh ? '请选择服务' : 'Please select a service');
                 return;
@@ -5255,8 +6542,8 @@
                 while (currentDate <= lastDate) {
                     const dateStr = currentDate.toISOString().split('T')[0];
 
-                    // Check for conflicts
-                    const hasConflict = checkNewAppointmentConflict(dateStr, startTime, duration, null);
+                    // Check for conflicts for this specific barber
+                    const hasConflict = checkNewAppointmentConflict(dateStr, startTime, duration, null, barberId);
                     if (hasConflict) {
                         hasAnyConflict = true;
                         const conflictDateStr = currentDate.toLocaleDateString();
@@ -5268,6 +6555,7 @@
                         date: dateStr,
                         startTime: startTime,
                         endTime: endTime,
+                        barberId: barberId,
                         reason: customerName || 'Blocked by owner'
                     });
 
@@ -5290,9 +6578,9 @@
                     return;
                 }
 
-                // Check for conflicts with existing appointments
+                // Check for conflicts with existing appointments for this specific barber
                 const duration = (endMinutes - startMinutes);
-                const hasConflict = checkNewAppointmentConflict(date, startTime, duration, service.activePeriods || null);
+                const hasConflict = checkNewAppointmentConflict(date, startTime, duration, service.activePeriods || null, barberId);
                 if (hasConflict) {
                     alert(isZh ? '该时间段与现有预约冲突' : 'This time slot conflicts with an existing appointment');
                     return;
@@ -5306,6 +6594,7 @@
                     customerName: customerName,
                     customerPhone: phone,
                     customerEmail: email,
+                    barberId: barberId,
                     date: date,
                     time: startTime,
                     services: [serviceId],
@@ -5322,6 +6611,11 @@
                 }
 
                 SharedData.saveAppointment(appointment);
+
+                // Send confirmation email if customer email is provided
+                if (appointment.customerEmail) {
+                    SharedData.sendConfirmationEmail(appointment);
+                }
             }
 
             // Close modal and refresh calendar
@@ -5382,6 +6676,9 @@
             const translatedServices = apt.serviceNames.map(name => translateServiceName(name));
             document.getElementById('modal-services').textContent = translatedServices.join(', ');
 
+            // Add barber name
+            document.getElementById('modal-barber').textContent = apt.barberName || 'Staff';
+
             // Format date and time without timezone shift
             const [year, month, day] = apt.date.split('-').map(Number);
             const aptDate = new Date(year, month - 1, day);
@@ -5403,6 +6700,7 @@
             document.getElementById('modal-title').textContent = isZh ? '预约详情' : 'Appointment Details';
             document.getElementById('label-customer').textContent = isZh ? '客户' : 'Customer';
             document.getElementById('label-services').textContent = isZh ? '服务项目' : 'Services';
+            document.getElementById('label-barber').textContent = isZh ? '理发师' : 'Barber';
             document.getElementById('label-datetime').textContent = isZh ? '日期时间' : 'Date & Time';
             document.getElementById('label-duration').textContent = isZh ? '时长' : 'Duration';
             document.getElementById('label-price').textContent = isZh ? '价格' : 'Price';
@@ -5433,6 +6731,11 @@
                     <div class="detail-group">
                         <div class="detail-label" id="label-services">Services</div>
                         <div class="detail-value" id="modal-services"></div>
+                    </div>
+
+                    <div class="detail-group">
+                        <div class="detail-label" id="label-barber">Barber</div>
+                        <div class="detail-value" id="modal-barber"></div>
                     </div>
 
                     <div class="detail-group">
@@ -5577,9 +6880,17 @@
                 const index = appointments.findIndex(apt => apt.id === currentAppointment.id);
 
                 if (index !== -1) {
+                    // Store old appointment details for the email
+                    const oldAppointment = {...appointments[index]};
+
                     appointments[index].date = newDate;
                     appointments[index].time = newTime;
                     localStorage.setItem('appointments', JSON.stringify(appointments));
+
+                    // Send reschedule email if customer has email
+                    if (appointments[index].customerEmail) {
+                        SharedData.sendRescheduledEmail(appointments[index], oldAppointment);
+                    }
 
                     // Trigger storage event
                     window.dispatchEvent(new StorageEvent('storage', {
@@ -5609,6 +6920,10 @@
                 }
             } else {
                 if (confirm(isZh ? '确定要取消这个预约吗？' : 'Are you sure you want to cancel this appointment?')) {
+                    // Send cancellation email before deleting if customer has email
+                    if (currentAppointment.customerEmail) {
+                        SharedData.sendCancellationEmail(currentAppointment);
+                    }
                     SharedData.deleteAppointment(currentAppointment.id);
                     closeModal();
                     generateWeeklyCalendar();
@@ -5619,18 +6934,363 @@
 
         function deleteAppointment(appointmentId) {
             if (confirm(isZh ? '确定要取消这个预约吗？' : 'Are you sure you want to cancel this appointment?')) {
+                // Get the appointment details before deleting
+                const appointment = SharedData.getAppointmentById(appointmentId);
+                if (appointment && appointment.customerEmail) {
+                    SharedData.sendCancellationEmail(appointment);
+                }
                 SharedData.deleteAppointment(appointmentId);
                 loadAppointments();
             }
         }
 
 
-        // Initialize when DOM is ready
+        // Staff Management Variables
+        window.currentBarberId = 'owner';
+        let barbers = [];
+
+        // Calendar and Dashboard barber selection
+        let calendarBarberId = '';  // Empty string means all staff
+        let dashboardBarberId = '';  // Empty string means all staff
+        let calendarViewMode = 'week';  // 'week' or 'day'
+
+        // Initialize and load staff
+        function initializeStaff() {
+            barbers = SharedData.getBarbers();
+            renderStaffTabs();
+            selectBarber('owner');
+            populateBarberSelectors();  // Populate calendar and dashboard dropdowns
+
+            // Set initial calendar view to day view for "All Staff"
+            if (calendarBarberId === '') {
+                calendarViewMode = 'day';
+            }
+        }
+
+        // Populate barber selectors for calendar and dashboard
+        function populateBarberSelectors() {
+            const calendarSelect = document.getElementById('calendar-barber-select');
+            const dashboardSelect = document.getElementById('dashboard-barber-select');
+
+            const t = isZh ? translations.zh : translations.en;
+
+            // Ensure barbers array is initialized
+            if (barbers.length === 0) {
+                barbers = SharedData.getBarbers();
+            }
+
+            // Preserve current selections before rebuilding
+            const currentCalendarValue = calendarSelect ? calendarSelect.value : '';
+            const currentDashboardValue = dashboardSelect ? dashboardSelect.value : '';
+
+            if (calendarSelect) {
+                // Clear and rebuild options
+                calendarSelect.innerHTML = '';
+
+                // Add "All Staff" option
+                const allStaffOption = document.createElement('option');
+                allStaffOption.value = '';
+                allStaffOption.textContent = t.allStaff;
+                calendarSelect.appendChild(allStaffOption);
+
+                // Add barber options
+                barbers.forEach(barber => {
+                    const option = document.createElement('option');
+                    option.value = barber.id;
+                    option.textContent = barber.name;
+                    calendarSelect.appendChild(option);
+                });
+
+                // Restore previous selection
+                calendarSelect.value = currentCalendarValue;
+            }
+
+            if (dashboardSelect) {
+                // Clear and rebuild options
+                dashboardSelect.innerHTML = '';
+
+                // Add "All Staff" option
+                const allStaffOption = document.createElement('option');
+                allStaffOption.value = '';
+                allStaffOption.textContent = t.allStaff;
+                dashboardSelect.appendChild(allStaffOption);
+
+                // Add barber options
+                barbers.forEach(barber => {
+                    const option = document.createElement('option');
+                    option.value = barber.id;
+                    option.textContent = barber.name;
+                    dashboardSelect.appendChild(option);
+                });
+
+                // Restore previous selection
+                dashboardSelect.value = currentDashboardValue;
+            }
+        }
+
+        // Calendar barber selection
+        function selectCalendarBarber(barberId) {
+            calendarBarberId = barberId;
+
+            // Switch to day view for "All Staff", week view for individual barbers
+            if (barberId === '') {
+                calendarViewMode = 'day';
+                generateDayViewCalendar();  // New function for day view with staff columns
+            } else {
+                calendarViewMode = 'week';
+                generateWeeklyCalendar();
+            }
+        }
+
+        // Dashboard barber selection
+        function selectDashboardBarber(barberId) {
+            dashboardBarberId = barberId;
+            updateDashboardMetrics();
+        }
+
+        // Render staff list
+        function renderStaffTabs() {
+            // First try to render in the new staff-list container
+            let container = document.getElementById('staff-list');
+
+            // Fall back to old staff-tabs if new container doesn't exist yet
+            if (!container) {
+                container = document.getElementById('staff-tabs');
+            }
+
+            if (!container) return;
+
+            container.innerHTML = '';
+
+            // If using the new staff-list layout
+            if (container.id === 'staff-list') {
+                barbers.forEach(barber => {
+                    const item = document.createElement('div');
+                    item.className = 'staff-item';
+                    if (barber.id === window.currentBarberId) {
+                        item.classList.add('active');
+                    }
+
+                    item.innerHTML = `
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 40px; height: 40px; background: #E3F2FD; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 12px;">
+                                <span style="font-size: 20px;">👤</span>
+                            </div>
+                            <div>
+                                <div style="font-weight: bold; font-size: 16px;">${barber.name}</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            ${!barber.isOwner ? `<button onclick="deleteStaff('${barber.id}'); event.stopPropagation();" style="background: #ff4444; color: white; border: none; padding: 5px 10px; border-radius: 3px; font-size: 12px;">Delete</button>` : ''}
+                            <span style="color: #999; font-size: 20px;">›</span>
+                        </div>
+                    `;
+
+                    item.onclick = () => {
+                        selectBarber(barber.id);
+                        // Show the configuration section
+                        const configSection = document.getElementById('current-staff-config');
+                        if (configSection) {
+                            configSection.style.display = 'block';
+                        }
+                    };
+
+                    container.appendChild(item);
+                });
+            }
+            // Old tab layout (fallback)
+            else {
+                barbers.forEach(barber => {
+                    const tab = document.createElement('div');
+                    tab.style.cssText = `
+                        padding: 10px 15px;
+                        background: ${barber.id === window.currentBarberId ? '#2196F3' : '#f0f0f0'};
+                        color: ${barber.id === window.currentBarberId ? 'white' : '#333'};
+                        border-radius: 5px;
+                        cursor: pointer;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 10px;
+                    `;
+
+                    tab.innerHTML = `
+                        <span>${barber.name}</span>
+                        ${!barber.isOwner ? `<button onclick="deleteStaff('${barber.id}'); event.stopPropagation();" style="background: #ff4444; color: white; border: none; padding: 2px 8px; border-radius: 3px; font-size: 12px;">×</button>` : ''}
+                    `;
+
+                    tab.onclick = () => selectBarber(barber.id);
+                    container.appendChild(tab);
+                });
+            }
+        }
+
+            // Back to staff list
+            function backToStaffList() {
+                const staffList = document.getElementById('staff-list-section');
+                const configHeader = document.getElementById('current-staff-config');
+                const configContainer = document.getElementById('services-config-container');
+
+                if (staffList) staffList.style.display = 'block';
+                if (configHeader) configHeader.style.display = 'none';
+                if (configContainer) configContainer.style.display = 'none';
+            }
+
+            // Select a barber
+            function selectBarber(barberId) {
+                window.currentBarberId = barberId;
+                const barber = SharedData.getBarberById(barberId);
+
+                // Update UI
+                document.getElementById('selected-staff-name').textContent = barber.name;
+                renderStaffTabs();
+
+                // Hide staff list and show configuration sections
+                const staffList = document.getElementById('staff-list-section');
+                const configHeader = document.getElementById('current-staff-config');
+                const configContainer = document.getElementById('services-config-container');
+
+                if (staffList) staffList.style.display = 'none';
+                if (configHeader) configHeader.style.display = 'block';
+                if (configContainer) configContainer.style.display = 'block';
+
+                // Show "Same as store hours?" checkbox for everyone
+                const sameAsStoreContainer = document.getElementById('same-as-store-hours-container');
+                if (sameAsStoreContainer) {
+                    sameAsStoreContainer.style.display = 'block';
+                    // Check if this barber uses store hours
+                    const checkbox = document.getElementById('same-as-store-hours');
+                    if (checkbox && barber.usesStoreHours) {
+                        checkbox.checked = true;
+                    } else if (checkbox) {
+                        checkbox.checked = false;
+                    }
+                }
+
+                // Load this barber's services and hours
+                loadServicesForBarber(barberId);
+                loadHoursForBarber(barberId);
+            }
+
+            // Add new staff
+            function addNewStaff() {
+                const name = prompt('Enter staff member name:');
+                if (!name) return;
+
+                // Ask if they want to copy settings
+                const copyOptions = ['Start with default settings'];
+                barbers.forEach(b => {
+                    copyOptions.push(`Copy from ${b.name}`);
+                });
+
+                const choice = confirm(`Copy settings from another staff member?\nOK = Choose who to copy from\nCancel = Start with defaults`);
+
+                let copyFromId = null;
+                if (choice && barbers.length > 0) {
+                    const copyFrom = prompt(`Copy settings from:\n${barbers.map((b, i) => `${i+1}. ${b.name}`).join('\n')}\n\nEnter number:`);
+                    if (copyFrom && parseInt(copyFrom) > 0 && parseInt(copyFrom) <= barbers.length) {
+                        copyFromId = barbers[parseInt(copyFrom) - 1].id;
+                    }
+                }
+
+                const newBarberId = SharedData.addBarber(name, copyFromId);
+                barbers = SharedData.getBarbers();
+                renderStaffTabs();
+                populateBarberSelectors();  // Update dropdowns
+                selectBarber(newBarberId);
+            }
+
+            // Delete staff
+            function deleteStaff(barberId) {
+                if (confirm('Delete this staff member? Their configuration will be lost.')) {
+                    SharedData.deleteBarber(barberId);
+                    barbers = SharedData.getBarbers();
+                    renderStaffTabs();
+                    populateBarberSelectors();  // Update dropdowns
+                    selectBarber('owner');
+                }
+            }
+
+            // Load services for specific barber
+            function loadServicesForBarber(barberId) {
+                const barber = SharedData.getBarberById(barberId);
+                if (!barber) return;
+
+                // Update the existing loadServices function to use barber's services
+                window.currentBarberServices = barber.services || {};
+                loadServices();
+            }
+
+            // Load hours for specific barber
+            function loadHoursForBarber(barberId) {
+                const barber = SharedData.getBarberById(barberId);
+                if (!barber) return;
+
+                // Check if barber uses store hours
+                const checkbox = document.getElementById('same-as-store-hours');
+                if (checkbox && barber.usesStoreHours) {
+                    checkbox.checked = true;
+                    // Trigger to apply store hours
+                    toggleSameAsStoreHours();
+                } else {
+                    // Update the existing loadStoreHours function to use barber's hours
+                    window.currentBarberHours = barber.hours || {};
+                    loadStoreHours();
+                }
+            }
+
+            // Override saveServices to save to current barber
+            const originalSaveServices = window.saveServices;
+            window.saveServices = function() {
+                if (window.currentBarberId && window.currentBarberId !== 'owner') {
+                    // Save to specific barber
+                    const services = {};
+                    document.querySelectorAll('.service-item').forEach(item => {
+                        const serviceId = item.getAttribute('data-service');
+                        const nameInput = item.querySelector('.service-name-input');
+                        const durationInput = item.querySelector('.service-duration');
+                        const priceInput = item.querySelector('.service-price');
+                        const toggle = item.querySelector('.toggle-switch');
+                        const hasActiveTime = item.querySelector('.active-time-toggle')?.checked || false;
+
+                        services[serviceId] = {
+                            name: nameInput.value,
+                            duration: parseInt(durationInput.value),
+                            price: parseFloat(priceInput.value),
+                            enabled: toggle.classList.contains('active'),
+                            hasActiveTime: hasActiveTime
+                        };
+
+                        if (hasActiveTime) {
+                            const periods = [];
+                            item.querySelectorAll(`#periods-${serviceId} .active-period-item`).forEach(periodItem => {
+                                const start = parseInt(periodItem.querySelector('.period-start').value);
+                                const end = parseInt(periodItem.querySelector('.period-end').value);
+                                periods.push({ start, end });
+                            });
+                            services[serviceId].activePeriods = periods;
+                        }
+                    });
+
+                    SharedData.updateBarber(window.currentBarberId, { services });
+                } else {
+                    // Save to main store services (owner)
+                    originalSaveServices();
+                    // Also update owner barber
+                    const services = SharedData.getServices();
+                    SharedData.updateBarber('owner', { services });
+                }
+            };
+
+            // Note: saveStoreHours function already handles saving for both owner and staff
+            // with proper validation and feedback, so no override is needed
+
+        // Initialize on DOM ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', function() {
                 updateLanguage();
                 // Don't generate calendar on page load - only when calendar tab is clicked
                 setupSwipeNavigation();
+                initializeStaff();  // Initialize staff management
                 loadStoreHours();
                 loadServices();
                 loadAppointments();
@@ -5645,6 +7305,7 @@
             updateLanguage();
             // Don't generate calendar on page load - only when calendar tab is clicked
             setupSwipeNavigation();
+            initializeStaff();  // Initialize staff management
             loadStoreHours();
             loadServices();
             loadAppointments();
@@ -5681,7 +7342,12 @@
             loadAppointments();
             updateDashboardMetrics();
             if (document.getElementById('calendar-section').classList.contains('active')) {
-                generateWeeklyCalendar();
+                // Refresh appropriate calendar view based on current mode
+                if (calendarViewMode === 'day') {
+                    generateDayViewCalendar();
+                } else {
+                    generateWeeklyCalendar();
+                }
             }
         }, 5000);
     </script>

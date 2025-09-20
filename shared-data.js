@@ -77,6 +77,119 @@ const SharedData = {
     // Color palette for custom services
     colorPalette: ['#795548', '#607D8B', '#FF5722', '#00BCD4', '#8BC34A', '#FFC107', '#3F51B5', '#009688'],
 
+    // Staff/Barber Management
+    getBarbers() {
+        const stored = localStorage.getItem('barbers');
+        if (!stored) {
+            // Initialize with owner as default
+            const ownerProfile = JSON.parse(localStorage.getItem('ownerProfile') || '{}');
+            const defaultBarber = {
+                id: 'owner',
+                name: ownerProfile.firstName ? `${ownerProfile.firstName} ${ownerProfile.lastName || ''}`.trim() : 'Owner',
+                isOwner: true,
+                services: this.getServices(),
+                hours: this.getStoreHours()
+            };
+            this.saveBarbers([defaultBarber]);
+            return [defaultBarber];
+        }
+        return JSON.parse(stored);
+    },
+
+    saveBarbers(barbers) {
+        localStorage.setItem('barbers', JSON.stringify(barbers));
+    },
+
+    getBarberById(barberId) {
+        const barbers = this.getBarbers();
+        return barbers.find(b => b.id === barberId);
+    },
+
+    addBarber(name, copyFromId = null) {
+        const barbers = this.getBarbers();
+        const newBarber = {
+            id: 'BARBER_' + Date.now(),
+            name: name,
+            isOwner: false,
+            services: {},
+            hours: {}
+        };
+
+        if (copyFromId) {
+            const sourceBarber = this.getBarberById(copyFromId);
+            if (sourceBarber) {
+                newBarber.services = JSON.parse(JSON.stringify(sourceBarber.services));
+                newBarber.hours = JSON.parse(JSON.stringify(sourceBarber.hours));
+            }
+        } else {
+            // Use store defaults
+            newBarber.services = JSON.parse(JSON.stringify(this.defaultServices));
+            newBarber.hours = JSON.parse(JSON.stringify(this.defaultStoreHours));
+        }
+
+        barbers.push(newBarber);
+        this.saveBarbers(barbers);
+        return newBarber.id;
+    },
+
+    updateBarber(barberId, updates) {
+        const barbers = this.getBarbers();
+        const index = barbers.findIndex(b => b.id === barberId);
+        if (index !== -1) {
+            barbers[index] = { ...barbers[index], ...updates };
+            this.saveBarbers(barbers);
+        }
+    },
+
+    deleteBarber(barberId) {
+        if (barberId === 'owner') return false;
+        const barbers = this.getBarbers();
+        const filtered = barbers.filter(b => b.id !== barberId);
+        this.saveBarbers(filtered);
+        return true;
+    },
+
+    // Get services for a specific barber
+    getBarberServices(barberId) {
+        const barber = this.getBarberById(barberId);
+        return barber ? barber.services : this.getServices();
+    },
+
+    // Get hours for a specific barber (respecting store hours)
+    getBarberHours(barberId) {
+        const barber = this.getBarberById(barberId);
+        const storeHours = this.getStoreHours();
+
+        if (!barber) return storeHours;
+
+        // Ensure barber hours don't exceed store hours
+        const barberHours = barber.hours || storeHours;
+        const constrainedHours = {};
+
+        Object.keys(storeHours).forEach(day => {
+            if (storeHours[day].closed) {
+                // Store is closed, barber must be closed too
+                constrainedHours[day] = { open: '', close: '', closed: true };
+            } else if (barberHours[day] && !barberHours[day].closed) {
+                // Both open - use more restrictive hours
+                const storeOpen = this.timeToMinutes(storeHours[day].open);
+                const storeClose = this.timeToMinutes(storeHours[day].close);
+                const barberOpen = this.timeToMinutes(barberHours[day].open);
+                const barberClose = this.timeToMinutes(barberHours[day].close);
+
+                constrainedHours[day] = {
+                    open: this.minutesToTime(Math.max(storeOpen, barberOpen)),
+                    close: this.minutesToTime(Math.min(storeClose, barberClose)),
+                    closed: false
+                };
+            } else {
+                constrainedHours[day] = barberHours[day] || storeHours[day];
+            }
+        });
+
+        return constrainedHours;
+    },
+
     // Get all appointments
     getAppointments() {
         const stored = localStorage.getItem('appointments');
@@ -84,14 +197,18 @@ const SharedData = {
     },
 
     // Get appointments for a specific date
-    getAppointmentsByDate(date) {
+    getAppointmentsByDate(date, barberId = null) {
         const appointments = this.getAppointments();
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         const dateStr = `${year}-${month}-${day}`;
 
-        return appointments.filter(apt => apt.date === dateStr);
+        let filtered = appointments.filter(apt => apt.date === dateStr);
+        if (barberId) {
+            filtered = filtered.filter(apt => apt.barberId === barberId);
+        }
+        return filtered;
     },
 
     // Save new appointment
@@ -150,9 +267,9 @@ const SharedData = {
     },
 
     // Get available time slots for a date
-    getAvailableSlots(date, serviceDuration = 30) {
+    getAvailableSlots(date, serviceDuration = 30, barberId = null) {
         const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-        const hours = this.getStoreHours();
+        const hours = barberId ? this.getBarberHours(barberId) : this.getStoreHours();
         const dayHours = hours[dayName];
 
         if (!dayHours || dayHours.closed) {
@@ -171,7 +288,7 @@ const SharedData = {
             const time = this.minutesToTime(minutes);
 
             // Check if this slot is available (not blocked and no conflicts)
-            if (!this.isSlotConflicting(date, time, serviceDuration)) {
+            if (!this.isSlotConflicting(date, time, serviceDuration, barberId)) {
                 slots.push(time);
             }
         }
@@ -180,14 +297,14 @@ const SharedData = {
     },
 
     // Check if a time slot conflicts with existing appointments or blocked times
-    isSlotConflicting(date, time, duration) {
-        // Check if blocked by owner
+    isSlotConflicting(date, time, duration, barberId = null) {
+        // Check if blocked by owner (affects all barbers)
         if (this.isTimeBlockedByOwner(date, time, duration)) {
             return true;
         }
 
         // Check for conflicts with existing appointments
-        const appointments = this.getAppointmentsByDate(date);
+        const appointments = this.getAppointmentsByDate(date, barberId);
         const slotStartMinutes = this.timeToMinutes(time);
         const slotEndMinutes = slotStartMinutes + duration;
 
@@ -600,9 +717,11 @@ const SharedData = {
             const templateParams = {
                 to_email: appointment.customerEmail,
                 customer_name: appointment.customerName,
-                business_name: ownerProfile.storeName || emailConfig.businessName || 'Premium Cuts Barbershop',
+                from_name: 'Book a Snip', // Platform name for sender
+                business_name: ownerProfile.storeName || emailConfig.businessName || 'Premium Cuts Barbershop', // Actual barber shop name
                 reply_to: emailConfig.replyTo || 'noreply@example.com',
                 booking_id: appointment.id,
+                barber_name: appointment.barberName || 'Staff',  // Add barber name
                 services: appointment.serviceNames ? appointment.serviceNames.join(', ') : appointment.services.join(', '),
                 date: dateStr,
                 time: this.formatTime(appointment.time),
@@ -620,6 +739,7 @@ const SharedData = {
                     '您的预约已确认。以下是您的预约详情：' : 
                     'Your appointment has been confirmed. Here are your booking details:',
                 label_booking_id: isCustomerZh ? '预约编号：' : 'Booking ID:',
+                label_barber: isCustomerZh ? '理发师：' : 'Barber:',  // Add barber label
                 label_services: isCustomerZh ? '服务项目：' : 'Services:',
                 label_date: isCustomerZh ? '日期：' : 'Date:',
                 label_time: isCustomerZh ? '时间：' : 'Time:',
@@ -629,9 +749,10 @@ const SharedData = {
                 label_contact: isCustomerZh ? '联系方式：' : 'Contact:',
                 button_modify: isCustomerZh ? '修改预约' : 'Modify Appointment',
                 button_cancel: isCustomerZh ? '取消预约' : 'Cancel Appointment',
-                footer_message: isCustomerZh ? 
-                    '如需更改，请点击上面的按钮或直接联系我们。' : 
-                    'If you need to make any changes, click the buttons above or contact us directly.'
+                footer_message: isCustomerZh ?
+                    '如需更改，请点击上面的按钮。' :
+                    'If you need to make any changes, click the buttons above.',
+                powered_by_text: isCustomerZh ? '预约服务由 Book a Snip 提供支持' : 'Booking powered by Book a Snip'
             };
 
             // For rescheduled appointments, modify the subject/content

@@ -234,8 +234,17 @@
                 <div class="progress-fill" id="progress"></div>
             </div>
 
-            <!-- Screen 1: Service Selection -->
-            <div id="service-screen" class="screen active">
+            <!-- Screen 1: Barber Selection -->
+            <div id="barber-screen" class="screen active">
+                <h2 id="select-barber">Select Your Barber</h2>
+                <div style="margin-top: 20px;" id="barber-container">
+                    <!-- Barbers will be loaded dynamically -->
+                </div>
+            </div>
+
+            <!-- Screen 2: Service Selection -->
+            <div id="service-screen" class="screen">
+                <button class="back-button" onclick="goBack('barber-screen')" id="service-back" style="display: none;">← Back</button>
                 <h2 id="select-service">Select Service</h2>
                 <div style="margin-top: 20px;" id="services-container">
                     <!-- Services will be loaded dynamically -->
@@ -243,7 +252,7 @@
                 <button class="next-button" onclick="goToDateTime()" disabled id="service-next">Next</button>
             </div>
 
-            <!-- Screen 2: Date & Time Selection -->
+            <!-- Screen 3: Date & Time Selection -->
             <div id="datetime-screen" class="screen">
                 <button class="back-button" onclick="goBack('service-screen')">← Back</button>
                 <h2 id="select-datetime">Select Date & Time</h2>
@@ -268,7 +277,7 @@
                 <button class="next-button" onclick="goToInfo()" disabled id="datetime-next">Next</button>
             </div>
 
-            <!-- Screen 3: Customer Information -->
+            <!-- Screen 4: Customer Information -->
             <div id="info-screen" class="screen">
                 <button class="back-button" onclick="goBack('datetime-screen')">← Back</button>
                 <h2 id="your-info">Your Information</h2>
@@ -291,7 +300,7 @@
                 <button class="next-button" onclick="goToConfirmation()" id="info-next">Review Booking</button>
             </div>
 
-            <!-- Screen 4: Confirmation -->
+            <!-- Screen 5: Confirmation -->
             <div id="confirmation-screen" class="screen">
                 <button class="back-button" onclick="goBack('info-screen')">← Back</button>
                 <h2 id="review-booking">Review Your Booking</h2>
@@ -331,7 +340,7 @@
                 <button class="next-button" onclick="confirmBooking()" id="confirm-button">Confirm Booking</button>
             </div>
 
-            <!-- Screen 5: Success -->
+            <!-- Screen 6: Success -->
             <div id="success-screen" class="screen">
                 <div class="success-icon">✓</div>
                 <h2 style="text-align: center;" id="booking-confirmed">Booking Confirmed!</h2>
@@ -361,14 +370,16 @@
 
     <script>
         let isZh = false;
+        let selectedBarberId = null;
         let selectedServices = [];
         let selectedDate = null;
         let selectedTime = null;
-        let currentScreen = 'service-screen';
+        let currentScreen = 'barber-screen';
 
         const translations = {
             zh: {
                 appTitle: '预约服务',
+                selectBarber: '选择理发师',
                 selectService: '选择服务',
                 nextBtn: '下一步',
                 back: '← 返回',
@@ -394,6 +405,8 @@
                 summaryServices: '服务项目：',
                 summaryDateTime: '日期时间：',
                 newBooking: '新建预约',
+                cancellationPolicyLabel: '取消政策',
+                selectDateFirst: '请先选择日期',
                 services: {
                     "Men's Cut": '男士理发',
                     "Women's Cut": '女士理发',
@@ -413,6 +426,7 @@
             },
             en: {
                 appTitle: 'Book Service',
+                selectBarber: 'Select Your Barber',
                 selectService: 'Select Service',
                 nextBtn: 'Next',
                 back: '← Back',
@@ -438,6 +452,8 @@
                 summaryServices: 'Services:',
                 summaryDateTime: 'Date & Time:',
                 newBooking: 'Make Another Booking',
+                cancellationPolicyLabel: 'Cancellation Policy',
+                selectDateFirst: 'Please select a date first',
                 services: {
                     "Men's Cut": "Men's Cut",
                     "Women's Cut": "Women's Cut",
@@ -469,6 +485,31 @@
             isZh = !isZh;
             updateLanguage();
             loadAvailableServices(); // Reload services with new language
+
+            // Update date/time screen if active
+            if (currentScreen === 'datetime-screen') {
+                // Refresh date display if a date is selected
+                if (selectedDate) {
+                    const datePicker = document.getElementById('appointment-date');
+                    if (datePicker && datePicker.value) {
+                        onDateSelected(); // Refresh the date display with new language
+                    }
+                } else {
+                    // If no date is selected, refresh the "Please select a date first" message
+                    const timeSlots = document.getElementById('time-slots');
+                    if (timeSlots) {
+                        const t = isZh ? translations.zh : translations.en;
+                        timeSlots.innerHTML = `<div style="text-align: center; padding: 20px; color: #666; background: #f5f5f5; border-radius: 10px;">${t.selectDateFirst}</div>`;
+                    }
+                }
+
+                // Refresh cancellation policy
+                const policyNotice = document.getElementById('policy-notice');
+                if (policyNotice) {
+                    policyNotice.remove();
+                    displayCancellationPolicy(); // Re-display with new language
+                }
+            }
         }
 
         function updateLanguage() {
@@ -478,6 +519,7 @@
             document.querySelector('.lang-toggle').textContent = isZh ? 'EN' : '中文';
 
             // Update all screens
+            document.getElementById('select-barber').textContent = t.selectBarber;
             document.getElementById('select-service').textContent = t.selectService;
             document.getElementById('service-next').textContent = t.nextBtn;
             document.getElementById('select-datetime').textContent = t.selectDateTime;
@@ -520,9 +562,11 @@
             const serviceCards = document.querySelectorAll('.service-card');
             serviceCards.forEach(card => {
                 const nameDiv = card.querySelector('.service-name');
-                const englishName = nameDiv.textContent;
-                if (t.services[englishName]) {
-                    nameDiv.textContent = t.services[englishName];
+                if (nameDiv) {
+                    const englishName = nameDiv.textContent;
+                    if (t.services[englishName]) {
+                        nameDiv.textContent = t.services[englishName];
+                    }
                 }
 
                 // Update active time text
@@ -548,6 +592,89 @@
             document.querySelectorAll('.back-button').forEach(btn => {
                 btn.textContent = t.back;
             });
+
+            // Update confirmation screen if active and data is available
+            if (currentScreen === 'confirmation-screen' && selectedServices.length > 0 && selectedDate) {
+                // Re-translate service names
+                const serviceNames = selectedServices.map(s => {
+                    const serviceName = serviceData[s].name;
+                    return t.services[serviceName] || serviceName;
+                });
+                document.getElementById('selected-services').textContent = serviceNames.join(', ');
+
+                // Re-format date
+                const dateStr = isZh ?
+                    `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日` :
+                    selectedDate.toLocaleDateString();
+                document.getElementById('selected-date').textContent = dateStr;
+
+                // Update duration
+                const totalDuration = selectedServices.reduce((sum, s) => sum + serviceData[s].duration, 0);
+                document.getElementById('total-duration').textContent = `${totalDuration} ${t.min}`;
+            }
+
+            // Update success screen if active and data is available
+            if (currentScreen === 'success-screen' && selectedServices.length > 0 && selectedDate && selectedTime) {
+                // Re-translate service names
+                const serviceNames = selectedServices.map(s => {
+                    const serviceName = serviceData[s].name;
+                    return t.services[serviceName] || serviceName;
+                });
+                document.getElementById('final-services').textContent = serviceNames.join(', ');
+
+                // Re-format date and time
+                const finalDateStr = isZh ?
+                    `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日` :
+                    selectedDate.toLocaleDateString();
+                document.getElementById('final-datetime').textContent = `${finalDateStr} ${selectedTime}`;
+            }
+        }
+
+        // Load barbers for selection
+        function loadBarbers() {
+            const barbers = SharedData.getBarbers();
+            const container = document.getElementById('barber-container');
+            container.innerHTML = '';
+
+            barbers.forEach(barber => {
+                const card = document.createElement('div');
+                card.className = 'service-card';
+                card.onclick = function() { selectBarber(barber.id); };
+
+                card.innerHTML = `
+                    <div>
+                        <div style="font-weight: bold;">${barber.name}</div>
+                    </div>
+                    <div class="checkbox" id="barber-check-${barber.id}"></div>
+                `;
+
+                container.appendChild(card);
+            });
+        }
+
+        // Select a barber
+        function selectBarber(barberId) {
+            // Clear previous selection
+            document.querySelectorAll('#barber-container .service-card').forEach(card => {
+                card.classList.remove('selected');
+                const checkbox = card.querySelector('.checkbox');
+                if (checkbox) {
+                    checkbox.classList.remove('checked');
+                    checkbox.innerHTML = '';
+                }
+            });
+
+            // Set new selection
+            selectedBarberId = barberId;
+            const selectedCard = document.querySelector(`#barber-check-${barberId}`).parentElement;
+            selectedCard.classList.add('selected');
+            const checkbox = document.getElementById(`barber-check-${barberId}`);
+            checkbox.classList.add('checked');
+            checkbox.innerHTML = '✓';
+
+            // Load services for selected barber and go to service screen
+            loadServicesForBarber(barberId);
+            showScreen('service-screen');
         }
 
         function toggleService(element, serviceId) {
@@ -582,7 +709,7 @@
         }
 
         function updateProgress() {
-            const screens = ['service-screen', 'datetime-screen', 'info-screen', 'confirmation-screen', 'success-screen'];
+            const screens = ['barber-screen', 'service-screen', 'datetime-screen', 'info-screen', 'confirmation-screen', 'success-screen'];
             const currentIndex = screens.indexOf(currentScreen);
             const progress = ((currentIndex + 1) / screens.length) * 100;
             document.getElementById('progress').style.width = progress + '%';
@@ -594,8 +721,8 @@
             generateDates();
             // Show message to select date first
             const timeSlots = document.getElementById('time-slots');
-            const selectDateMsg = isZh ? '请先选择日期' : 'Please select a date first';
-            timeSlots.innerHTML = `<div style="text-align: center; padding: 20px; color: #666; background: #f5f5f5; border-radius: 10px;">${selectDateMsg}</div>`;
+            const t = isZh ? translations.zh : translations.en;
+            timeSlots.innerHTML = `<div style="text-align: center; padding: 20px; color: #666; background: #f5f5f5; border-radius: 10px;">${t.selectDateFirst}</div>`;
         }
 
         function generateDates() {
@@ -727,11 +854,12 @@
                     const noticeDiv = document.createElement('div');
                     noticeDiv.id = 'policy-notice';
                     noticeDiv.style = 'margin-bottom: 15px; padding: 12px; background: #fff3e0; border: 1px solid #ffb74d; border-radius: 5px;';
+                    const t = isZh ? translations.zh : translations.en;
                     noticeDiv.innerHTML = `
                         <div style="display: flex; align-items: center;">
                             <span style="font-size: 16px; margin-right: 8px;">⚠️</span>
                             <div>
-                                <div style="font-weight: bold; color: #f57c00; margin-bottom: 4px;">${isZh ? '取消政策' : 'Cancellation Policy'}</div>
+                                <div style="font-weight: bold; color: #f57c00; margin-bottom: 4px;">${t.cancellationPolicyLabel || (isZh ? '取消政策' : 'Cancellation Policy')}</div>
                                 <div style="font-size: 13px; color: #666;">${policyText}</div>
                             </div>
                         </div>
@@ -752,8 +880,8 @@
             timeSlots.innerHTML = '';
 
             if (!selectedDate) {
-                const selectDateMsg = isZh ? '请先选择日期' : 'Please select a date first';
-                timeSlots.innerHTML = `<div style="text-align: center; color: #666;">${selectDateMsg}</div>`;
+                const t = isZh ? translations.zh : translations.en;
+                timeSlots.innerHTML = `<div style="text-align: center; color: #666;">${t.selectDateFirst}</div>`;
                 return;
             }
 
@@ -768,7 +896,7 @@
             // Get available slots or use defaults
             let availableSlots;
             try {
-                availableSlots = SharedData.getAvailableSlots(selectedDate, totalDuration);
+                availableSlots = SharedData.getAvailableSlots(selectedDate, totalDuration, selectedBarberId);
             } catch (e) {
                 // Generate default slots if SharedData isn't available
                 const dayName = selectedDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
@@ -1018,6 +1146,7 @@
             const dateStr = `${year}-${month}-${day}`;
 
             const appointment = {
+                barberId: selectedBarberId,
                 services: selectedServices,
                 serviceNames: serviceNames,
                 date: dateStr,
@@ -1320,6 +1449,8 @@
         }
 
         function startNew() {
+            // Reset all selections
+            selectedBarberId = null;
             selectedServices = [];
             selectedDate = null;
             selectedTime = null;
@@ -1329,16 +1460,30 @@
             document.getElementById('phone').value = '';
             document.getElementById('email').value = '';
 
-            // Reset selections
+            // Reset service selections
             document.querySelectorAll('.service-card').forEach(card => {
                 card.classList.remove('selected');
-                card.querySelector('.checkbox').classList.remove('checked');
-                card.querySelector('.checkbox').innerHTML = '';
+                const checkbox = card.querySelector('.checkbox');
+                if (checkbox) {
+                    checkbox.classList.remove('checked');
+                    checkbox.innerHTML = '';
+                }
             });
 
             document.getElementById('service-next').disabled = true;
 
-            showScreen('service-screen');
+            // Check number of barbers and show appropriate screen
+            const barbers = SharedData.getBarbers();
+            if (barbers.length === 1) {
+                // Single barber - skip barber selection and go straight to services
+                selectedBarberId = barbers[0].id;
+                loadServicesForBarber(selectedBarberId);
+                showScreen('service-screen');
+            } else {
+                // Multiple barbers - show barber selection screen
+                loadBarbers();
+                showScreen('barber-screen');
+            }
         }
 
         function checkTimeOff() {
@@ -1397,7 +1542,61 @@
             }
         }
 
+        function loadServicesForBarber(barberId) {
+            const barber = SharedData.getBarberById(barberId);
+            const services = barber.services || SharedData.getServices();
+            const container = document.getElementById('services-container');
+            container.innerHTML = '';
+
+            // Show/hide back button based on number of barbers
+            const barbers = SharedData.getBarbers();
+            const backButton = document.getElementById('service-back');
+            if (backButton) {
+                backButton.style.display = barbers.length > 1 ? 'block' : 'none';
+            }
+
+            const t = isZh ? translations.zh : translations.en;
+
+            Object.keys(services).forEach(serviceId => {
+                const service = services[serviceId];
+                if (!service.enabled) return;
+
+                const card = document.createElement('div');
+                card.className = 'service-card';
+                card.onclick = function() { toggleService(this, serviceId); };
+
+                // Get the correct translation for the service name
+                let serviceName = service.name;
+                if (isZh && t.services[service.name]) {
+                    serviceName = t.services[service.name];
+                }
+
+                const minText = t.min || 'min';
+
+                card.innerHTML = `
+                    <div>
+                        <div class="service-name" style="font-weight: bold;">${serviceName}</div>
+                        <div style="font-size: 14px; color: #666;">
+                            ${service.duration} ${minText} • $${service.price}
+                        </div>
+                    </div>
+                    <div class="checkbox" id="check-${serviceId}"></div>
+                `;
+
+                container.appendChild(card);
+            });
+
+            // Check for time off notice
+            checkTimeOff();
+        }
+
         function loadAvailableServices() {
+            // This is now a fallback for when no barber is selected
+            if (selectedBarberId) {
+                loadServicesForBarber(selectedBarberId);
+                return;
+            }
+
             const services = SharedData.getServices();
             const container = document.getElementById('services-container');
             container.innerHTML = '';
@@ -1441,8 +1640,20 @@
         if (action && bookingId) {
             handleBookingAction(action, bookingId);
         } else {
-            // Normal initialization
-            loadAvailableServices();
+            // Normal initialization - check for barbers first
+            const barbers = SharedData.getBarbers();
+
+            if (barbers.length === 1) {
+                // Single barber - skip barber selection and go straight to services
+                selectedBarberId = barbers[0].id;
+                loadServicesForBarber(selectedBarberId);
+                showScreen('service-screen');
+            } else {
+                // Multiple barbers - show barber selection screen
+                loadBarbers();
+                showScreen('barber-screen');
+            }
+
             updateLanguage();
             updateProgress();
         }
