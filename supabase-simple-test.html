@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Supabase Test (No Auth)</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+        .status {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Simple Supabase Test (No Authentication)</h1>
+
+    <div id="status" class="status info">Ready to test...</div>
+
+    <h2>Step 1: Create a Test Shop</h2>
+    <button onclick="createTestShop()">Create Test Shop</button>
+
+    <h2>Step 2: Test Operations</h2>
+    <button onclick="testBarbers()">Test Barbers</button>
+    <button onclick="testServices()">Test Services</button>
+    <button onclick="testAppointments()">Test Appointments</button>
+    <button onclick="viewAllData()">View All Data</button>
+
+    <h2>Step 3: Use with Owner App</h2>
+    <p>Shop ID: <span id="shop-id">Not created yet</span></p>
+    <button onclick="copyShopId()">Copy Shop ID</button>
+    <button onclick="openOwnerApp()">Open Owner App</button>
+
+    <pre id="results"></pre>
+
+    <script>
+        // Initialize Supabase
+        const SUPABASE_URL = 'https://zpgebfbzdmahlbhjbvvk.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwZ2ViZmJ6ZG1haGxiaGpidnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg0MDYxNzAsImV4cCI6MjA3Mzk4MjE3MH0.KtiKm9TdgedUXKXMQQxYNzeFbKAgKbqP2_0IhI_AFHA';
+
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let testShopId = localStorage.getItem('test_shop_id');
+        if (testShopId) {
+            document.getElementById('shop-id').textContent = testShopId;
+        }
+
+        async function createTestShop() {
+            const status = document.getElementById('status');
+            const results = document.getElementById('results');
+
+            try {
+                status.className = 'status info';
+                status.textContent = 'Creating test shop...';
+
+                // Create a shop directly (no auth)
+                const { data: shop, error: shopError } = await supabaseClient
+                    .from('shops')
+                    .insert({
+                        name: 'Test Barbershop ' + Date.now(),
+                        email: 'test' + Date.now() + '@example.com',
+                        phone: '555-' + Math.floor(Math.random() * 9000 + 1000)
+                    })
+                    .select()
+                    .single();
+
+                if (shopError) throw shopError;
+
+                testShopId = shop.id;
+                localStorage.setItem('test_shop_id', testShopId);
+                localStorage.setItem('supabase_shop_id', testShopId); // For supabase-bridge.js
+
+                document.getElementById('shop-id').textContent = testShopId;
+
+                // Create shop settings
+                await supabaseClient
+                    .from('shop_settings')
+                    .insert({ shop_id: testShopId });
+
+                // Create default barber
+                const { data: barber } = await supabaseClient
+                    .from('barbers')
+                    .insert({
+                        shop_id: testShopId,
+                        name: 'John Doe',
+                        is_owner: true,
+                        is_active: true
+                    })
+                    .select()
+                    .single();
+
+                // Create default services
+                const defaultServices = [
+                    { shop_id: testShopId, name: "Men's Cut", name_zh: "男士理发", duration: 30, price: 25, color: '#2196F3' },
+                    { shop_id: testShopId, name: "Women's Cut", name_zh: "女士理发", duration: 45, price: 35, color: '#E91E63' },
+                    { shop_id: testShopId, name: "Kids Cut", name_zh: "儿童理发", duration: 15, price: 15, color: '#4CAF50' }
+                ];
+
+                await supabaseClient
+                    .from('services')
+                    .insert(defaultServices);
+
+                status.className = 'status success';
+                status.textContent = '✅ Test shop created successfully!';
+
+                results.textContent = JSON.stringify({
+                    shop: shop,
+                    barber: barber,
+                    message: 'Shop created with ID: ' + testShopId
+                }, null, 2);
+
+            } catch (error) {
+                status.className = 'status error';
+                status.textContent = '❌ Error: ' + error.message;
+                results.textContent = JSON.stringify(error, null, 2);
+            }
+        }
+
+        async function testBarbers() {
+            if (!testShopId) {
+                alert('Create a test shop first!');
+                return;
+            }
+
+            const results = document.getElementById('results');
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('barbers')
+                    .select('*')
+                    .eq('shop_id', testShopId);
+
+                if (error) throw error;
+
+                results.textContent = 'Barbers:\n' + JSON.stringify(data, null, 2);
+            } catch (error) {
+                results.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        async function testServices() {
+            if (!testShopId) {
+                alert('Create a test shop first!');
+                return;
+            }
+
+            const results = document.getElementById('results');
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('services')
+                    .select('*')
+                    .eq('shop_id', testShopId);
+
+                if (error) throw error;
+
+                results.textContent = 'Services:\n' + JSON.stringify(data, null, 2);
+            } catch (error) {
+                results.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        async function testAppointments() {
+            if (!testShopId) {
+                alert('Create a test shop first!');
+                return;
+            }
+
+            const results = document.getElementById('results');
+
+            try {
+                // Get first barber and service
+                const { data: barbers } = await supabaseClient
+                    .from('barbers')
+                    .select('*')
+                    .eq('shop_id', testShopId)
+                    .limit(1);
+
+                const { data: services } = await supabaseClient
+                    .from('services')
+                    .select('*')
+                    .eq('shop_id', testShopId)
+                    .limit(1);
+
+                if (!barbers?.length || !services?.length) {
+                    throw new Error('Need at least one barber and service');
+                }
+
+                // Create test appointment
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+
+                const { data: appointment, error } = await supabaseClient
+                    .from('appointments')
+                    .insert({
+                        shop_id: testShopId,
+                        barber_id: barbers[0].id,
+                        customer_name: 'Test Customer',
+                        customer_phone: '555-0001',
+                        customer_email: 'customer@test.com',
+                        service_ids: [services[0].id],
+                        appointment_date: tomorrow.toISOString().split('T')[0],
+                        start_time: '14:00',
+                        end_time: '14:30',
+                        status: 'confirmed',
+                        total_price: services[0].price
+                    })
+                    .select()
+                    .single();
+
+                if (error) throw error;
+
+                results.textContent = 'Appointment created:\n' + JSON.stringify(appointment, null, 2);
+            } catch (error) {
+                results.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        async function viewAllData() {
+            if (!testShopId) {
+                alert('Create a test shop first!');
+                return;
+            }
+
+            const results = document.getElementById('results');
+
+            try {
+                const { data: shop } = await supabaseClient
+                    .from('shops')
+                    .select('*')
+                    .eq('id', testShopId)
+                    .single();
+
+                const { data: barbers } = await supabaseClient
+                    .from('barbers')
+                    .select('*')
+                    .eq('shop_id', testShopId);
+
+                const { data: services } = await supabaseClient
+                    .from('services')
+                    .select('*')
+                    .eq('shop_id', testShopId);
+
+                const { data: appointments } = await supabaseClient
+                    .from('appointments')
+                    .select('*')
+                    .eq('shop_id', testShopId);
+
+                results.textContent = JSON.stringify({
+                    shop,
+                    barbers,
+                    services,
+                    appointments
+                }, null, 2);
+            } catch (error) {
+                results.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        function copyShopId() {
+            if (!testShopId) {
+                alert('Create a test shop first!');
+                return;
+            }
+
+            navigator.clipboard.writeText(testShopId);
+            alert('Shop ID copied to clipboard!');
+        }
+
+        function openOwnerApp() {
+            if (!testShopId) {
+                alert('Create a test shop first!');
+                return;
+            }
+
+            // Make sure shop ID is saved for supabase-bridge.js
+            localStorage.setItem('supabase_shop_id', testShopId);
+            window.open('owner-app.html', '_blank');
+        }
+    </script>
+</body>
+</html>

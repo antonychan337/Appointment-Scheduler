@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Service Enabled States</title>
+    <script src="shared-data.js"></script>
+</head>
+<body>
+    <h1>Fix Service Enabled States</h1>
+    <div id="output"></div>
+    <button onclick="enableAllServices()">Enable All Services</button>
+    <button onclick="showCurrentState()">Show Current State</button>
+
+    <script>
+        function showCurrentState() {
+            const services = SharedData.getServices();
+            const output = document.getElementById('output');
+
+            output.innerHTML = '<h2>Current Service States:</h2>';
+            output.innerHTML += '<table border="1" cellpadding="5">';
+            output.innerHTML += '<tr><th>Service ID</th><th>Name</th><th>Enabled</th><th>Price</th><th>Duration</th></tr>';
+
+            Object.keys(services).forEach(serviceId => {
+                const service = services[serviceId];
+                output.innerHTML += `
+                    <tr>
+                        <td>${serviceId}</td>
+                        <td>${service.name}</td>
+                        <td style="background: ${service.enabled ? '#90EE90' : '#FFB6C1'}">${service.enabled}</td>
+                        <td>$${service.price}</td>
+                        <td>${service.duration} min</td>
+                    </tr>
+                `;
+            });
+
+            output.innerHTML += '</table>';
+        }
+
+        function enableAllServices() {
+            const services = SharedData.getServices();
+
+            // Enable all services
+            Object.keys(services).forEach(serviceId => {
+                services[serviceId].enabled = true;
+            });
+
+            // Save the updated services
+            SharedData.saveServices(services);
+
+            alert('All services have been enabled!');
+            showCurrentState();
+        }
+
+        // Show initial state
+        showCurrentState();
+    </script>
+</body>
+</html>

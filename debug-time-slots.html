@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Debug Time Slots</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .section {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .error { color: red; }
+        .success { color: green; }
+        .warning { color: orange; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        .slot {
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 3px;
+            background: #e0e0e0;
+            border-radius: 3px;
+        }
+        .slot.invalid {
+            background: #ffcccc;
+            text-decoration: line-through;
+        }
+    </style>
+</head>
+<body>
+    <h1>Debug Time Slots Generation</h1>
+
+    <div class="section">
+        <h3>Test Parameters:</h3>
+        <label>
+            Day:
+            <select id="day-select">
+                <option value="saturday">Saturday</option>
+                <option value="friday">Friday</option>
+                <option value="monday">Monday</option>
+            </select>
+        </label>
+        <label>
+            Service Duration:
+            <input type="number" id="duration" value="30" min="15" step="15"> minutes
+        </label>
+        <button onclick="testSlots()">Test Slot Generation</button>
+    </div>
+
+    <div class="section">
+        <h3>Store Hours:</h3>
+        <pre id="store-hours">Loading...</pre>
+    </div>
+
+    <div class="section">
+        <h3>Generated Slots:</h3>
+        <div id="slots-list"></div>
+    </div>
+
+    <div class="section">
+        <h3>Analysis:</h3>
+        <pre id="analysis"></pre>
+    </div>
+
+    <script>
+        async function loadStoreHours() {
+            await SharedData.initialize();
+            const hours = SharedData.getStoreHours();
+            document.getElementById('store-hours').textContent = JSON.stringify(hours, null, 2);
+            return hours;
+        }
+
+        async function testSlots() {
+            const dayName = document.getElementById('day-select').value;
+            const duration = parseInt(document.getElementById('duration').value);
+
+            // Get store hours
+            const storeHours = await loadStoreHours();
+            const dayHours = storeHours[dayName];
+
+            const analysisDiv = document.getElementById('analysis');
+            const slotsDiv = document.getElementById('slots-list');
+
+            if (!dayHours || dayHours.closed) {
+                analysisDiv.innerHTML = `<span class="error">Store is CLOSED on ${dayName}</span>`;
+                slotsDiv.innerHTML = 'No slots available';
+                return;
+            }
+
+            analysisDiv.innerHTML = `Day: ${dayName}\n`;
+            analysisDiv.innerHTML += `Store Hours: ${dayHours.open} - ${dayHours.close}\n`;
+            analysisDiv.innerHTML += `Service Duration: ${duration} minutes\n\n`;
+
+            // Calculate times in minutes
+            const [openHour, openMin] = dayHours.open.split(':').map(Number);
+            const [closeHour, closeMin] = dayHours.close.split(':').map(Number);
+            const openMinutes = openHour * 60 + openMin;
+            const closeMinutes = closeHour * 60 + closeMin;
+
+            analysisDiv.innerHTML += `Open: ${dayHours.open} = ${openMinutes} minutes\n`;
+            analysisDiv.innerHTML += `Close: ${dayHours.close} = ${closeMinutes} minutes\n`;
+
+            // Calculate last valid slot
+            const lastValidSlotMinutes = closeMinutes - duration;
+            const lastValidHour = Math.floor(lastValidSlotMinutes / 60);
+            const lastValidMin = lastValidSlotMinutes % 60;
+            const lastValidTime = `${lastValidHour.toString().padStart(2, '0')}:${lastValidMin.toString().padStart(2, '0')}`;
+
+            analysisDiv.innerHTML += `\nLast Valid Slot Calculation:\n`;
+            analysisDiv.innerHTML += `Closing time (${closeMinutes} min) - Service duration (${duration} min) = ${lastValidSlotMinutes} min\n`;
+            analysisDiv.innerHTML += `Last valid slot time: ${lastValidTime}\n\n`;
+
+            // Get slots from SharedData
+            const testDate = new Date();
+            const dayIndex = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].indexOf(dayName);
+            const daysToAdd = (dayIndex - testDate.getDay() + 7) % 7 || 7; // Get next occurrence of this day
+            testDate.setDate(testDate.getDate() + daysToAdd);
+
+            const slots = SharedData.getAvailableSlots(testDate, duration);
+
+            analysisDiv.innerHTML += `\nSlots returned by SharedData.getAvailableSlots():\n`;
+            analysisDiv.innerHTML += `Total slots: ${slots.length}\n`;
+
+            if (slots.length > 0) {
+                analysisDiv.innerHTML += `First slot: ${slots[0]}\n`;
+                analysisDiv.innerHTML += `Last slot: ${slots[slots.length - 1]}\n`;
+            }
+
+            // Display all slots and mark invalid ones
+            slotsDiv.innerHTML = '';
+            slots.forEach(slot => {
+                const [slotHour, slotMin] = slot.split(':').map(Number);
+                const slotMinutes = slotHour * 60 + slotMin;
+                const endMinutes = slotMinutes + duration;
+
+                const slotDiv = document.createElement('span');
+                slotDiv.className = 'slot';
+                slotDiv.textContent = slot;
+
+                // Check if this slot would end after closing
+                if (endMinutes > closeMinutes) {
+                    slotDiv.className += ' invalid';
+                    slotDiv.title = `Would end at ${Math.floor(endMinutes/60)}:${(endMinutes%60).toString().padStart(2,'0')} (after closing)`;
+                }
+
+                slotsDiv.appendChild(slotDiv);
+            });
+
+            // Check for problematic slots
+            const problematicSlots = slots.filter(slot => {
+                const [h, m] = slot.split(':').map(Number);
+                const slotMin = h * 60 + m;
+                return (slotMin + duration) > closeMinutes;
+            });
+
+            if (problematicSlots.length > 0) {
+                analysisDiv.innerHTML += `\n<span class="error">⚠️ PROBLEM: Found ${problematicSlots.length} slots that would end after closing:</span>\n`;
+                problematicSlots.forEach(slot => {
+                    const [h, m] = slot.split(':').map(Number);
+                    const endMin = h * 60 + m + duration;
+                    const endTime = `${Math.floor(endMin/60)}:${(endMin%60).toString().padStart(2,'0')}`;
+                    analysisDiv.innerHTML += `  ${slot} would end at ${endTime}\n`;
+                });
+            } else {
+                analysisDiv.innerHTML += `\n<span class="success">✅ All slots are valid!</span>\n`;
+            }
+        }
+
+        // Load on start
+        setTimeout(() => {
+            loadStoreHours();
+            testSlots();
+        }, 500);
+    </script>
+</body>
+</html>

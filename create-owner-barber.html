@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Create Owner Barber</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fix Customer App - Create Owner Barber</h1>
+
+    <div class="card">
+        <h2>Current Status:</h2>
+        <div id="status" class="info">Checking database...</div>
+    </div>
+
+    <div class="card">
+        <h2>Actions:</h2>
+        <button onclick="createOwnerBarber()">Create Owner Barber</button>
+        <button onclick="checkStatus()">Refresh Status</button>
+        <button onclick="testCustomerApp()">Test Customer App</button>
+    </div>
+
+    <div class="card">
+        <h2>Details:</h2>
+        <pre id="details">Loading...</pre>
+    </div>
+
+    <script>
+        async function checkStatus() {
+            const statusDiv = document.getElementById('status');
+            const detailsDiv = document.getElementById('details');
+
+            const shopId = localStorage.getItem('supabase_shop_id');
+
+            if (!shopId) {
+                statusDiv.className = 'error';
+                statusDiv.innerHTML = '❌ No shop ID found!';
+                detailsDiv.textContent = 'Please complete the setup wizard first.';
+                return;
+            }
+
+            detailsDiv.textContent = `Shop ID: ${shopId}\n\n`;
+
+            try {
+                // Check shop
+                const { data: shop, error: shopError } = await supabaseClient
+                    .from('shops')
+                    .select('*')
+                    .eq('id', shopId)
+                    .single();
+
+                if (shopError) {
+                    statusDiv.className = 'error';
+                    statusDiv.innerHTML = `❌ Error loading shop: ${shopError.message}`;
+                    return;
+                }
+
+                detailsDiv.textContent += `Shop Name: ${shop.name}\n`;
+                detailsDiv.textContent += `Shop Email: ${shop.email}\n`;
+                detailsDiv.textContent += `Shop Slug: ${shop.slug || 'NOT SET'}\n\n`;
+
+                // Check barbers
+                const { data: barbers, error: barbersError } = await supabaseClient
+                    .from('barbers')
+                    .select('*')
+                    .eq('shop_id', shopId);
+
+                if (barbersError) {
+                    detailsDiv.textContent += `Error loading barbers: ${barbersError.message}\n`;
+                } else {
+                    detailsDiv.textContent += `\nBarbers in database: ${barbers.length}\n\n`;
+
+                    if (barbers.length === 0) {
+                        statusDiv.className = 'error';
+                        statusDiv.innerHTML = '❌ No barbers found! Click "Create Owner Barber" to fix.';
+                    } else {
+                        const activeBarbers = barbers.filter(b => b.is_active);
+                        detailsDiv.textContent += `Active barbers: ${activeBarbers.length}\n`;
+
+                        barbers.forEach(barber => {
+                            detailsDiv.textContent += `\n${barber.is_active ? '✅' : '❌'} ${barber.name}`;
+                            detailsDiv.textContent += ` (${barber.is_owner ? 'Owner' : 'Staff'})`;
+                            detailsDiv.textContent += `\n   ID: ${barber.id}`;
+                            detailsDiv.textContent += `\n   Services: ${barber.service_ids ? barber.service_ids.length : 0}`;
+                            detailsDiv.textContent += '\n';
+                        });
+
+                        if (activeBarbers.length === 0) {
+                            statusDiv.className = 'error';
+                            statusDiv.innerHTML = '❌ No active barbers! Customer app won\'t work.';
+                        } else {
+                            statusDiv.className = 'success';
+                            statusDiv.innerHTML = `✅ ${activeBarbers.length} active barber(s) found. Customer app should work!`;
+                        }
+                    }
+                }
+
+                // Check services
+                const { data: services } = await supabaseClient
+                    .from('services')
+                    .select('*')
+                    .eq('shop_id', shopId);
+
+                if (services) {
+                    detailsDiv.textContent += `\n\nServices in database: ${services.length}\n`;
+                    services.forEach(service => {
+                        detailsDiv.textContent += `- ${service.name} (${service.enabled ? 'enabled' : 'disabled'})\n`;
+                    });
+                }
+
+            } catch (error) {
+                statusDiv.className = 'error';
+                statusDiv.innerHTML = `❌ Error: ${error.message}`;
+                detailsDiv.textContent = error.stack;
+            }
+        }
+
+        async function createOwnerBarber() {
+            const statusDiv = document.getElementById('status');
+            const shopId = localStorage.getItem('supabase_shop_id');
+
+            if (!shopId) {
+                alert('No shop ID found!');
+                return;
+            }
+
+            try {
+                statusDiv.className = 'info';
+                statusDiv.innerHTML = 'Creating owner barber...';
+
+                // Get shop details
+                const { data: shop } = await supabaseClient
+                    .from('shops')
+                    .select('name, owner_first_name, owner_last_name')
+                    .eq('id', shopId)
+                    .single();
+
+                // Get all services for this shop
+                const { data: services } = await supabaseClient
+                    .from('services')
+                    .select('id')
+                    .eq('shop_id', shopId);
+
+                const serviceIds = services ? services.map(s => s.id) : [];
+
+                // Determine owner name
+                let ownerName = 'Owner';
+                if (shop) {
+                    if (shop.owner_first_name || shop.owner_last_name) {
+                        ownerName = `${shop.owner_first_name || ''} ${shop.owner_last_name || ''}`.trim();
+                    } else {
+                        // Try to get from localStorage
+                        const ownerProfile = JSON.parse(localStorage.getItem('ownerProfile') || '{}');
+                        if (ownerProfile.firstName) {
+                            ownerName = `${ownerProfile.firstName} ${ownerProfile.lastName || ''}`.trim();
+                        }
+                    }
+                }
+
+                console.log('Creating owner barber:', ownerName, 'with services:', serviceIds);
+
+                // Create the owner barber
+                const { data: newBarber, error } = await supabaseClient
+                    .from('barbers')
+                    .insert({
+                        shop_id: shopId,
+                        name: ownerName,
+                        is_owner: true,
+                        is_active: true,
+                        service_ids: serviceIds,
+                        uses_store_hours: true,
+                        working_hours: {
+                            monday: { open: '09:00', close: '18:00', closed: false },
+                            tuesday: { open: '09:00', close: '18:00', closed: false },
+                            wednesday: { open: '09:00', close: '18:00', closed: false },
+                            thursday: { open: '09:00', close: '18:00', closed: false },
+                            friday: { open: '09:00', close: '20:00', closed: false },
+                            saturday: { open: '10:00', close: '17:00', closed: false },
+                            sunday: { open: '', close: '', closed: true }
+                        }
+                    })
+                    .select()
+                    .single();
+
+                if (error) {
+                    console.error('Error creating barber:', error);
+                    statusDiv.className = 'error';
+                    statusDiv.innerHTML = `❌ Error: ${error.message}`;
+                } else {
+                    console.log('Barber created:', newBarber);
+                    statusDiv.className = 'success';
+                    statusDiv.innerHTML = `✅ Owner barber created successfully! ID: ${newBarber.id}`;
+
+                    // Refresh status after a moment
+                    setTimeout(checkStatus, 1000);
+                }
+
+            } catch (error) {
+                statusDiv.className = 'error';
+                statusDiv.innerHTML = `❌ Error: ${error.message}`;
+                console.error('Error:', error);
+            }
+        }
+
+        function testCustomerApp() {
+            const shopId = localStorage.getItem('supabase_shop_id');
+
+            // Set customer context
+            localStorage.setItem('customer_shop_id', shopId);
+            localStorage.setItem('customer_shop_slug', 'antonys_salon');
+
+            // Open customer app
+            window.location.href = 'customer-app.html?shop=antonys_salon';
+        }
+
+        // Check status on load
+        setTimeout(checkStatus, 500);
+    </script>
+</body>
+</html>

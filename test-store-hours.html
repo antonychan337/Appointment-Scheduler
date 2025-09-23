@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Store Hours</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            background: #f5f5f5;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        pre {
+            background: white;
+            padding: 10px;
+            overflow: auto;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Store Hours Loading</h1>
+
+    <button onclick="testAll()">Run All Tests</button>
+    <button onclick="location.reload()">Refresh</button>
+
+    <div class="section">
+        <h2>1. Initialization</h2>
+        <div id="init-result"></div>
+    </div>
+
+    <div class="section">
+        <h2>2. Direct Database Query</h2>
+        <div id="db-result"></div>
+    </div>
+
+    <div class="section">
+        <h2>3. SharedData.getStoreHours()</h2>
+        <div id="shared-result"></div>
+    </div>
+
+    <div class="section">
+        <h2>4. Check Default Store Hours</h2>
+        <div id="default-result"></div>
+    </div>
+
+    <script>
+        async function testAll() {
+            // 1. Initialize
+            const initDiv = document.getElementById('init-result');
+            initDiv.innerHTML = 'Initializing SharedData...';
+
+            try {
+                await SharedData.initialize();
+
+                const shopId = SharedData.getCurrentShopId();
+                initDiv.innerHTML = `<span class="success">✓ Initialized</span><br>`;
+                initDiv.innerHTML += `Shop ID: ${shopId || 'NONE'}`;
+
+                if (!shopId) {
+                    initDiv.innerHTML += '<br><span class="error">ERROR: No shop ID found!</span>';
+                    return;
+                }
+            } catch (e) {
+                initDiv.innerHTML = `<span class="error">Error: ${e.message}</span>`;
+                return;
+            }
+
+            // 2. Direct database query
+            const dbDiv = document.getElementById('db-result');
+            dbDiv.innerHTML = 'Querying database directly...';
+
+            try {
+                const shopId = SharedData.getCurrentShopId();
+                const { data: shop, error } = await supabaseClient
+                    .from('shops')
+                    .select('store_hours')
+                    .eq('id', shopId)
+                    .single();
+
+                if (error) {
+                    dbDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+                } else if (shop) {
+                    dbDiv.innerHTML = '<span class="success">✓ Found store_hours in database:</span>';
+                    const pre = document.createElement('pre');
+                    pre.textContent = JSON.stringify(shop.store_hours, null, 2);
+                    dbDiv.appendChild(pre);
+                } else {
+                    dbDiv.innerHTML = '<span class="error">No shop data found</span>';
+                }
+            } catch (e) {
+                dbDiv.innerHTML = `<span class="error">Exception: ${e.message}</span>`;
+            }
+
+            // 3. Test SharedData.getStoreHours()
+            const sharedDiv = document.getElementById('shared-result');
+            sharedDiv.innerHTML = 'Calling SharedData.getStoreHours()...';
+
+            try {
+                const hours = await SharedData.getStoreHours();
+
+                if (hours) {
+                    sharedDiv.innerHTML = '<span class="success">✓ getStoreHours() returned:</span>';
+                    const pre = document.createElement('pre');
+                    pre.textContent = JSON.stringify(hours, null, 2);
+                    sharedDiv.appendChild(pre);
+                } else {
+                    sharedDiv.innerHTML = '<span class="error">getStoreHours() returned null/undefined</span>';
+                }
+            } catch (e) {
+                sharedDiv.innerHTML = `<span class="error">Error: ${e.message}</span>`;
+            }
+
+            // 4. Check default store hours
+            const defaultDiv = document.getElementById('default-result');
+            defaultDiv.innerHTML = 'Checking default store hours...';
+
+            try {
+                const defaults = SharedData.defaultStoreHours;
+
+                if (defaults) {
+                    defaultDiv.innerHTML = '<span class="success">✓ Default hours exist:</span>';
+                    const pre = document.createElement('pre');
+                    pre.textContent = JSON.stringify(defaults, null, 2);
+                    defaultDiv.appendChild(pre);
+                } else {
+                    defaultDiv.innerHTML = '<span class="error">No default hours defined</span>';
+                }
+            } catch (e) {
+                defaultDiv.innerHTML = `<span class="error">Error: ${e.message}</span>`;
+            }
+        }
+
+        // Run tests automatically on load
+        testAll();
+    </script>
+</body>
+</html>

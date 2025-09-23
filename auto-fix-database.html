@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Auto-Fix Database</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+</head>
+<body>
+    <h1>Automatically Fixing Database Issues...</h1>
+    <div id="output"></div>
+
+    <script>
+        const output = document.getElementById('output');
+
+        function log(message, type = 'info') {
+            const p = document.createElement('p');
+            p.textContent = message;
+            p.style.color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'black';
+            output.appendChild(p);
+            console.log(message);
+        }
+
+        async function autoFix() {
+            log('Starting automatic database fix...');
+
+            // Check if user is authenticated
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                log('Not logged in. Please log in first through the owner app.', 'error');
+                return;
+            }
+            log(`Logged in as: ${user.email}`, 'success');
+
+            // Get shop ID
+            const shopId = localStorage.getItem('currentShopId');
+            if (!shopId) {
+                log('No shop ID found. Creating one...', 'error');
+                // Try to get from database
+                const { data: shops } = await supabase
+                    .from('shops')
+                    .select('id')
+                    .eq('owner_id', user.id)
+                    .single();
+
+                if (shops?.id) {
+                    localStorage.setItem('currentShopId', shops.id);
+                    log(`Found shop ID: ${shops.id}`, 'success');
+                } else {
+                    log('No shop found. Please go through setup wizard first.', 'error');
+                    return;
+                }
+            } else {
+                log(`Using shop ID: ${shopId}`, 'success');
+            }
+
+            // Test loading profile to see what columns are missing
+            log('Testing profile load to identify missing columns...');
+            const { data: shopData, error: shopError } = await supabase
+                .from('shops')
+                .select('*')
+                .eq('id', shopId)
+                .single();
+
+            if (shopError) {
+                log(`Error loading shop: ${shopError.message}`, 'error');
+
+                if (shopError.code === '42703') {
+                    log('Missing columns detected! Attempting to fix...', 'error');
+
+                    // Apply migration via Supabase API
+                    const migrationSQL = `
+                        -- Add missing columns to shops table
+                        ALTER TABLE shops
+                        ADD COLUMN IF NOT EXISTS store_hours JSONB DEFAULT '{
+                            "monday": {"open": "09:00", "close": "18:00", "closed": false},
+                            "tuesday": {"open": "09:00", "close": "18:00", "closed": false},
+                            "wednesday": {"open": "09:00", "close": "18:00", "closed": false},
+                            "thursday": {"open": "09:00", "close": "18:00", "closed": false},
+                            "friday": {"open": "09:00", "close": "18:00", "closed": false},
+                            "saturday": {"open": "10:00", "close": "17:00", "closed": false},
+                            "sunday": {"open": "10:00", "close": "17:00", "closed": true}
+                        }'::JSONB;
+
+                        ALTER TABLE shops
+                        ADD COLUMN IF NOT EXISTS min_booking_hours INTEGER DEFAULT 2,
+                        ADD COLUMN IF NOT EXISTS max_booking_days INTEGER DEFAULT 30,
+                        ADD COLUMN IF NOT EXISTS cancellation_notice_hours INTEGER DEFAULT 24;
+
+                        ALTER TABLE shops
+                        ADD COLUMN IF NOT EXISTS display_info JSONB DEFAULT '{}'::JSONB;
+
+                        ALTER TABLE shops
+                        ADD COLUMN IF NOT EXISTS owner_first_name TEXT,
+                        ADD COLUMN IF NOT EXISTS owner_last_name TEXT,
+                        ADD COLUMN IF NOT EXISTS address TEXT,
+                        ADD COLUMN IF NOT EXISTS phone TEXT,
+                        ADD COLUMN IF NOT EXISTS wechat_id TEXT;
+                    `;
+
+                    log('Migration SQL prepared. Note: You need to run this in Supabase SQL Editor.', 'error');
+                    log('Copy this SQL and run it in your Supabase dashboard:', 'info');
+
+                    const pre = document.createElement('pre');
+                    pre.textContent = migrationSQL;
+                    pre.style.background = '#f0f0f0';
+                    pre.style.padding = '10px';
+                    pre.style.overflow = 'auto';
+                    output.appendChild(pre);
+
+                    const button = document.createElement('button');
+                    button.textContent = 'Copy SQL to Clipboard';
+                    button.onclick = () => {
+                        navigator.clipboard.writeText(migrationSQL);
+                        button.textContent = 'Copied!';
+                    };
+                    output.appendChild(button);
+
+                    return;
+                }
+            } else {
+                log('Shop data loaded successfully!', 'success');
+
+                // Check which columns exist
+                const requiredColumns = [
+                    'store_hours',
+                    'min_booking_hours',
+                    'max_booking_days',
+                    'cancellation_notice_hours',
+                    'display_info',
+                    'owner_first_name',
+                    'owner_last_name',
+                    'address',
+                    'phone',
+                    'wechat_id'
+                ];
+
+                const missingColumns = requiredColumns.filter(col => !(col in shopData));
+
+                if (missingColumns.length > 0) {
+                    log(`Missing columns: ${missingColumns.join(', ')}`, 'error');
+                    log('Please run the migration SQL above in Supabase.', 'error');
+                } else {
+                    log('All required columns exist!', 'success');
+
+                    // Test loading other data
+                    log('Testing barbers table...');
+                    const { data: barbers, error: barbersError } = await supabase
+                        .from('barbers')
+                        .select('*')
+                        .eq('shop_id', shopId);
+
+                    if (barbersError) {
+                        log(`Error loading barbers: ${barbersError.message}`, 'error');
+                    } else {
+                        log(`Found ${barbers?.length || 0} barbers`, 'success');
+                        if (barbers?.length > 0) {
+                            log(`First barber (owner): ${barbers[0].name}`, 'info');
+                        }
+                    }
+
+                    log('Testing services table...');
+                    const { data: services, error: servicesError } = await supabase
+                        .from('services')
+                        .select('*')
+                        .eq('shop_id', shopId);
+
+                    if (servicesError) {
+                        log(`Error loading services: ${servicesError.message}`, 'error');
+                    } else {
+                        log(`Found ${services?.length || 0} services`, 'success');
+                    }
+
+                    log('✅ Database structure looks good!', 'success');
+                    log('Data should now flow correctly from setup wizard to owner app.', 'success');
+                }
+            }
+        }
+
+        // Run automatically
+        autoFix();
+    </script>
+</body>
+</html>

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Debug Database</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            background: #f5f5f5;
+        }
+        h2 {
+            color: #333;
+            margin-top: 0;
+        }
+        pre {
+            background: white;
+            padding: 10px;
+            overflow: auto;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Database Debugging Tool</h1>
+
+    <div class="section">
+        <h2>1. Authentication Status</h2>
+        <pre id="auth-status">Checking...</pre>
+    </div>
+
+    <div class="section">
+        <h2>2. LocalStorage Data</h2>
+        <pre id="localstorage-data">Checking...</pre>
+    </div>
+
+    <div class="section">
+        <h2>3. Shop Data</h2>
+        <pre id="shop-data">Checking...</pre>
+    </div>
+
+    <div class="section">
+        <h2>4. Barbers Data</h2>
+        <pre id="barbers-data">Checking...</pre>
+    </div>
+
+    <div class="section">
+        <h2>5. Services Data</h2>
+        <pre id="services-data">Checking...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Actions</h2>
+        <button onclick="clearLocalStorage()">Clear LocalStorage</button>
+        <button onclick="setTestShopId()">Set Test Shop ID</button>
+        <button onclick="signOut()">Sign Out</button>
+        <button onclick="location.reload()">Refresh</button>
+    </div>
+
+    <script>
+        async function checkEverything() {
+            // 1. Check authentication
+            const authDiv = document.getElementById('auth-status');
+            try {
+                const { data: { user }, error } = await supabaseClient.auth.getUser();
+                if (error) {
+                    authDiv.innerHTML = `<span class="error">Auth Error: ${error.message}</span>`;
+                } else if (user) {
+                    authDiv.innerHTML = `<span class="success">Logged in as: ${user.email}</span>\n`;
+                    authDiv.innerHTML += `User ID: ${user.id}\n`;
+                    authDiv.innerHTML += `Confirmed: ${user.confirmed_at ? 'Yes' : 'No'}`;
+                } else {
+                    authDiv.innerHTML = `<span class="warning">Not logged in</span>`;
+                }
+            } catch (e) {
+                authDiv.innerHTML = `<span class="error">Exception: ${e.message}</span>`;
+            }
+
+            // 2. Check localStorage
+            const localDiv = document.getElementById('localstorage-data');
+            const relevantKeys = ['supabase_shop_id', 'setupComplete', 'currentShopId', 'preferredLanguage'];
+            let localData = 'Relevant localStorage items:\n';
+            relevantKeys.forEach(key => {
+                const value = localStorage.getItem(key);
+                if (value !== null) {
+                    localData += `${key}: ${value}\n`;
+                }
+            });
+            localDiv.textContent = localData;
+
+            // 3. Initialize SharedData and get shop
+            await SharedData.initialize();
+
+            const shopDiv = document.getElementById('shop-data');
+            const shopId = SharedData.getCurrentShopId();
+
+            if (shopId) {
+                shopDiv.innerHTML = `<span class="success">Current Shop ID: ${shopId}</span>\n\n`;
+
+                // Try to load shop data directly
+                try {
+                    const { data: shop, error } = await supabaseClient
+                        .from('shops')
+                        .select('*')
+                        .eq('id', shopId)
+                        .single();
+
+                    if (error) {
+                        shopDiv.innerHTML += `<span class="error">Error loading shop: ${error.message}</span>`;
+                    } else if (shop) {
+                        shopDiv.innerHTML += 'Shop data:\n' + JSON.stringify(shop, null, 2);
+                    } else {
+                        shopDiv.innerHTML += `<span class="warning">No shop found with ID: ${shopId}</span>`;
+                    }
+                } catch (e) {
+                    shopDiv.innerHTML += `<span class="error">Exception: ${e.message}</span>`;
+                }
+            } else {
+                shopDiv.innerHTML = `<span class="warning">No Shop ID found</span>\n`;
+
+                // Try to find shops for this user
+                const { data: { user } } = await supabaseClient.auth.getUser();
+                if (user) {
+                    try {
+                        const { data: shops, error } = await supabaseClient
+                            .from('shops')
+                            .select('id, name, email')
+                            .eq('email', user.email);
+
+                        if (shops && shops.length > 0) {
+                            shopDiv.innerHTML += '\nFound shops for your email:\n';
+                            shops.forEach(shop => {
+                                shopDiv.innerHTML += `- ${shop.name} (ID: ${shop.id})\n`;
+                            });
+                        } else {
+                            shopDiv.innerHTML += '\nNo shops found for your email';
+                        }
+                    } catch (e) {
+                        shopDiv.innerHTML += `\nError searching shops: ${e.message}`;
+                    }
+                }
+            }
+
+            // 4. Check barbers
+            const barbersDiv = document.getElementById('barbers-data');
+            if (shopId) {
+                try {
+                    const barbers = await SharedData.getBarbers();
+                    barbersDiv.innerHTML = `Found ${barbers.length} barbers:\n`;
+                    barbers.forEach(barber => {
+                        barbersDiv.innerHTML += `- ${barber.name} (ID: ${barber.id}, Owner: ${barber.isOwner})\n`;
+                    });
+                } catch (e) {
+                    barbersDiv.innerHTML = `<span class="error">Error: ${e.message}</span>`;
+                }
+            } else {
+                barbersDiv.innerHTML = `<span class="warning">Cannot load barbers without shop ID</span>`;
+            }
+
+            // 5. Check services
+            const servicesDiv = document.getElementById('services-data');
+            if (shopId) {
+                try {
+                    const services = await SharedData.getServices();
+                    servicesDiv.innerHTML = `Found ${Object.keys(services).length} services:\n`;
+                    Object.entries(services).forEach(([id, service]) => {
+                        servicesDiv.innerHTML += `- ${service.name}: $${service.price} (${service.duration}min)\n`;
+                    });
+                } catch (e) {
+                    servicesDiv.innerHTML = `<span class="error">Error: ${e.message}</span>`;
+                }
+            } else {
+                servicesDiv.innerHTML = `<span class="warning">Cannot load services without shop ID</span>`;
+            }
+        }
+
+        function clearLocalStorage() {
+            if (confirm('Clear all localStorage data?')) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
+        function setTestShopId() {
+            const shopId = prompt('Enter Shop ID:');
+            if (shopId) {
+                localStorage.setItem('supabase_shop_id', shopId);
+                SharedData.setCurrentShopId(shopId);
+                location.reload();
+            }
+        }
+
+        async function signOut() {
+            await SharedData.signOut();
+            location.reload();
+        }
+
+        // Run on load
+        checkEverything();
+    </script>
+</body>
+</html>

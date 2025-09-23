@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fix Duplicate Services</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .warning { background: #fff3cd; color: #856404; }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #4A90E2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #357ABD; }
+        .service-list {
+            background: #f5f5f5;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fix Duplicate Services</h1>
+    <div id="output"></div>
+    <button onclick="analyzeServices()">1. Analyze Current Services</button>
+    <button onclick="fixDuplicates()">2. Fix Duplicates (Keep First)</button>
+    <button onclick="updateBarberServices()">3. Update Barber Service IDs</button>
+
+    <script>
+        const output = document.getElementById('output');
+
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = message;
+            output.appendChild(div);
+        }
+
+        async function analyzeServices() {
+            output.innerHTML = '';
+            log('Analyzing services...');
+
+            // Try multiple possible shop ID locations
+            let shopId = localStorage.getItem('supabase_shop_id') ||
+                        localStorage.getItem('currentShopId');
+
+            if (!shopId) {
+                log('No shop ID found in localStorage!', 'error');
+                log('Trying to get shop ID from Supabase...', 'info');
+
+                // Try to get shop ID from Supabase
+                await SharedData.initialize();
+                shopId = SharedData.getCurrentShopId();
+
+                if (!shopId) {
+                    log('Still no shop ID found! Please run the setup wizard first.', 'error');
+                    return;
+                }
+            }
+
+            log(`Using shop ID: ${shopId}`, 'info');
+
+            // Get all services for this shop
+            const { data: services, error } = await supabaseClient
+                .from('services')
+                .select('*')
+                .eq('shop_id', shopId)
+                .order('created_at', { ascending: true });
+
+            if (error) {
+                log(`Error: ${error.message}`, 'error');
+                return;
+            }
+
+            log(`Found ${services.length} total services`, 'info');
+
+            // Group by name to find duplicates
+            const servicesByName = {};
+            services.forEach(service => {
+                if (!servicesByName[service.name]) {
+                    servicesByName[service.name] = [];
+                }
+                servicesByName[service.name].push(service);
+            });
+
+            // Show duplicates
+            let hasDuplicates = false;
+            Object.entries(servicesByName).forEach(([name, serviceList]) => {
+                if (serviceList.length > 1) {
+                    hasDuplicates = true;
+                    log(`⚠️ "${name}" has ${serviceList.length} duplicates:`, 'warning');
+                    serviceList.forEach(s => {
+                        log(`  - ID: ${s.id} (created: ${new Date(s.created_at).toLocaleString()})`, 'info');
+                    });
+                }
+            });
+
+            if (!hasDuplicates) {
+                log('✅ No duplicate services found!', 'success');
+            } else {
+                log('Click "Fix Duplicates" to keep only the first of each service', 'warning');
+            }
+
+            // Store for later use
+            window.servicesData = { services, servicesByName };
+        }
+
+        async function fixDuplicates() {
+            if (!window.servicesData) {
+                log('Please analyze services first!', 'error');
+                return;
+            }
+
+            output.innerHTML = '';
+            log('Fixing duplicates...');
+
+            const { servicesByName } = window.servicesData;
+            const shopId = localStorage.getItem('supabase_shop_id') ||
+                         localStorage.getItem('currentShopId') ||
+                         SharedData.getCurrentShopId();
+            const keepIds = [];
+            const deleteIds = [];
+
+            // Determine which IDs to keep and delete
+            Object.entries(servicesByName).forEach(([name, serviceList]) => {
+                if (serviceList.length > 1) {
+                    // Keep the first (oldest) service
+                    keepIds.push(serviceList[0].id);
+                    // Delete the rest
+                    for (let i = 1; i < serviceList.length; i++) {
+                        deleteIds.push(serviceList[i].id);
+                    }
+                } else {
+                    keepIds.push(serviceList[0].id);
+                }
+            });
+
+            log(`Keeping ${keepIds.length} services, deleting ${deleteIds.length} duplicates`, 'info');
+
+            if (deleteIds.length > 0) {
+                // Delete duplicate services
+                const { error } = await supabaseClient
+                    .from('services')
+                    .delete()
+                    .in('id', deleteIds);
+
+                if (error) {
+                    log(`Error deleting: ${error.message}`, 'error');
+                } else {
+                    log(`✅ Deleted ${deleteIds.length} duplicate services`, 'success');
+                }
+            }
+
+            // Store the kept IDs for barber update
+            window.keptServiceIds = keepIds;
+            log('Now click "Update Barber Service IDs" to fix barber references', 'info');
+        }
+
+        async function updateBarberServices() {
+            if (!window.keptServiceIds) {
+                log('Please fix duplicates first!', 'error');
+                return;
+            }
+
+            output.innerHTML = '';
+            log('Updating barber service references...');
+
+            const shopId = localStorage.getItem('supabase_shop_id') ||
+                         localStorage.getItem('currentShopId') ||
+                         SharedData.getCurrentShopId();
+
+            // Get all barbers for this shop
+            const { data: barbers, error: barbersError } = await supabaseClient
+                .from('barbers')
+                .select('*')
+                .eq('shop_id', shopId);
+
+            if (barbersError) {
+                log(`Error getting barbers: ${barbersError.message}`, 'error');
+                return;
+            }
+
+            log(`Found ${barbers.length} barber(s)`, 'info');
+
+            // Update each barber to use the kept service IDs
+            for (const barber of barbers) {
+                if (barber.is_owner) {
+                    // Owner gets all services
+                    const { error } = await supabaseClient
+                        .from('barbers')
+                        .update({ service_ids: window.keptServiceIds })
+                        .eq('id', barber.id);
+
+                    if (error) {
+                        log(`Error updating ${barber.name}: ${error.message}`, 'error');
+                    } else {
+                        log(`✅ Updated ${barber.name} with all ${window.keptServiceIds.length} services`, 'success');
+                    }
+                } else {
+                    // Non-owners: filter their service_ids to only include kept ones
+                    const validServiceIds = (barber.service_ids || []).filter(id =>
+                        window.keptServiceIds.includes(id)
+                    );
+
+                    if (validServiceIds.length !== (barber.service_ids || []).length) {
+                        const { error } = await supabaseClient
+                            .from('barbers')
+                            .update({ service_ids: validServiceIds })
+                            .eq('id', barber.id);
+
+                        if (error) {
+                            log(`Error updating ${barber.name}: ${error.message}`, 'error');
+                        } else {
+                            log(`✅ Updated ${barber.name} services (${validServiceIds.length} valid)`, 'success');
+                        }
+                    } else {
+                        log(`${barber.name} already has valid service IDs`, 'info');
+                    }
+                }
+            }
+
+            log('🎉 All done! Reload the owner app to see the fixed services.', 'success');
+        }
+
+        // Auto-analyze on load
+        setTimeout(analyzeServices, 500);
+    </script>
+</body>
+</html>

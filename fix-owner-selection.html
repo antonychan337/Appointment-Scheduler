@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Owner Selection in Owner App</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #2C3E50;
+            margin-bottom: 20px;
+        }
+
+        .description {
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .fix-section {
+            margin: 30px 0;
+            padding: 25px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .fix-section h2 {
+            color: #2C3E50;
+            margin-bottom: 15px;
+        }
+
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 15px 0;
+            position: relative;
+        }
+
+        .line-change {
+            margin: 10px 0;
+        }
+
+        .old-line {
+            background: rgba(255, 0, 0, 0.1);
+            color: #ff6b6b;
+            padding: 5px;
+            border-left: 3px solid #ff6b6b;
+        }
+
+        .new-line {
+            background: rgba(0, 255, 0, 0.1);
+            color: #51cf66;
+            padding: 5px;
+            border-left: 3px solid #51cf66;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px 5px;
+        }
+
+        button:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffc107;
+        }
+
+        ol {
+            margin-left: 20px;
+            line-height: 1.8;
+        }
+
+        .highlight {
+            background: #ffeb3b;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Fix Owner Selection in Owner App</h1>
+
+        <div class="description">
+            The owner app is trying to select a barber with ID 'owner', but in Supabase, barbers have UUID IDs.
+            The owner is always the <strong>first barber</strong> created during setup. This fix updates the code to
+            properly select the first barber as the owner.
+        </div>
+
+        <div class="status warning">
+            <strong>⚠️ Manual Fix Required:</strong> The owner-app.html file needs to be manually updated.
+            Follow the instructions below to fix the issue.
+        </div>
+
+        <div class="fix-section">
+            <h2>Problem</h2>
+            <p>The owner app has this hardcoded line that causes the warning:</p>
+            <div class="code-block">
+                <div class="old-line">window.currentBarberId = 'owner';  // Line 7127</div>
+            </div>
+            <p>This tries to find a barber with ID 'owner', which doesn't exist in Supabase.</p>
+        </div>
+
+        <div class="fix-section">
+            <h2>Solution - Update Three Sections</h2>
+
+            <h3>1️⃣ Fix Line 7127</h3>
+            <p>Change the hardcoded 'owner' to null:</p>
+            <div class="code-block">
+                <div class="line-change">
+                    <div class="old-line">- window.currentBarberId = 'owner';</div>
+                    <div class="new-line">+ window.currentBarberId = null;  // Will be set to first barber (owner)</div>
+                </div>
+            </div>
+
+            <h3>2️⃣ Update selectBarber Function (around line 7419)</h3>
+            <p>Add logic to handle null barberId and select first barber:</p>
+            <div class="code-block">
+                <div class="new-line">
+function selectBarber(barberId) {
+    // If no barberId provided, select the first barber (owner)
+    if (!barberId && barbers.length > 0) {
+        barberId = barbers[0].id;
+    }
+
+    window.currentBarberId = barberId;
+
+    // Rest of the function stays the same...
+    let barber = barbers.find(b => b.id === barberId);
+
+    // If not found, use first barber instead of 'owner'
+    if (!barber && barbers.length > 0) {
+        console.warn(`Barber ${barberId} not found, using first barber (owner)`);
+        barber = barbers[0];
+        window.currentBarberId = barber.id;
+    }
+    // Continue with rest of function...
+}
+                </div>
+            </div>
+
+            <h3>3️⃣ Update Initialization (around line 7193)</h3>
+            <p>After loading barbers, select the first one:</p>
+            <div class="code-block">
+                <div class="new-line">
+// After renderStaffTabs();
+if (barbers.length > 0) {
+    renderStaffTabs();
+    // Select the first barber (owner) by default
+    if (!window.currentBarberId) {
+        selectBarber(barbers[0].id);
+    }
+    populateBarberSelectors();
+}
+                </div>
+            </div>
+        </div>
+
+        <div class="fix-section">
+            <h2>How to Apply the Fix</h2>
+            <ol>
+                <li>Open <span class="highlight">owner-app.html</span> in your code editor</li>
+                <li>Search for <span class="highlight">window.currentBarberId = 'owner'</span> (line 7127)</li>
+                <li>Replace it with <span class="highlight">window.currentBarberId = null</span></li>
+                <li>Find the <span class="highlight">selectBarber</span> function (around line 7419)</li>
+                <li>Add the null check at the beginning of the function</li>
+                <li>Update the fallback logic to use <span class="highlight">barbers[0]</span> instead of a hardcoded owner object</li>
+                <li>Save the file</li>
+            </ol>
+        </div>
+
+        <div class="fix-section">
+            <h2>Testing</h2>
+            <button onclick="window.location.href='owner-app.html'">🔄 Test Owner App</button>
+            <button onclick="window.location.href='fix-owner-barber.html'">🔧 Check Owner Status</button>
+            <p style="margin-top: 15px;">After applying the fix:</p>
+            <ul>
+                <li>The "Barber owner not found" warning should disappear</li>
+                <li>The first barber (created during setup) will be selected automatically</li>
+                <li>The owner's name and services will display correctly</li>
+            </ul>
+        </div>
+
+        <div class="status info">
+            <strong>📝 Note:</strong> The owner is always the first barber in the system. When someone signs up and
+            completes the setup wizard, they are automatically created as the first barber with is_owner = true.
+        </div>
+    </div>
+</body>
+</html>

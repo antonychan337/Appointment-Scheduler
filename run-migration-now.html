@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Run Migration Now</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .status { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover { background: #0056b3; }
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Automatic Database Migration</h1>
+    <div id="output"></div>
+
+    <script>
+        const SUPABASE_URL = 'https://zpgebfbzdmahlbhjbvvk.supabase.co';
+        const SUPABASE_SERVICE_KEY = prompt('Enter your Supabase SERVICE_ROLE_KEY (found in Settings > API):');
+
+        if (!SUPABASE_SERVICE_KEY) {
+            document.getElementById('output').innerHTML = `
+                <div class="status error">
+                    <h3>Service Key Required</h3>
+                    <p>To run migrations, you need your Supabase service role key.</p>
+                    <p>Find it at: <a href="${SUPABASE_URL}" target="_blank">Supabase Dashboard</a> → Settings → API → service_role (secret)</p>
+                </div>
+            `;
+        } else {
+            runMigration();
+        }
+
+        async function runMigration() {
+            const output = document.getElementById('output');
+
+            function log(message, type = 'info') {
+                const div = document.createElement('div');
+                div.className = `status ${type}`;
+                div.textContent = message;
+                output.appendChild(div);
+            }
+
+            log('Starting migration...', 'info');
+
+            const migrationQueries = [
+                {
+                    name: 'Add store_hours column',
+                    sql: `ALTER TABLE shops ADD COLUMN IF NOT EXISTS store_hours JSONB DEFAULT '{"monday": {"open": "09:00", "close": "18:00", "closed": false}, "tuesday": {"open": "09:00", "close": "18:00", "closed": false}, "wednesday": {"open": "09:00", "close": "18:00", "closed": false}, "thursday": {"open": "09:00", "close": "18:00", "closed": false}, "friday": {"open": "09:00", "close": "18:00", "closed": false}, "saturday": {"open": "10:00", "close": "17:00", "closed": false}, "sunday": {"open": "10:00", "close": "17:00", "closed": true}}'::JSONB`
+                },
+                {
+                    name: 'Add booking settings columns',
+                    sql: `ALTER TABLE shops
+                          ADD COLUMN IF NOT EXISTS min_booking_hours INTEGER DEFAULT 2,
+                          ADD COLUMN IF NOT EXISTS max_booking_days INTEGER DEFAULT 30,
+                          ADD COLUMN IF NOT EXISTS cancellation_notice_hours INTEGER DEFAULT 24`
+                },
+                {
+                    name: 'Add display_info column',
+                    sql: `ALTER TABLE shops ADD COLUMN IF NOT EXISTS display_info JSONB DEFAULT '{}'::JSONB`
+                },
+                {
+                    name: 'Add owner info columns',
+                    sql: `ALTER TABLE shops
+                          ADD COLUMN IF NOT EXISTS owner_first_name TEXT,
+                          ADD COLUMN IF NOT EXISTS owner_last_name TEXT,
+                          ADD COLUMN IF NOT EXISTS address TEXT,
+                          ADD COLUMN IF NOT EXISTS phone TEXT,
+                          ADD COLUMN IF NOT EXISTS wechat_id TEXT`
+                }
+            ];
+
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (const query of migrationQueries) {
+                try {
+                    const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/exec_sql`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': SUPABASE_SERVICE_KEY,
+                            'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`
+                        },
+                        body: JSON.stringify({ query: query.sql })
+                    });
+
+                    if (response.ok) {
+                        log(`✅ ${query.name}`, 'success');
+                        successCount++;
+                    } else {
+                        // Try alternative approach
+                        const altResponse = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'apikey': SUPABASE_SERVICE_KEY,
+                                'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+                                'Prefer': 'return=representation'
+                            },
+                            body: JSON.stringify({ sql: query.sql })
+                        });
+
+                        if (altResponse.ok) {
+                            log(`✅ ${query.name}`, 'success');
+                            successCount++;
+                        } else {
+                            log(`❌ ${query.name} - May need manual execution`, 'warning');
+                            errorCount++;
+                        }
+                    }
+                } catch (error) {
+                    log(`⚠️ ${query.name} - ${error.message}`, 'warning');
+                    errorCount++;
+                }
+            }
+
+            if (errorCount > 0) {
+                log(`Migration partially complete. ${successCount} succeeded, ${errorCount} need manual execution.`, 'warning');
+
+                // Show manual SQL
+                const manualDiv = document.createElement('div');
+                manualDiv.innerHTML = `
+                    <h3>Manual SQL Required</h3>
+                    <p>Copy this SQL and run it in your Supabase SQL Editor:</p>
+                    <pre>${migrationQueries.map(q => `-- ${q.name}\n${q.sql};`).join('\n\n')}</pre>
+                    <button onclick="copySQL()">Copy SQL</button>
+                    <button onclick="window.open('${SUPABASE_URL}/project/_/sql/new', '_blank')">Open SQL Editor</button>
+                `;
+                output.appendChild(manualDiv);
+
+                window.copySQL = function() {
+                    const sql = migrationQueries.map(q => `-- ${q.name}\n${q.sql};`).join('\n\n');
+                    navigator.clipboard.writeText(sql);
+                    alert('SQL copied to clipboard!');
+                };
+            } else {
+                log('✅ Migration complete! All columns added successfully.', 'success');
+
+                // Add button to test
+                const testBtn = document.createElement('button');
+                testBtn.textContent = 'Test Owner App Now';
+                testBtn.onclick = () => window.open('owner-app.html', '_blank');
+                output.appendChild(testBtn);
+            }
+        }
+    </script>
+</body>
+</html>

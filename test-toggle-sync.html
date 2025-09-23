@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Toggle Sync</title>
+    <script src="shared-data.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { margin: 5px; padding: 8px 15px; cursor: pointer; }
+        .success { color: green; }
+        .error { color: red; }
+        table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    </style>
+</head>
+<body>
+    <h1>Test Service Toggle Sync</h1>
+
+    <div class="test-section">
+        <h2>Step 1: Enable All Services</h2>
+        <button onclick="enableAllServices()">Enable All Services</button>
+        <div id="step1-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Step 2: Update Barber Services</h2>
+        <button onclick="updateBarberServices()">Update Barber Services</button>
+        <div id="step2-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Step 3: Test Toggle (Disable Women's Cut)</h2>
+        <button onclick="testToggleService()">Toggle Women's Cut Off</button>
+        <div id="step3-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Current Status</h2>
+        <button onclick="showStatus()">Refresh Status</button>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        function enableAllServices() {
+            const services = SharedData.getServices();
+            Object.keys(services).forEach(id => {
+                services[id].enabled = true;
+            });
+            SharedData.saveServices(services);
+
+            document.getElementById('step1-result').innerHTML =
+                '<p class="success">✓ All services enabled</p>';
+            showStatus();
+        }
+
+        function updateBarberServices() {
+            const services = SharedData.getServices();
+            const enabledServiceIds = Object.keys(services).filter(id => services[id].enabled);
+            const serviceAssignment = {};
+            enabledServiceIds.forEach(id => {
+                serviceAssignment[id] = true;
+            });
+
+            const barbers = SharedData.getBarbers();
+            barbers.forEach(barber => {
+                SharedData.updateBarber(barber.id, { services: serviceAssignment });
+            });
+
+            document.getElementById('step2-result').innerHTML =
+                `<p class="success">✓ Updated ${barbers.length} barber(s) with ${enabledServiceIds.length} services</p>`;
+            showStatus();
+        }
+
+        function testToggleService() {
+            // Simulate what owner app does when toggling
+            const services = SharedData.getServices();
+
+            // Toggle women's cut off
+            services['womens-cut'].enabled = false;
+            SharedData.saveServices(services);
+
+            // THIS IS WHAT SHOULD HAPPEN IN OWNER APP
+            // Update all barbers
+            const enabledServiceIds = Object.keys(services).filter(id => services[id].enabled);
+            const serviceAssignment = {};
+            enabledServiceIds.forEach(id => {
+                serviceAssignment[id] = true;
+            });
+
+            const barbers = SharedData.getBarbers();
+            barbers.forEach(barber => {
+                SharedData.updateBarber(barber.id, { services: serviceAssignment });
+            });
+
+            document.getElementById('step3-result').innerHTML =
+                '<p class="success">✓ Toggled Women\'s Cut off and updated barbers</p>';
+            showStatus();
+        }
+
+        function showStatus() {
+            const services = SharedData.getServices();
+            const barbers = SharedData.getBarbers();
+            const status = document.getElementById('status');
+
+            let html = '<h3>Services:</h3>';
+            html += '<table>';
+            html += '<tr><th>Service</th><th>Enabled</th></tr>';
+
+            Object.keys(services).forEach(id => {
+                const service = services[id];
+                html += `
+                    <tr>
+                        <td>${service.name}</td>
+                        <td style="background: ${service.enabled ? '#90EE90' : '#FFB6C1'}">${service.enabled}</td>
+                    </tr>
+                `;
+            });
+            html += '</table>';
+
+            html += '<h3>Barber Services (as Customer App sees them):</h3>';
+            barbers.forEach(barber => {
+                html += `<h4>${barber.name}:</h4>`;
+
+                // Process like customer app
+                let barberServiceIds;
+                if (Array.isArray(barber.services)) {
+                    barberServiceIds = barber.services;
+                } else if (barber.services && typeof barber.services === 'object') {
+                    barberServiceIds = Object.keys(barber.services).filter(key => barber.services[key]);
+                } else {
+                    barberServiceIds = Object.keys(services);
+                }
+
+                const visibleServices = [];
+                barberServiceIds.forEach(id => {
+                    if (services[id] && services[id].enabled) {
+                        visibleServices.push(services[id].name);
+                    }
+                });
+
+                html += `<p>Shows ${visibleServices.length} services: ${visibleServices.join(', ') || 'None'}</p>`;
+            });
+
+            status.innerHTML = html;
+        }
+
+        // Show initial status
+        showStatus();
+    </script>
+</body>
+</html>

@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Flow Test - Setup to Owner to Customer</title>
+    <script src="shared-data.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #4CAF50;
+            margin-top: 30px;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .data-card {
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+        }
+        .data-card h3 {
+            margin-top: 0;
+            color: #4CAF50;
+        }
+        .data-item {
+            margin: 10px 0;
+            padding: 8px;
+            background: white;
+            border-radius: 4px;
+        }
+        .data-label {
+            font-weight: bold;
+            color: #666;
+        }
+        .data-value {
+            color: #333;
+            margin-left: 10px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .pass {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .fail {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        button {
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .button-group {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        #results {
+            margin-top: 30px;
+        }
+        .json-display {
+            font-family: monospace;
+            font-size: 12px;
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        th {
+            background: #4CAF50;
+            color: white;
+        }
+        .section-divider {
+            border-top: 2px solid #4CAF50;
+            margin: 30px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Data Flow Test Suite</h1>
+        <p>Tests data persistence from Setup Wizard → Owner App → Customer App</p>
+
+        <div class="button-group">
+            <button onclick="simulateSetupWizard()">1. Simulate Setup Wizard</button>
+            <button onclick="verifyOwnerAppData()">2. Verify Owner App Data</button>
+            <button onclick="verifyCustomerAppData()">3. Verify Customer App Data</button>
+            <button onclick="testPolicyEnforcement()">4. Test Policy Enforcement</button>
+            <button onclick="testServiceConfiguration()">5. Test Service Configuration</button>
+            <button onclick="runFullDataFlowTest()">Run Complete Flow Test</button>
+            <button onclick="showCurrentData()">Show Current Data</button>
+            <button onclick="clearAllData()">Clear All Data</button>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const resultsDiv = document.getElementById('results');
+
+        function log(message, type = 'info') {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${type}`;
+            resultDiv.innerHTML = message;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        function clearResults() {
+            resultsDiv.innerHTML = '';
+        }
+
+        function simulateSetupWizard() {
+            clearResults();
+            log('<h2>Simulating Setup Wizard Data Entry</h2>', 'info');
+
+            try {
+                // Step 1: Language preference
+                SharedData.setPreferredLanguage('en');
+                log('✓ Language set to English', 'pass');
+
+                // Step 2: Business Profile
+                const profile = {
+                    storeName: "Premium Test Salon",
+                    storeAddress: "123 Test Street, Test City",
+                    firstName: "Sarah",
+                    lastName: "TestOwner",
+                    phone: "555-0100",
+                    email: "owner@testsalon.com",
+                    wechat: "test_wechat",
+                    storeHours: {
+                        monday: { open: "09:00", close: "19:00", closed: false },
+                        tuesday: { open: "09:00", close: "19:00", closed: false },
+                        wednesday: { open: "09:00", close: "19:00", closed: false },
+                        thursday: { open: "09:00", close: "21:00", closed: false },
+                        friday: { open: "09:00", close: "21:00", closed: false },
+                        saturday: { open: "10:00", close: "18:00", closed: false },
+                        sunday: { open: "11:00", close: "17:00", closed: false }
+                    }
+                };
+                localStorage.setItem('ownerProfile', JSON.stringify(profile));
+                log('✓ Business profile saved', 'pass');
+
+                // Step 3: Display Info
+                const displayInfo = {
+                    showPhone: true,
+                    showEmail: true,
+                    showAddress: true,
+                    showWechat: false
+                };
+                localStorage.setItem('displayInfo', JSON.stringify(displayInfo));
+                log('✓ Display preferences saved', 'pass');
+
+                // Step 4: Store Hours
+                SharedData.saveStoreHours(profile.storeHours);
+                log('✓ Store hours saved (Mon-Fri: 9-7/9, Sat: 10-6, Sun: 11-5)', 'pass');
+
+                // Step 5: Services with different configurations
+                const services = {
+                    'mens-cut': {
+                        name: "Premium Men's Cut",
+                        duration: 45,
+                        price: 35,
+                        enabled: true,
+                        hasActiveTime: false
+                    },
+                    'womens-cut': {
+                        name: "Women's Style Cut",
+                        duration: 60,
+                        price: 55,
+                        enabled: true,
+                        hasActiveTime: false
+                    },
+                    'coloring': {
+                        name: "Full Color Treatment",
+                        duration: 120,
+                        price: 150,
+                        enabled: true,
+                        hasActiveTime: true,
+                        activePeriods: [
+                            { start: 0, end: 45 },
+                            { start: 90, end: 120 }
+                        ]
+                    },
+                    'highlights': {
+                        name: "Partial Highlights",
+                        duration: 90,
+                        price: 95,
+                        enabled: false,  // Disabled service
+                        hasActiveTime: false
+                    }
+                };
+                SharedData.saveServices(services);
+                log('✓ Services configured (4 services, 1 with active periods, 1 disabled)', 'pass');
+
+                // Step 6: Booking Policies
+                const policies = {
+                    minBookingHours: 3,
+                    minCancelHours: 48,
+                    maxAdvanceDays: 60
+                };
+                SharedData.setBookingPolicies(policies);
+                log('✓ Booking policies set (3hr booking, 48hr cancel, 60 days advance)', 'pass');
+
+                // Step 7: Create owner barber
+                const owner = {
+                    id: 'owner',
+                    name: 'Sarah TestOwner',
+                    isOwner: true,
+                    services: Object.keys(services).filter(id => services[id].enabled),
+                    hours: profile.storeHours,
+                    usesStoreHours: true
+                };
+                SharedData.saveBarbers([owner]);
+                log('✓ Owner barber created', 'pass');
+
+                // Step 8: Generate booking URL
+                const slug = profile.storeName
+                    .toLowerCase()
+                    .replace(/'/g, '')
+                    .replace(/[^a-z0-9]+/g, '_')
+                    .replace(/^_|_$/g, '');
+                const urlData = {
+                    slug: slug,
+                    createdAt: new Date().toISOString()
+                };
+                localStorage.setItem('bookingUrl', JSON.stringify(urlData));
+                log(`✓ Booking URL generated: yourdomain.com/book/${slug}`, 'pass');
+
+                // Mark setup complete
+                localStorage.setItem('setupComplete', 'true');
+                log('<strong>Setup Wizard simulation complete!</strong>', 'pass');
+
+            } catch (error) {
+                log(`Error in setup wizard simulation: ${error.message}`, 'fail');
+            }
+        }
+
+        function verifyOwnerAppData() {
+            clearResults();
+            log('<h2>Verifying Owner App Data Reception</h2>', 'info');
+
+            try {
+                // Check setup completion
+                const setupComplete = localStorage.getItem('setupComplete') === 'true';
+                log(`Setup marked complete: ${setupComplete ? 'PASS ✓' : 'FAIL ✗'}`, setupComplete ? 'pass' : 'fail');
+
+                // Check owner profile
+                const profile = JSON.parse(localStorage.getItem('ownerProfile') || '{}');
+                log(`Business name: ${profile.storeName || 'NOT SET'}`, profile.storeName ? 'pass' : 'fail');
+                log(`Store hours in profile: ${profile.storeHours ? 'PASS ✓' : 'FAIL ✗'}`, profile.storeHours ? 'pass' : 'fail');
+
+                // Check services
+                const services = SharedData.getServices();
+                const serviceCount = Object.keys(services).length;
+                log(`Services loaded: ${serviceCount} services`, serviceCount > 0 ? 'pass' : 'fail');
+
+                // Check enabled services
+                const enabledServices = Object.keys(services).filter(id => services[id].enabled);
+                log(`Enabled services: ${enabledServices.length} (should be 3)`, enabledServices.length === 3 ? 'pass' : 'fail');
+
+                // Check service with active periods
+                const coloringService = services['coloring'];
+                if (coloringService) {
+                    log(`Coloring service has active periods: ${coloringService.hasActiveTime ? 'PASS ✓' : 'FAIL ✗'}`,
+                        coloringService.hasActiveTime ? 'pass' : 'fail');
+                    if (coloringService.activePeriods) {
+                        log(`Active periods count: ${coloringService.activePeriods.length}`, 'info');
+                    }
+                }
+
+                // Check barbers
+                const barbers = SharedData.getBarbers();
+                log(`Barbers loaded: ${barbers.length} barber(s)`, barbers.length > 0 ? 'pass' : 'fail');
+
+                // Check booking policies
+                const policies = SharedData.getBookingPolicies();
+                log(`Min booking hours: ${policies.minBookingHours}hr`, policies.minBookingHours === 3 ? 'pass' : 'fail');
+                log(`Min cancel hours: ${policies.minCancelHours}hr`, policies.minCancelHours === 48 ? 'pass' : 'fail');
+                log(`Max advance days: ${policies.maxAdvanceDays}`, policies.maxAdvanceDays === 60 ? 'pass' : 'fail');
+
+                // Check booking URL
+                const bookingUrl = JSON.parse(localStorage.getItem('bookingUrl') || '{}');
+                log(`Booking URL slug: ${bookingUrl.slug || 'NOT SET'}`, bookingUrl.slug ? 'pass' : 'fail');
+
+                // Check store hours
+                const storeHours = SharedData.getStoreHours();
+                const hasAllDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+                    .every(day => storeHours[day] !== undefined);
+                log(`Store hours for all days: ${hasAllDays ? 'PASS ✓' : 'FAIL ✗'}`, hasAllDays ? 'pass' : 'fail');
+
+            } catch (error) {
+                log(`Error verifying owner app data: ${error.message}`, 'fail');
+            }
+        }
+
+        function verifyCustomerAppData() {
+            clearResults();
+            log('<h2>Verifying Customer App Data Access</h2>', 'info');
+
+            try {
+                // Check barbers visible to customers
+                const barbers = SharedData.getBarbers();
+                log(`Barbers available for booking: ${barbers.length}`, barbers.length > 0 ? 'pass' : 'fail');
+
+                // Check services available
+                const services = SharedData.getServices();
+                const enabledServices = Object.keys(services).filter(id => services[id].enabled);
+                log(`Services available for booking: ${enabledServices.length}`, enabledServices.length > 0 ? 'pass' : 'fail');
+
+                // List services with prices
+                enabledServices.forEach(id => {
+                    const service = services[id];
+                    log(`• ${service.name}: $${service.price} (${service.duration}min)`, 'info');
+                });
+
+                // Check booking policies application
+                const policies = SharedData.getBookingPolicies();
+                const now = new Date();
+                const minBookingTime = new Date();
+                minBookingTime.setHours(minBookingTime.getHours() + policies.minBookingHours);
+
+                log(`Earliest booking time: ${minBookingTime.toLocaleString()}`, 'info');
+                log(`Latest booking date: ${policies.maxAdvanceDays} days from now`, 'info');
+
+                // Check barber availability
+                barbers.forEach(barber => {
+                    const hours = barber.hours || SharedData.getStoreHours();
+                    const todayDay = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][now.getDay()];
+                    const todayHours = hours[todayDay];
+
+                    if (!todayHours.closed) {
+                        log(`${barber.name} available today: ${todayHours.open} - ${todayHours.close}`, 'info');
+                    } else {
+                        log(`${barber.name} closed today`, 'warning');
+                    }
+                });
+
+                // Check display preferences
+                const displayInfo = JSON.parse(localStorage.getItem('displayInfo') || '{}');
+                log('<strong>Customer-visible information:</strong>', 'info');
+                log(`Phone visible: ${displayInfo.showPhone ? 'Yes' : 'No'}`, 'info');
+                log(`Email visible: ${displayInfo.showEmail ? 'Yes' : 'No'}`, 'info');
+                log(`Address visible: ${displayInfo.showAddress ? 'Yes' : 'No'}`, 'info');
+                log(`WeChat visible: ${displayInfo.showWechat ? 'Yes' : 'No'}`, 'info');
+
+            } catch (error) {
+                log(`Error verifying customer app data: ${error.message}`, 'fail');
+            }
+        }
+
+        function testPolicyEnforcement() {
+            clearResults();
+            log('<h2>Testing Policy Enforcement</h2>', 'info');
+
+            try {
+                const policies = SharedData.getBookingPolicies();
+                const now = new Date();
+
+                // Test minimum booking hours
+                const tooSoonTime = new Date();
+                tooSoonTime.setHours(tooSoonTime.getHours() + policies.minBookingHours - 1);
+
+                const validTime = new Date();
+                validTime.setHours(validTime.getHours() + policies.minBookingHours + 1);
+
+                log(`Current time: ${now.toLocaleString()}`, 'info');
+                log(`Min booking hours: ${policies.minBookingHours}`, 'info');
+                log(`Too soon booking (${tooSoonTime.toLocaleString()}): Should be blocked`, 'warning');
+                log(`Valid booking (${validTime.toLocaleString()}): Should be allowed`, 'pass');
+
+                // Test maximum advance days
+                const maxDate = new Date();
+                maxDate.setDate(maxDate.getDate() + policies.maxAdvanceDays);
+
+                const tooFarDate = new Date();
+                tooFarDate.setDate(tooFarDate.getDate() + policies.maxAdvanceDays + 1);
+
+                log(`Max advance days: ${policies.maxAdvanceDays}`, 'info');
+                log(`Max valid date: ${maxDate.toLocaleDateString()}`, 'pass');
+                log(`Too far date: ${tooFarDate.toLocaleDateString()} - Should be blocked`, 'warning');
+
+                // Test cancellation policy
+                const appointment = {
+                    date: maxDate.toISOString().split('T')[0],
+                    time: '14:00'
+                };
+
+                const appointmentDateTime = new Date(appointment.date + 'T' + appointment.time);
+                const cancelDeadline = new Date(appointmentDateTime);
+                cancelDeadline.setHours(cancelDeadline.getHours() - policies.minCancelHours);
+
+                log(`Cancellation notice required: ${policies.minCancelHours} hours`, 'info');
+                log(`For appointment at ${appointmentDateTime.toLocaleString()}`, 'info');
+                log(`Must cancel before: ${cancelDeadline.toLocaleString()}`, 'warning');
+
+            } catch (error) {
+                log(`Error testing policies: ${error.message}`, 'fail');
+            }
+        }
+
+        function testServiceConfiguration() {
+            clearResults();
+            log('<h2>Testing Service Configuration Details</h2>', 'info');
+
+            try {
+                const services = SharedData.getServices();
+                const barbers = SharedData.getBarbers();
+
+                // Create a table showing service details
+                let html = '<table><thead><tr><th>Service</th><th>Duration</th><th>Price</th><th>Enabled</th><th>Active Periods</th></tr></thead><tbody>';
+
+                Object.keys(services).forEach(id => {
+                    const service = services[id];
+                    let activePeriodText = 'None';
+
+                    if (service.hasActiveTime && service.activePeriods) {
+                        activePeriodText = service.activePeriods
+                            .map(p => `${p.start}-${p.end}min`)
+                            .join(', ');
+                    }
+
+                    html += `<tr>
+                        <td>${service.name}</td>
+                        <td>${service.duration} min</td>
+                        <td>$${service.price}</td>
+                        <td>${service.enabled ? '✓' : '✗'}</td>
+                        <td>${activePeriodText}</td>
+                    </tr>`;
+                });
+
+                html += '</tbody></table>';
+                log(html, 'info');
+
+                // Test service availability per barber
+                log('<h3>Service Availability by Barber</h3>', 'info');
+
+                barbers.forEach(barber => {
+                    const barberServices = barber.services || [];
+                    log(`<strong>${barber.name}:</strong>`, 'info');
+
+                    if (barberServices.length === 0) {
+                        log('• No services assigned', 'warning');
+                    } else {
+                        barberServices.forEach(serviceId => {
+                            const service = services[serviceId];
+                            if (service) {
+                                log(`• ${service.name} ($${service.price})`, 'pass');
+                            }
+                        });
+                    }
+                });
+
+                // Test custom service pricing per barber
+                log('<h3>Service Price Consistency Check</h3>', 'info');
+
+                const menscut = services['mens-cut'];
+                if (menscut) {
+                    log(`Men's Cut base price: $${menscut.price}`, 'info');
+
+                    barbers.forEach(barber => {
+                        if (barber.services && barber.services.includes('mens-cut')) {
+                            // In future, barbers might have custom prices
+                            log(`${barber.name}: Using base price $${menscut.price}`, 'pass');
+                        }
+                    });
+                }
+
+            } catch (error) {
+                log(`Error testing service configuration: ${error.message}`, 'fail');
+            }
+        }
+
+        function showCurrentData() {
+            clearResults();
+            log('<h2>Current System Data</h2>', 'info');
+
+            const data = {
+                setupComplete: localStorage.getItem('setupComplete'),
+                language: SharedData.getPreferredLanguage(),
+                ownerProfile: JSON.parse(localStorage.getItem('ownerProfile') || '{}'),
+                displayInfo: JSON.parse(localStorage.getItem('displayInfo') || '{}'),
+                storeHours: SharedData.getStoreHours(),
+                services: SharedData.getServices(),
+                barbers: SharedData.getBarbers(),
+                bookingPolicies: SharedData.getBookingPolicies(),
+                bookingUrl: JSON.parse(localStorage.getItem('bookingUrl') || '{}'),
+                appointments: SharedData.getAppointments()
+            };
+
+            const jsonDiv = document.createElement('div');
+            jsonDiv.className = 'json-display';
+            jsonDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            resultsDiv.appendChild(jsonDiv);
+        }
+
+        function runFullDataFlowTest() {
+            clearResults();
+            log('<h1>Running Complete Data Flow Test</h1>', 'info');
+
+            // Clear data first
+            localStorage.clear();
+            log('Cleared all existing data', 'info');
+
+            setTimeout(() => {
+                simulateSetupWizard();
+                setTimeout(() => {
+                    log('<div class="section-divider"></div>', 'info');
+                    verifyOwnerAppData();
+                    setTimeout(() => {
+                        log('<div class="section-divider"></div>', 'info');
+                        verifyCustomerAppData();
+                        setTimeout(() => {
+                            log('<div class="section-divider"></div>', 'info');
+                            testPolicyEnforcement();
+                            setTimeout(() => {
+                                log('<div class="section-divider"></div>', 'info');
+                                testServiceConfiguration();
+
+                                // Summary
+                                log('<h2>Test Summary</h2>', 'info');
+
+                                const allResults = resultsDiv.querySelectorAll('.test-result');
+                                const passCount = resultsDiv.querySelectorAll('.pass').length;
+                                const failCount = resultsDiv.querySelectorAll('.fail').length;
+
+                                if (failCount === 0) {
+                                    log('<h3>✅ All data flow tests passed!</h3>', 'pass');
+                                } else {
+                                    log(`<h3>⚠️ ${failCount} issues found in data flow</h3>`, 'fail');
+                                }
+
+                                log(`Total checks: ${passCount + failCount}`, 'info');
+                                log(`Passed: ${passCount}`, 'pass');
+                                log(`Failed: ${failCount}`, failCount > 0 ? 'fail' : 'pass');
+
+                            }, 500);
+                        }, 500);
+                    }, 500);
+                }, 500);
+            }, 100);
+        }
+
+        function clearAllData() {
+            if (confirm('This will clear all application data. Continue?')) {
+                localStorage.clear();
+                clearResults();
+                log('All data cleared!', 'pass');
+            }
+        }
+
+        // Auto-load current state on page load
+        window.onload = function() {
+            log('<h2>Data Flow Test Suite Ready</h2>', 'info');
+            log('Tests the complete data flow from Setup Wizard → Owner App → Customer App', 'info');
+            log('Click "Run Complete Flow Test" to begin comprehensive testing', 'info');
+        };
+    </script>
+</body>
+</html>

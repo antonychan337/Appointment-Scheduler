@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Barber Services</title>
+    <script src="shared-data.js"></script>
+</head>
+<body>
+    <h1>Debug Barber Services Assignment</h1>
+    <div id="output"></div>
+    <br>
+    <button onclick="fixBarberServices()">Fix: Assign All Enabled Services to All Barbers</button>
+
+    <script>
+        function showDebugInfo() {
+            const output = document.getElementById('output');
+            const services = SharedData.getServices();
+            const barbers = SharedData.getBarbers();
+
+            output.innerHTML = '<h2>Services Status:</h2>';
+            output.innerHTML += '<table border="1" cellpadding="5">';
+            output.innerHTML += '<tr><th>Service ID</th><th>Name</th><th>Enabled</th></tr>';
+
+            const enabledServiceIds = [];
+            Object.keys(services).forEach(serviceId => {
+                const service = services[serviceId];
+                if (service.enabled) {
+                    enabledServiceIds.push(serviceId);
+                }
+                output.innerHTML += `
+                    <tr>
+                        <td>${serviceId}</td>
+                        <td>${service.name}</td>
+                        <td style="background: ${service.enabled ? '#90EE90' : '#FFB6C1'}">${service.enabled}</td>
+                    </tr>
+                `;
+            });
+
+            output.innerHTML += '</table>';
+            output.innerHTML += `<p><strong>Enabled Service IDs:</strong> ${JSON.stringify(enabledServiceIds)}</p>`;
+
+            output.innerHTML += '<h2>Barber Service Assignments:</h2>';
+            barbers.forEach(barber => {
+                output.innerHTML += `<h3>${barber.name} (${barber.id})</h3>`;
+
+                // Show raw data
+                output.innerHTML += `<p><strong>Raw barber.services:</strong> ${JSON.stringify(barber.services)}</p>`;
+                output.innerHTML += `<p><strong>Type:</strong> ${Array.isArray(barber.services) ? 'Array' : typeof barber.services}</p>`;
+
+                // Process like customer app does
+                let barberServiceIds;
+                if (Array.isArray(barber.services)) {
+                    barberServiceIds = barber.services;
+                } else if (barber.services && typeof barber.services === 'object') {
+                    barberServiceIds = Object.keys(barber.services).filter(key => barber.services[key]);
+                } else {
+                    barberServiceIds = Object.keys(services);
+                }
+
+                // Show which services would be displayed
+                output.innerHTML += '<p><strong>Services this barber would show in customer app:</strong></p>';
+                output.innerHTML += '<ul>';
+                let shownCount = 0;
+                barberServiceIds.forEach(serviceId => {
+                    const service = services[serviceId];
+                    if (service && service.enabled) {
+                        output.innerHTML += `<li style="color: green;">✓ ${serviceId}: ${service.name}</li>`;
+                        shownCount++;
+                    }
+                });
+                output.innerHTML += '</ul>';
+                output.innerHTML += `<p><strong>Total shown: ${shownCount} of ${enabledServiceIds.length} enabled services</strong></p>`;
+
+                // Check for issues
+                if (shownCount < enabledServiceIds.length) {
+                    output.innerHTML += `<p style="color: red;"><strong>⚠️ Problem:</strong> This barber is not assigned all enabled services!</p>`;
+                }
+
+                output.innerHTML += '<hr>';
+            });
+        }
+
+        function fixBarberServices() {
+            const services = SharedData.getServices();
+            const barbers = SharedData.getBarbers();
+
+            // Get all enabled service IDs
+            const enabledServiceIds = Object.keys(services).filter(serviceId => services[serviceId].enabled);
+
+            // Update each barber to have all enabled services
+            barbers.forEach(barber => {
+                // Create an object with all enabled services set to true
+                const serviceAssignment = {};
+                enabledServiceIds.forEach(serviceId => {
+                    serviceAssignment[serviceId] = true;
+                });
+
+                // Update the barber
+                SharedData.updateBarber(barber.id, { services: serviceAssignment });
+            });
+
+            alert('Fixed! All barbers now have all enabled services assigned.');
+            showDebugInfo();
+        }
+
+        // Show initial state
+        showDebugInfo();
+    </script>
+</body>
+</html>

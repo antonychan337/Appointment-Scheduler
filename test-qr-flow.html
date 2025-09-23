@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test QR Code Flow</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.js"></script>
+    <script src="qrcode-loader.js"></script>
+    <script src="supabase-config.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .test-section {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        button {
+            padding: 10px 20px;
+            background: #4A90E2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #357ABD;
+        }
+        canvas {
+            border: 1px solid #ddd;
+            margin: 10px 0;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>QR Code Flow Test</h1>
+
+    <div class="test-section">
+        <h2>1. Check Database Setup</h2>
+        <button onclick="checkSlugColumn()">Check Slug Column</button>
+        <button onclick="checkShopData()">Check Shop Data</button>
+        <div id="db-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Test QR Code Generation</h2>
+        <input type="text" id="test-slug" placeholder="Enter slug" value="test_shop">
+        <button onclick="testQRGeneration()">Generate QR Code</button>
+        <br>
+        <canvas id="test-canvas"></canvas>
+        <div id="qr-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Test Complete Flow</h2>
+        <button onclick="testSetupWizardFlow()">Test Setup Wizard Flow</button>
+        <button onclick="testOwnerAppFlow()">Test Owner App Flow</button>
+        <div id="flow-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. Current Shop Data</h2>
+        <button onclick="loadCurrentShop()">Load Current Shop</button>
+        <pre id="shop-data"></pre>
+    </div>
+
+    <script>
+        function showStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.className = `status ${type}`;
+            element.innerHTML = message;
+        }
+
+        async function checkSlugColumn() {
+            try {
+                showStatus('db-status', 'Checking slug column...', 'info');
+
+                const { data, error } = await supabaseClient
+                    .from('shops')
+                    .select('id, name, slug')
+                    .limit(1);
+
+                if (error) {
+                    if (error.message.includes('slug')) {
+                        showStatus('db-status', `❌ Slug column missing: ${error.message}`, 'error');
+                    } else {
+                        throw error;
+                    }
+                } else {
+                    showStatus('db-status', '✅ Slug column exists!', 'success');
+                }
+            } catch (error) {
+                showStatus('db-status', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkShopData() {
+            try {
+                showStatus('db-status', 'Loading shops...', 'info');
+
+                const { data, error } = await supabaseClient
+                    .from('shops')
+                    .select('*')
+                    .limit(5);
+
+                if (error) throw error;
+
+                const summary = `
+                    <strong>Found ${data?.length || 0} shops</strong><br>
+                    ${data?.map(shop => `
+                        - ${shop.name} (ID: ${shop.id})<br>
+                        &nbsp;&nbsp;Slug: ${shop.slug || 'Not set'}<br>
+                    `).join('') || 'No shops found'}
+                `;
+                showStatus('db-status', summary, 'success');
+            } catch (error) {
+                showStatus('db-status', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        function testQRGeneration() {
+            const slug = document.getElementById('test-slug').value;
+            const url = `https://yourdomain.com/book/${slug}`;
+
+            showStatus('qr-status', `Generating QR code for: ${url}`, 'info');
+
+            const canvas = document.getElementById('test-canvas');
+
+            if (typeof QRCode === 'undefined') {
+                showStatus('qr-status', '❌ QRCode library not loaded!', 'error');
+                return;
+            }
+
+            QRCode.toCanvas(canvas, url, {
+                width: 200,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#ffffff'
+                }
+            }, function (error) {
+                if (error) {
+                    showStatus('qr-status', `❌ Error: ${error}`, 'error');
+                } else {
+                    showStatus('qr-status', `✅ QR Code generated for: ${url}`, 'success');
+                }
+            });
+        }
+
+        function testSetupWizardFlow() {
+            showStatus('flow-status', 'Opening setup-wizard-app.html in new window...', 'info');
+            window.open('setup-wizard-app.html', '_blank');
+
+            setTimeout(() => {
+                showStatus('flow-status',
+                    `<strong>Setup Wizard Test Steps:</strong><br>
+                    1. Complete setup wizard to step 5<br>
+                    2. Check if QR code appears on success screen<br>
+                    3. Verify slug is saved to database<br>
+                    4. Test download QR code button`,
+                    'info');
+            }, 1000);
+        }
+
+        function testOwnerAppFlow() {
+            showStatus('flow-status', 'Opening owner-app.html in new window...', 'info');
+            window.open('owner-app.html', '_blank');
+
+            setTimeout(() => {
+                showStatus('flow-status',
+                    `<strong>Owner App Test Steps:</strong><br>
+                    1. Go to Settings > Booking Link<br>
+                    2. Check if QR code displays for existing slug<br>
+                    3. Try changing the slug<br>
+                    4. Verify new QR code generates<br>
+                    5. Test download QR code button`,
+                    'info');
+            }, 1000);
+        }
+
+        async function loadCurrentShop() {
+            try {
+                const shopId = localStorage.getItem('supabase_shop_id');
+                const shopData = document.getElementById('shop-data');
+
+                if (!shopId) {
+                    shopData.textContent = 'No shop ID in localStorage';
+                    return;
+                }
+
+                const { data, error } = await supabaseClient
+                    .from('shops')
+                    .select('*')
+                    .eq('id', shopId)
+                    .single();
+
+                if (error) {
+                    shopData.textContent = `Error: ${error.message}`;
+                } else {
+                    shopData.textContent = JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                document.getElementById('shop-data').textContent = `Error: ${error.message}`;
+            }
+        }
+
+        // Check library availability on load
+        window.addEventListener('load', () => {
+            const status = [];
+            status.push(`✅ Supabase: ${typeof supabaseClient !== 'undefined' ? 'Loaded' : 'Not loaded'}`);
+            status.push(`✅ QRCode: ${typeof QRCode !== 'undefined' ? 'Loaded' : 'Not loaded'}`);
+
+            console.log('Library Status:', status);
+            console.log('QRCode object:', typeof QRCode !== 'undefined' ? QRCode : 'Not defined');
+            if (typeof QRCode !== 'undefined') {
+                console.log('QRCode methods:', Object.keys(QRCode));
+                console.log('QRCode.toCanvas available:', typeof QRCode.toCanvas);
+            }
+
+            // Show status on page
+            const dbStatus = document.getElementById('db-status');
+            dbStatus.innerHTML = `<div class="status info">
+                ${status.join('<br>')}
+            </div>`;
+
+            // Auto-check database
+            setTimeout(() => checkSlugColumn(), 500);
+        });
+    </script>
+</body>
+</html>

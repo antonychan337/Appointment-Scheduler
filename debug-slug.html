@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Debug Booking Slug</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .debug-box {
+            background: white;
+            border: 2px solid #333;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Debug Booking Slug</h1>
+
+    <div class="debug-box">
+        <h3>1. Shop ID from localStorage:</h3>
+        <pre id="shop-id"></pre>
+    </div>
+
+    <div class="debug-box">
+        <h3>2. Shop Data from Supabase:</h3>
+        <pre id="shop-data"></pre>
+    </div>
+
+    <div class="debug-box">
+        <h3>3. Owner Profile from localStorage:</h3>
+        <pre id="owner-profile"></pre>
+    </div>
+
+    <div class="debug-box">
+        <h3>4. Expected Slug Generation:</h3>
+        <pre id="expected-slug"></pre>
+    </div>
+
+    <script>
+        async function debugSlug() {
+            // 1. Get shop ID
+            const shopId = localStorage.getItem('supabase_shop_id');
+            document.getElementById('shop-id').textContent = shopId || 'No shop ID found';
+
+            // 2. Get shop data from Supabase
+            if (shopId && typeof supabaseClient !== 'undefined') {
+                try {
+                    console.log('Querying shops table for ID:', shopId);
+
+                    // Try to get ALL fields to see what's available
+                    const { data: shop, error } = await supabaseClient
+                        .from('shops')
+                        .select('*')
+                        .eq('id', shopId)
+                        .single();
+
+                    if (error) {
+                        document.getElementById('shop-data').innerHTML =
+                            `<span class="error">Error: ${JSON.stringify(error, null, 2)}</span>`;
+                        console.error('Supabase error:', error);
+                    } else {
+                        document.getElementById('shop-data').innerHTML =
+                            `<span class="success">${JSON.stringify(shop, null, 2)}</span>`;
+                        console.log('Shop data:', shop);
+
+                        // Generate expected slug from shop name
+                        if (shop && shop.name) {
+                            const expectedSlug = shop.name
+                                .toLowerCase()
+                                .replace(/'/g, '')
+                                .replace(/[^a-z0-9]+/g, '_')
+                                .replace(/^_|_$/g, '');
+
+                            document.getElementById('expected-slug').innerHTML =
+                                `<span class="info">From shop name "${shop.name}":\n` +
+                                `Expected slug: "${expectedSlug}"\n` +
+                                `Current slug in DB: "${shop.slug || 'NOT SET'}"</span>`;
+                        }
+                    }
+                } catch (error) {
+                    document.getElementById('shop-data').innerHTML =
+                        `<span class="error">Exception: ${error.message}</span>`;
+                }
+            } else {
+                document.getElementById('shop-data').innerHTML =
+                    '<span class="error">Supabase client not available or no shop ID</span>';
+            }
+
+            // 3. Get owner profile from localStorage
+            const ownerProfile = JSON.parse(localStorage.getItem('ownerProfile') || '{}');
+            document.getElementById('owner-profile').textContent = JSON.stringify(ownerProfile, null, 2);
+
+            // Also check setup data
+            const setupData = JSON.parse(localStorage.getItem('setupData') || '{}');
+            if (setupData.profile) {
+                document.getElementById('owner-profile').textContent +=
+                    '\n\nSetup Data Profile:\n' + JSON.stringify(setupData.profile, null, 2);
+            }
+        }
+
+        // Run debug on load
+        setTimeout(debugSlug, 1000);
+    </script>
+</body>
+</html>

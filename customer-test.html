@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Customer App Test Launcher</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <script src="shared-data.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .shop-item {
+            padding: 15px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .shop-item:hover {
+            background: #f0f7ff;
+            border-color: #4A90E2;
+        }
+        .shop-name {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .shop-slug {
+            color: #666;
+            font-size: 14px;
+        }
+        .no-shops {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Customer App Test Launcher</h1>
+    <p class="subtitle">Select a shop to test the customer booking experience:</p>
+
+    <div id="shops-list"></div>
+
+    <script>
+        async function loadShops() {
+            const container = document.getElementById('shops-list');
+
+            try {
+                // Get all shops from database - try minimal query first
+                const { data: shops, error } = await supabaseClient
+                    .from('shops')
+                    .select('id, name')
+                    .order('created_at', { ascending: false });
+
+                if (error) {
+                    console.error('Error loading shops:', error);
+                    console.error('Error details:', error.message, error.code);
+
+                    // Try even simpler query
+                    const { data: simpleShops, error: simpleError } = await supabaseClient
+                        .from('shops')
+                        .select('*');
+
+                    if (simpleError) {
+                        console.error('Simple query also failed:', simpleError);
+                        container.innerHTML = `<div class="no-shops">Error: ${simpleError.message}</div>`;
+                    } else {
+                        console.log('Simple query worked, shops:', simpleShops);
+                        if (simpleShops && simpleShops.length > 0) {
+                            // Use the simple query result
+                            displayShops(simpleShops);
+                            return;
+                        }
+                    }
+                    return;
+                }
+
+                if (!shops || shops.length === 0) {
+                    container.innerHTML = '<div class="no-shops">No shops found. Please set up a shop first.</div>';
+                    return;
+                }
+
+                displayShops(shops);
+            } catch (error) {
+                console.error('Error:', error);
+                container.innerHTML = '<div class="no-shops">Unable to load shops</div>';
+            }
+        }
+
+        function displayShops(shops) {
+            const container = document.getElementById('shops-list');
+
+            shops.forEach(shop => {
+                const shopElement = document.createElement('div');
+                shopElement.className = 'shop-item';
+
+                // Generate slug if not exists
+                const slug = shop.slug || shop.name
+                    .toLowerCase()
+                    .replace(/'/g, '')
+                    .replace(/[^a-z0-9]+/g, '_')
+                    .replace(/^_|_$/g, '');
+
+                shopElement.innerHTML = `
+                    <div class="shop-name">${shop.name}</div>
+                    <div class="shop-slug">Booking URL: /book/${slug}</div>
+                `;
+
+                shopElement.onclick = () => openCustomerApp(shop.id, slug);
+
+                container.appendChild(shopElement);
+            });
+        }
+
+        function openCustomerApp(shopId, shopSlug) {
+            // Store the shop context for the customer app
+            localStorage.setItem('customer_shop_id', shopId);
+            localStorage.setItem('customer_shop_slug', shopSlug);
+
+            // Open customer app with shop parameter
+            window.location.href = `customer-app.html?shop=${shopSlug}`;
+        }
+
+        // Load shops on page load
+        loadShops();
+    </script>
+</body>
+</html>

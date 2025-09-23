@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Services Type</title>
+    <script src="shared-data.js"></script>
+</head>
+<body>
+    <h1>Debug Services Type</h1>
+    <div id="output"></div>
+
+    <script>
+        const output = document.getElementById('output');
+
+        // Check what's actually stored in barber.services
+        const barbers = SharedData.getBarbers();
+
+        output.innerHTML = '<h2>Barber Services Data Types:</h2>';
+
+        barbers.forEach(barber => {
+            const servicesType = typeof barber.services;
+            const isArray = Array.isArray(barber.services);
+            const servicesValue = JSON.stringify(barber.services, null, 2);
+
+            output.innerHTML += `
+                <div style="border: 1px solid #ccc; padding: 10px; margin: 10px 0;">
+                    <h3>Barber: ${barber.name} (${barber.id})</h3>
+                    <p><strong>Type of services:</strong> ${servicesType}</p>
+                    <p><strong>Is Array:</strong> ${isArray}</p>
+                    <p><strong>Value:</strong></p>
+                    <pre style="background: #f0f0f0; padding: 10px;">${servicesValue}</pre>
+                </div>
+            `;
+        });
+
+        // Also check what's in the services object
+        const allServices = SharedData.getServices();
+        output.innerHTML += `
+            <h2>All Services:</h2>
+            <pre style="background: #f0f0f0; padding: 10px;">${JSON.stringify(allServices, null, 2)}</pre>
+        `;
+    </script>
+</body>
+</html>

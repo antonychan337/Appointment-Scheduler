@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset All Data</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Bridge -->
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #2C3E50;
+            margin-bottom: 10px;
+        }
+
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        h2 {
+            color: #333;
+            font-size: 20px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 12px 24px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+
+        .btn-primary {
+            background: #2C3E50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1a252f;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            display: block;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            display: block;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            display: block;
+        }
+
+        .data-list {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .item {
+            padding: 3px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Reset All Data</h1>
+        <p>Use this tool to clear all data and start fresh for testing.</p>
+
+        <div class="warning">
+            <strong>⚠️ Warning:</strong> These actions cannot be undone. Make sure you want to delete all data before proceeding.
+        </div>
+
+        <!-- localStorage Section -->
+        <div class="section">
+            <h2>📱 Local Storage Data</h2>
+            <p>Clear all data stored in your browser's localStorage.</p>
+
+            <div id="localStorage-items" class="data-list">
+                <em>Loading...</em>
+            </div>
+
+            <button class="btn-warning" onclick="clearLocalStorage()">Clear Local Storage</button>
+            <button class="btn-primary" onclick="showLocalStorage()">Refresh List</button>
+        </div>
+
+        <!-- Supabase Section -->
+        <div class="section">
+            <h2>☁️ Supabase Data</h2>
+            <p>Clear data from Supabase database (requires authentication).</p>
+
+            <div id="supabase-status" class="data-list">
+                <em>Checking connection...</em>
+            </div>
+
+            <button class="btn-danger" onclick="clearSupabaseData()">Clear Supabase Data</button>
+            <button class="btn-primary" onclick="checkSupabaseConnection()">Check Connection</button>
+        </div>
+
+        <!-- Combined Reset -->
+        <div class="section">
+            <h2>🚀 Complete Reset</h2>
+            <p>Clear everything and start completely fresh.</p>
+
+            <button class="btn-danger" onclick="clearEverything()">
+                Clear All Data (Local + Supabase)
+            </button>
+
+            <button class="btn-success" onclick="startFreshSetup()">
+                Clear All & Start Fresh Setup
+            </button>
+        </div>
+
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        // Show localStorage contents
+        function showLocalStorage() {
+            const container = document.getElementById('localStorage-items');
+            const keys = Object.keys(localStorage);
+
+            if (keys.length === 0) {
+                container.innerHTML = '<em>No data in localStorage</em>';
+                return;
+            }
+
+            container.innerHTML = '<strong>localStorage Keys:</strong><br>';
+            keys.forEach(key => {
+                const value = localStorage.getItem(key);
+                const preview = value ? value.substring(0, 50) + (value.length > 50 ? '...' : '') : '';
+                container.innerHTML += `
+                    <div class="item">
+                        <strong>${key}:</strong> ${preview}
+                    </div>
+                `;
+            });
+        }
+
+        // Clear localStorage
+        function clearLocalStorage() {
+            if (confirm('Are you sure you want to clear all localStorage data?')) {
+                try {
+                    // List of keys before clearing
+                    const keys = Object.keys(localStorage);
+
+                    // Clear everything
+                    localStorage.clear();
+
+                    // Set setupComplete to false for next login
+                    localStorage.setItem('setupComplete', 'false');
+
+                    showStatus('success', `Cleared ${keys.length} items from localStorage and set setupComplete to false`);
+                    showLocalStorage();
+                } catch (error) {
+                    showStatus('error', 'Error clearing localStorage: ' + error.message);
+                }
+            }
+        }
+
+        // Check Supabase connection
+        async function checkSupabaseConnection() {
+            const container = document.getElementById('supabase-status');
+
+            try {
+                const { data: { user } } = await supabaseClient.auth.getUser();
+
+                if (user) {
+                    container.innerHTML = `
+                        <strong>✅ Connected to Supabase</strong><br>
+                        User: ${user.email}<br>
+                        ID: ${user.id}
+                    `;
+
+                    // Try to get shop data
+                    const shopId = localStorage.getItem('supabase_shop_id');
+                    if (shopId) {
+                        container.innerHTML += `<br>Shop ID: ${shopId}`;
+                    }
+                } else {
+                    container.innerHTML = `
+                        <strong>❌ Not authenticated</strong><br>
+                        <em>You need to be logged in to clear Supabase data</em>
+                    `;
+                }
+            } catch (error) {
+                container.innerHTML = `
+                    <strong>❌ Connection error</strong><br>
+                    ${error.message}
+                `;
+            }
+        }
+
+        // Clear Supabase data
+        async function clearSupabaseData() {
+            if (!confirm('Are you sure you want to clear all Supabase data for your shop?')) {
+                return;
+            }
+
+            try {
+                const { data: { user } } = await supabaseClient.auth.getUser();
+
+                if (!user) {
+                    showStatus('error', 'You must be logged in to clear Supabase data');
+                    return;
+                }
+
+                showStatus('info', 'Clearing Supabase data...');
+
+                // Get shop ID
+                const { data: profile } = await supabaseClient
+                    .from('profiles')
+                    .select('shop_id')
+                    .eq('id', user.id)
+                    .single();
+
+                if (!profile?.shop_id) {
+                    showStatus('info', 'No shop data found in Supabase');
+                    return;
+                }
+
+                const shopId = profile.shop_id;
+
+                // Delete in order (respecting foreign key constraints)
+                const deletions = [
+                    { table: 'appointments', name: 'Appointments' },
+                    { table: 'blocked_times', name: 'Blocked Times' },
+                    { table: 'services', name: 'Services' },
+                    { table: 'barbers', name: 'Barbers' },
+                    { table: 'shop_settings', name: 'Shop Settings' },
+                    { table: 'shops', name: 'Shop' }
+                ];
+
+                let deleted = [];
+                for (const { table, name } of deletions) {
+                    try {
+                        const { data, error } = await supabaseClient
+                            .from(table)
+                            .delete()
+                            .eq('shop_id', shopId);
+
+                        if (!error) {
+                            deleted.push(name);
+                        }
+                    } catch (err) {
+                        console.error(`Error deleting ${name}:`, err);
+                    }
+                }
+
+                // Clear profile shop reference
+                await supabaseClient
+                    .from('profiles')
+                    .update({ shop_id: null })
+                    .eq('id', user.id);
+
+                showStatus('success', `Cleared Supabase data: ${deleted.join(', ')}`);
+
+                // Clear the cached shop ID
+                localStorage.removeItem('supabase_shop_id');
+
+                checkSupabaseConnection();
+
+            } catch (error) {
+                showStatus('error', 'Error clearing Supabase data: ' + error.message);
+            }
+        }
+
+        // Clear everything
+        async function clearEverything() {
+            if (!confirm('This will clear ALL data from both localStorage and Supabase. Are you sure?')) {
+                return;
+            }
+
+            // Clear Supabase first
+            await clearSupabaseData();
+
+            // Then clear localStorage
+            localStorage.clear();
+
+            // Set setupComplete to false for next login
+            localStorage.setItem('setupComplete', 'false');
+
+            showStatus('success', 'All data cleared successfully! setupComplete flag set to false.');
+            showLocalStorage();
+        }
+
+        // Clear and redirect to fresh setup
+        async function startFreshSetup() {
+            if (!confirm('This will clear all data and redirect you to start fresh. Continue?')) {
+                return;
+            }
+
+            // Sign out from Supabase
+            try {
+                await supabaseClient.auth.signOut();
+            } catch (error) {
+                console.error('Error signing out:', error);
+            }
+
+            // Clear everything
+            localStorage.clear();
+
+            // Set setupComplete to false for next login
+            localStorage.setItem('setupComplete', 'false');
+
+            showStatus('success', 'All data cleared! setupComplete flag set to false. Redirecting to authentication page...');
+
+            // Redirect after 2 seconds
+            setTimeout(() => {
+                window.location.href = 'auth-app.html';
+            }, 2000);
+        }
+
+        // Show status message
+        function showStatus(type, message) {
+            const status = document.getElementById('status');
+            status.className = `status ${type}`;
+            status.textContent = message;
+
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                status.className = 'status';
+            }, 5000);
+        }
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            showLocalStorage();
+            checkSupabaseConnection();
+        });
+    </script>
+</body>
+</html>

@@ -336,6 +336,11 @@ const SharedData = {
         return false;
     },
 
+    // Alias for customer app compatibility
+    isTimeSlotBooked(date, time, duration, barberId = null) {
+        return this.isSlotConflicting(date, time, duration, barberId);
+    },
+
     // Helper: Convert time string to minutes
     timeToMinutes(time) {
         if (!time) return 0;
@@ -898,5 +903,37 @@ const SharedData = {
 
     sendCancellationEmail(appointment) {
         this.sendEmail('cancelled', appointment);
+    },
+
+    // Booking policies management
+    getBookingPolicies() {
+        const policies = localStorage.getItem('bookingPolicies');
+        if (policies) {
+            return JSON.parse(policies);
+        }
+        // Default policies
+        return {
+            minBookingHours: 0,
+            minCancelHours: 24,
+            maxAdvanceDays: 60
+        };
+    },
+
+    setBookingPolicies(policies) {
+        localStorage.setItem('bookingPolicies', JSON.stringify(policies));
+    },
+
+    // Language preference management
+    getPreferredLanguage() {
+        return localStorage.getItem('preferredLanguage') || 'en';
+    },
+
+    setPreferredLanguage(lang) {
+        localStorage.setItem('preferredLanguage', lang);
+        // Dispatch storage event to notify other tabs
+        window.dispatchEvent(new StorageEvent('storage', {
+            key: 'preferredLanguage',
+            newValue: lang
+        }));
     }
 };

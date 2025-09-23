@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Supabase Schema</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Bridge -->
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #2C3E50;
+            margin-bottom: 20px;
+        }
+
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .section h2 {
+            color: #2C3E50;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            background: #2C3E50;
+            color: white;
+        }
+
+        button:hover {
+            background: #1a252f;
+        }
+
+        .btn-success {
+            background: #28a745;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .table-info {
+            margin: 15px 0;
+            padding: 15px;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+        }
+
+        .table-name {
+            font-weight: bold;
+            color: #2C3E50;
+            margin-bottom: 10px;
+        }
+
+        .columns {
+            font-family: monospace;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .column-item {
+            padding: 2px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Check Supabase Schema</h1>
+        <p>This tool checks what tables and columns exist in your Supabase database.</p>
+
+        <div class="section">
+            <h2>Check Tables and Schema</h2>
+            <button onclick="checkTables()">Check All Tables</button>
+            <button onclick="checkShopsTable()" class="btn-success">Check Shops Table</button>
+            <button onclick="testSimpleQuery()">Test Simple Query</button>
+            <div id="tables-output"></div>
+        </div>
+
+        <div class="section">
+            <h2>Test Queries</h2>
+            <button onclick="testShopQuery()">Test Shop Query (All Columns)</button>
+            <button onclick="testShopQueryMinimal()">Test Shop Query (Minimal)</button>
+            <button onclick="testServicesQuery()">Test Services Query</button>
+            <button onclick="testBarbersQuery()">Test Barbers Query</button>
+            <div id="query-output"></div>
+        </div>
+
+        <div class="section">
+            <h2>Add Missing Columns</h2>
+            <p>If columns are missing, you can add them to your Supabase tables using SQL.</p>
+            <button onclick="showAddColumnsSQL()">Show SQL to Add Missing Columns</button>
+            <div id="sql-output"></div>
+        </div>
+
+        <div class="section">
+            <h2>Console Output</h2>
+            <pre id="console-output"></pre>
+        </div>
+    </div>
+
+    <script>
+        const consoleOutput = document.getElementById('console-output');
+
+        function log(message, data = null) {
+            const timestamp = new Date().toTimeString().slice(0, 8);
+            let output = `[${timestamp}] ${message}`;
+            if (data) {
+                output += '\n' + JSON.stringify(data, null, 2);
+            }
+            consoleOutput.textContent += output + '\n';
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            console.log(message, data);
+        }
+
+        async function checkTables() {
+            const output = document.getElementById('tables-output');
+            output.innerHTML = '<div class="status info">Checking tables...</div>';
+
+            try {
+                const { data: { user } } = await supabaseClient.auth.getUser();
+                if (!user) {
+                    output.innerHTML = '<div class="status error">Not authenticated. Please login first.</div>';
+                    return;
+                }
+
+                log('Authenticated as: ' + user.email);
+
+                // Try to query each table
+                const tables = ['shops', 'services', 'barbers', 'appointments', 'blocked_times'];
+                let results = '<div class="status success">Table Check Results:</div>';
+
+                for (const table of tables) {
+                    try {
+                        const { data, error } = await supabaseClient
+                            .from(table)
+                            .select('*')
+                            .limit(1);
+
+                        if (error) {
+                            results += `<div class="table-info">
+                                <div class="table-name">❌ ${table}</div>
+                                <div class="columns">Error: ${error.message}</div>
+                            </div>`;
+                            log(`Error with ${table}: ${error.message}`);
+                        } else {
+                            const columns = data && data.length > 0 ? Object.keys(data[0]) : [];
+                            results += `<div class="table-info">
+                                <div class="table-name">✅ ${table}</div>
+                                <div class="columns">Columns: ${columns.length > 0 ? columns.join(', ') : 'No data to determine columns'}</div>
+                            </div>`;
+                            log(`${table} columns:`, columns);
+                        }
+                    } catch (e) {
+                        results += `<div class="table-info">
+                            <div class="table-name">❌ ${table}</div>
+                            <div class="columns">Exception: ${e.message}</div>
+                        </div>`;
+                        log(`Exception with ${table}: ${e.message}`);
+                    }
+                }
+
+                output.innerHTML = results;
+            } catch (error) {
+                output.innerHTML = `<div class="status error">Error: ${error.message}</div>`;
+                log('Error checking tables:', error);
+            }
+        }
+
+        async function checkShopsTable() {
+            const output = document.getElementById('tables-output');
+            output.innerHTML = '<div class="status info">Checking shops table in detail...</div>';
+
+            try {
+                // First, get the shop ID
+                const shopId = SharedData.getCurrentShopId();
+                if (!shopId) {
+                    output.innerHTML = '<div class="status error">No shop ID found. Please login and ensure setup is complete.</div>';
+                    return;
+                }
+
+                log('Using shop ID: ' + shopId);
+
+                // Try to fetch the shop with all columns
+                const { data, error } = await supabaseClient
+                    .from('shops')
+                    .select('*')
+                    .eq('id', shopId)
+                    .single();
+
+                if (error) {
+                    output.innerHTML = `<div class="status error">Error querying shop: ${error.message}</div>`;
+                    log('Error:', error);
+                } else {
+                    const columns = Object.keys(data);
+                    let html = '<div class="status success">Shop Table Structure:</div>';
+                    html += '<div class="table-info">';
+                    html += '<div class="table-name">Columns found in shops table:</div>';
+                    html += '<div class="columns">';
+
+                    columns.forEach(col => {
+                        const value = data[col];
+                        const type = value === null ? 'null' : typeof value;
+                        html += `<div class="column-item">• ${col}: ${type}${value !== null && value !== undefined ? ` (sample: ${JSON.stringify(value).substring(0, 50)})` : ''}</div>`;
+                    });
+
+                    html += '</div></div>';
+
+                    // Check for missing expected columns
+                    const expectedColumns = [
+                        'store_hours',
+                        'min_booking_hours',
+                        'max_booking_days',
+                        'cancellation_notice_hours',
+                        'display_info'
+                    ];
+
+                    const missingColumns = expectedColumns.filter(col => !columns.includes(col));
+                    if (missingColumns.length > 0) {
+                        html += '<div class="table-info">';
+                        html += '<div class="table-name">⚠️ Missing expected columns:</div>';
+                        html += '<div class="columns">';
+                        missingColumns.forEach(col => {
+                            html += `<div class="column-item">• ${col}</div>`;
+                        });
+                        html += '</div></div>';
+                    }
+
+                    output.innerHTML = html;
+                    log('Shop data:', data);
+                }
+            } catch (error) {
+                output.innerHTML = `<div class="status error">Exception: ${error.message}</div>`;
+                log('Exception:', error);
+            }
+        }
+
+        async function testSimpleQuery() {
+            const output = document.getElementById('query-output');
+            output.innerHTML = '<div class="status info">Testing simple query...</div>';
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('shops')
+                    .select('id, name, email')
+                    .limit(1);
+
+                if (error) {
+                    output.innerHTML = `<div class="status error">Error: ${error.message}</div>`;
+                    log('Simple query error:', error);
+                } else {
+                    output.innerHTML = `<div class="status success">Simple query successful! Found ${data.length} shop(s)</div>`;
+                    log('Simple query result:', data);
+                }
+            } catch (error) {
+                output.innerHTML = `<div class="status error">Exception: ${error.message}</div>`;
+                log('Exception:', error);
+            }
+        }
+
+        async function testShopQuery() {
+            const output = document.getElementById('query-output');
+            const shopId = SharedData.getCurrentShopId();
+
+            if (!shopId) {
+                output.innerHTML = '<div class="status error">No shop ID found</div>';
+                return;
+            }
+
+            output.innerHTML = '<div class="status info">Testing shop query with all columns...</div>';
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('shops')
+                    .select('*')
+                    .eq('id', shopId)
+                    .single();
+
+                if (error) {
+                    output.innerHTML = `<div class="status error">Error: ${JSON.stringify(error)}</div>`;
+                    log('Shop query error:', error);
+                } else {
+                    output.innerHTML = '<div class="status success">Shop query successful!</div>';
+                    log('Shop data:', data);
+                }
+            } catch (error) {
+                output.innerHTML = `<div class="status error">Exception: ${error.message}</div>`;
+                log('Exception:', error);
+            }
+        }
+
+        async function testShopQueryMinimal() {
+            const output = document.getElementById('query-output');
+            const shopId = SharedData.getCurrentShopId();
+
+            if (!shopId) {
+                output.innerHTML = '<div class="status error">No shop ID found</div>';
+                return;
+            }
+
+            output.innerHTML = '<div class="status info">Testing minimal shop query...</div>';
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('shops')
+                    .select('id, name, email')
+                    .eq('id', shopId)
+                    .single();
+
+                if (error) {
+                    output.innerHTML = `<div class="status error">Error: ${JSON.stringify(error)}</div>`;
+                    log('Minimal query error:', error);
+                } else {
+                    output.innerHTML = '<div class="status success">Minimal query successful!</div>';
+                    log('Minimal shop data:', data);
+                }
+            } catch (error) {
+                output.innerHTML = `<div class="status error">Exception: ${error.message}</div>`;
+                log('Exception:', error);
+            }
+        }
+
+        async function testServicesQuery() {
+            const output = document.getElementById('query-output');
+            const shopId = SharedData.getCurrentShopId();
+
+            output.innerHTML = '<div class="status info">Testing services query...</div>';
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('services')
+                    .select('*')
+                    .eq('shop_id', shopId);
+
+                if (error) {
+                    output.innerHTML = `<div class="status error">Error: ${JSON.stringify(error)}</div>`;
+                    log('Services query error:', error);
+                } else {
+                    output.innerHTML = `<div class="status success">Services query successful! Found ${data.length} service(s)</div>`;
+                    log('Services data:', data);
+                }
+            } catch (error) {
+                output.innerHTML = `<div class="status error">Exception: ${error.message}</div>`;
+                log('Exception:', error);
+            }
+        }
+
+        async function testBarbersQuery() {
+            const output = document.getElementById('query-output');
+            const shopId = SharedData.getCurrentShopId();
+
+            output.innerHTML = '<div class="status info">Testing barbers query...</div>';
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('barbers')
+                    .select('*')
+                    .eq('shop_id', shopId);
+
+                if (error) {
+                    output.innerHTML = `<div class="status error">Error: ${JSON.stringify(error)}</div>`;
+                    log('Barbers query error:', error);
+                } else {
+                    output.innerHTML = `<div class="status success">Barbers query successful! Found ${data.length} barber(s)</div>`;
+                    log('Barbers data:', data);
+                }
+            } catch (error) {
+                output.innerHTML = `<div class="status error">Exception: ${error.message}</div>`;
+                log('Exception:', error);
+            }
+        }
+
+        function showAddColumnsSQL() {
+            const output = document.getElementById('sql-output');
+
+            const sql = `
+-- Add missing columns to shops table
+-- Run these commands in your Supabase SQL editor
+
+-- Add store hours (JSON)
+ALTER TABLE shops
+ADD COLUMN IF NOT EXISTS store_hours JSONB DEFAULT '{
+    "monday": {"open": "09:00", "close": "18:00", "closed": false},
+    "tuesday": {"open": "09:00", "close": "18:00", "closed": false},
+    "wednesday": {"open": "09:00", "close": "18:00", "closed": false},
+    "thursday": {"open": "09:00", "close": "18:00", "closed": false},
+    "friday": {"open": "09:00", "close": "20:00", "closed": false},
+    "saturday": {"open": "10:00", "close": "17:00", "closed": false},
+    "sunday": {"open": "", "close": "", "closed": true}
+}'::JSONB;
+
+-- Add booking policy columns
+ALTER TABLE shops
+ADD COLUMN IF NOT EXISTS min_booking_hours INTEGER DEFAULT 2;
+
+ALTER TABLE shops
+ADD COLUMN IF NOT EXISTS max_booking_days INTEGER DEFAULT 30;
+
+ALTER TABLE shops
+ADD COLUMN IF NOT EXISTS cancellation_notice_hours INTEGER DEFAULT 24;
+
+-- Add display info (JSON)
+ALTER TABLE shops
+ADD COLUMN IF NOT EXISTS display_info JSONB DEFAULT '{
+    "showPhone": true,
+    "showEmail": true,
+    "showAddress": true,
+    "showWechat": false
+}'::JSONB;
+
+-- Add other potentially missing columns
+ALTER TABLE shops
+ADD COLUMN IF NOT EXISTS owner_first_name TEXT;
+
+ALTER TABLE shops
+ADD COLUMN IF NOT EXISTS owner_last_name TEXT;
+
+ALTER TABLE shops
+ADD COLUMN IF NOT EXISTS address TEXT;
+
+ALTER TABLE shops
+ADD COLUMN IF NOT EXISTS phone TEXT;
+
+ALTER TABLE shops
+ADD COLUMN IF NOT EXISTS wechat_id TEXT;`;
+
+            output.innerHTML = `
+                <div class="status info">Copy this SQL and run it in your Supabase SQL Editor:</div>
+                <pre>${sql}</pre>
+                <div class="status info">
+                    To run this SQL:
+                    <ol>
+                        <li>Go to your Supabase dashboard</li>
+                        <li>Click on "SQL Editor" in the left sidebar</li>
+                        <li>Paste the SQL above</li>
+                        <li>Click "Run" to execute</li>
+                    </ol>
+                </div>
+            `;
+
+            log('SQL commands generated for adding missing columns');
+        }
+
+        // Initialize on load
+        window.addEventListener('load', async () => {
+            await SharedData.initialize();
+            const shopId = SharedData.getCurrentShopId();
+            if (shopId) {
+                log('Initialized with shop ID: ' + shopId);
+            } else {
+                log('No shop ID found - please login first');
+            }
+        });
+    </script>
+</body>
+</html>

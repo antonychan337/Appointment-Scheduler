@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Confirmation Helper</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 40px;
+            max-width: 600px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #2C3E50;
+            margin-bottom: 20px;
+        }
+
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 12px 24px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #2C3E50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1a252f;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            display: block;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            display: block;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            display: block;
+        }
+
+        .solution {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+
+        code {
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📧 Email Confirmation Helper</h1>
+
+        <div class="info">
+            <strong>Problem:</strong> Supabase email confirmation link doesn't redirect properly.
+            <br><br>
+            <strong>Solution:</strong> Use this tool to manually confirm your email or bypass confirmation for testing.
+        </div>
+
+        <h2>Option 1: Disable Email Confirmation (Recommended for Testing)</h2>
+        <div class="solution">
+            <p>To disable email confirmation in Supabase:</p>
+            <ol>
+                <li>Go to your Supabase project dashboard</li>
+                <li>Navigate to <strong>Authentication → Settings</strong></li>
+                <li>Under <strong>Email Auth</strong>, find <strong>"Enable email confirmations"</strong></li>
+                <li>Toggle it <strong>OFF</strong></li>
+                <li>Save changes</li>
+            </ol>
+            <p><strong>Note:</strong> This allows immediate login after signup without email verification.</p>
+        </div>
+
+        <h2>Option 2: Manual Token Confirmation</h2>
+        <p>If you received a confirmation email, paste the confirmation URL here:</p>
+
+        <div class="form-group">
+            <label>Confirmation URL from Email:</label>
+            <input type="text" id="confirmation-url" placeholder="Paste the full URL from your email">
+        </div>
+
+        <button class="btn-primary" onclick="extractAndConfirm()">Extract Token and Confirm</button>
+
+        <h2>Option 3: Test Login with Existing Account</h2>
+        <div class="form-group">
+            <label>Email:</label>
+            <input type="email" id="test-email" placeholder="your@email.com">
+        </div>
+        <div class="form-group">
+            <label>Password:</label>
+            <input type="password" id="test-password" placeholder="Your password">
+        </div>
+
+        <button class="btn-primary" onclick="testLogin()">Test Login</button>
+        <button class="btn-success" onclick="forceLogin()">Force Login (Skip Verification)</button>
+
+        <div id="status" class="status"></div>
+
+        <h2>Option 4: Create Test Account (No Email Required)</h2>
+        <button class="btn-success" onclick="createTestAccount()">Create Test Shop Account</button>
+        <p style="margin-top: 10px; color: #666; font-size: 14px;">
+            This will create a test account with:<br>
+            Email: <code>test@example.com</code><br>
+            Password: <code>test123</code>
+        </p>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://zpgebfbzdmahlbhjbvvk.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwZ2ViZmJ6ZG1haGxiaGpidnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg0MDYxNzAsImV4cCI6MjA3Mzk4MjE3MH0.KtiKm9TdgedUXKXMQQxYNzeFbKAgKbqP2_0IhI_AFHA';
+
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        function showStatus(type, message) {
+            const status = document.getElementById('status');
+            status.className = `status ${type}`;
+            status.innerHTML = message;
+        }
+
+        async function extractAndConfirm() {
+            const url = document.getElementById('confirmation-url').value;
+            if (!url) {
+                showStatus('error', 'Please paste the confirmation URL');
+                return;
+            }
+
+            try {
+                // Extract token from URL
+                const urlObj = new URL(url);
+                const token = urlObj.searchParams.get('token') || urlObj.hash.match(/token=([^&]+)/)?.[1];
+                const type = urlObj.searchParams.get('type') || 'email';
+
+                if (!token) {
+                    showStatus('error', 'Could not extract token from URL');
+                    return;
+                }
+
+                showStatus('info', 'Attempting to verify token...');
+
+                // Try to verify the token
+                const { data, error } = await supabaseClient.auth.verifyOtp({
+                    token_hash: token,
+                    type: type
+                });
+
+                if (error) {
+                    showStatus('error', `Verification failed: ${error.message}`);
+                } else {
+                    showStatus('success', 'Email confirmed successfully! You can now login. Redirecting...');
+                    setTimeout(() => {
+                        window.location.href = 'auth-app.html';
+                    }, 2000);
+                }
+            } catch (error) {
+                showStatus('error', `Error: ${error.message}`);
+            }
+        }
+
+        async function testLogin() {
+            const email = document.getElementById('test-email').value;
+            const password = document.getElementById('test-password').value;
+
+            if (!email || !password) {
+                showStatus('error', 'Please enter email and password');
+                return;
+            }
+
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
+                    email,
+                    password
+                });
+
+                if (error) {
+                    if (error.message.includes('Email not confirmed')) {
+                        showStatus('error', `Email not confirmed. ${error.message}<br><br>
+                            <strong>Solution:</strong> Disable email confirmation in Supabase dashboard
+                            (Authentication → Settings → Email Auth → Enable email confirmations → OFF)`);
+                    } else {
+                        showStatus('error', `Login failed: ${error.message}`);
+                    }
+                } else {
+                    showStatus('success', 'Login successful! Redirecting...');
+                    localStorage.setItem('supabase_shop_id', 'test-shop');
+                    setTimeout(() => {
+                        window.location.href = 'owner-app.html';
+                    }, 2000);
+                }
+            } catch (error) {
+                showStatus('error', `Error: ${error.message}`);
+            }
+        }
+
+        async function forceLogin() {
+            const email = document.getElementById('test-email').value;
+            const password = document.getElementById('test-password').value;
+
+            if (!email || !password) {
+                showStatus('error', 'Please enter email and password');
+                return;
+            }
+
+            showStatus('info', 'Attempting to bypass email verification...');
+
+            // Store credentials and redirect
+            localStorage.setItem('bypass_auth', JSON.stringify({ email, password }));
+            localStorage.setItem('setupComplete', 'false');
+
+            showStatus('success', 'Credentials saved. Redirecting to setup wizard...');
+            setTimeout(() => {
+                window.location.href = 'setup-wizard-app.html';
+            }, 2000);
+        }
+
+        async function createTestAccount() {
+            showStatus('info', 'Creating test account...');
+
+            try {
+                // Try to sign up
+                const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
+                    email: 'test@example.com',
+                    password: 'test123',
+                    options: {
+                        data: {
+                            shop_name: 'Test Shop',
+                            owner_name: 'Test Owner'
+                        }
+                    }
+                });
+
+                if (signUpError && !signUpError.message.includes('already registered')) {
+                    showStatus('error', `Signup failed: ${signUpError.message}`);
+                    return;
+                }
+
+                // Try to login
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
+                    email: 'test@example.com',
+                    password: 'test123'
+                });
+
+                if (error) {
+                    showStatus('error', `Login failed: ${error.message}<br><br>
+                        <strong>If email confirmation is required:</strong><br>
+                        Please disable it in Supabase dashboard → Authentication → Settings → Email Auth`);
+                } else {
+                    showStatus('success', `Test account ready!<br>
+                        Email: <code>test@example.com</code><br>
+                        Password: <code>test123</code><br><br>
+                        Redirecting to setup wizard...`);
+
+                    // Save test profile data
+                    localStorage.setItem('initialProfile', JSON.stringify({
+                        storeName: 'Test Barbershop',
+                        firstName: 'Test',
+                        lastName: 'Owner',
+                        email: 'test@example.com'
+                    }));
+
+                    setTimeout(() => {
+                        window.location.href = 'setup-wizard-app.html';
+                    }, 3000);
+                }
+            } catch (error) {
+                showStatus('error', `Error: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

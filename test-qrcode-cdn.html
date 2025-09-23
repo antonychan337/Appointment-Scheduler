@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test QRCode CDN</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .test {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        canvas {
+            border: 1px solid #333;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>QRCode Library CDN Test</h1>
+
+    <div class="test">
+        <h2>Test 1: unpkg CDN</h2>
+        <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
+        <canvas id="canvas1"></canvas>
+        <div id="status1"></div>
+    </div>
+
+    <div class="test">
+        <h2>Test 2: jsdelivr CDN</h2>
+        <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+        <canvas id="canvas2"></canvas>
+        <div id="status2"></div>
+    </div>
+
+    <div class="test">
+        <h2>Test 3: cdnjs (Alternative Library)</h2>
+        <div id="qrcode3"></div>
+        <div id="status3"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <script>
+        // Wait for all scripts to load
+        window.addEventListener('load', function() {
+            const testUrl = 'https://yourdomain.com/book/test_shop';
+
+            // Test 1: Check if QRCode from unpkg/jsdelivr is loaded
+            const status1 = document.getElementById('status1');
+            if (typeof QRCode !== 'undefined' && QRCode.toCanvas) {
+                try {
+                    QRCode.toCanvas(document.getElementById('canvas1'), testUrl, {
+                        width: 200,
+                        margin: 2
+                    }, function(error) {
+                        if (error) {
+                            status1.innerHTML = '<span class="error">Error: ' + error + '</span>';
+                        } else {
+                            status1.innerHTML = '<span class="success">✅ QRCode library loaded and working!</span>';
+                        }
+                    });
+                } catch (e) {
+                    status1.innerHTML = '<span class="error">Error: ' + e.message + '</span>';
+                }
+            } else {
+                status1.innerHTML = '<span class="error">❌ QRCode library not loaded</span>';
+            }
+
+            // Test 2: Double check
+            const status2 = document.getElementById('status2');
+            if (typeof QRCode !== 'undefined' && QRCode.toCanvas) {
+                try {
+                    QRCode.toCanvas(document.getElementById('canvas2'), testUrl, {
+                        width: 200,
+                        margin: 2,
+                        color: {
+                            dark: '#000000',
+                            light: '#ffffff'
+                        }
+                    }, function(error) {
+                        if (error) {
+                            status2.innerHTML = '<span class="error">Error: ' + error + '</span>';
+                        } else {
+                            status2.innerHTML = '<span class="success">✅ QRCode library working!</span>';
+                        }
+                    });
+                } catch (e) {
+                    status2.innerHTML = '<span class="error">Error: ' + e.message + '</span>';
+                }
+            } else {
+                status2.innerHTML = '<span class="error">❌ QRCode library not loaded</span>';
+            }
+
+            // Test 3: Alternative library (QRCodeJS)
+            const status3 = document.getElementById('status3');
+            if (typeof QRCode !== 'undefined') {
+                try {
+                    // This is the alternative library syntax
+                    new QRCode(document.getElementById("qrcode3"), {
+                        text: testUrl,
+                        width: 200,
+                        height: 200
+                    });
+                    status3.innerHTML = '<span class="success">✅ Alternative QRCodeJS library loaded!</span>';
+                } catch (e) {
+                    // Try the other library's syntax
+                    if (QRCode.toCanvas) {
+                        status3.innerHTML = '<span class="success">✅ Standard QRCode library detected</span>';
+                    } else {
+                        status3.innerHTML = '<span class="error">Error: ' + e.message + '</span>';
+                    }
+                }
+            } else {
+                status3.innerHTML = '<span class="error">❌ No QRCode library loaded</span>';
+            }
+
+            // Debug info
+            console.log('QRCode object:', typeof QRCode !== 'undefined' ? QRCode : 'Not loaded');
+            console.log('QRCode methods:', typeof QRCode !== 'undefined' ? Object.keys(QRCode) : 'N/A');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Check Table Structure</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+</head>
+<body>
+    <h1>Checking Database Table Structure...</h1>
+    <pre id="output"></pre>
+
+    <script>
+        async function checkTables() {
+            const output = document.getElementById('output');
+            let result = '';
+
+            // Get a sample row from shops to see what columns exist
+            try {
+                const { data: shops, error: shopsError } = await supabase
+                    .from('shops')
+                    .select('*')
+                    .limit(1);
+
+                if (shopsError) {
+                    result += 'Error querying shops: ' + shopsError.message + '\n';
+                } else if (shops && shops.length > 0) {
+                    result += 'Shops table columns:\n';
+                    result += JSON.stringify(Object.keys(shops[0]), null, 2) + '\n\n';
+                    result += 'Sample data:\n';
+                    result += JSON.stringify(shops[0], null, 2) + '\n\n';
+                } else {
+                    result += 'No shops found in database\n\n';
+                }
+            } catch (e) {
+                result += 'Exception checking shops: ' + e.message + '\n\n';
+            }
+
+            // Check barbers table
+            try {
+                const { data: barbers, error: barbersError } = await supabase
+                    .from('barbers')
+                    .select('*')
+                    .limit(1);
+
+                if (barbersError) {
+                    result += 'Error querying barbers: ' + barbersError.message + '\n';
+                } else if (barbers && barbers.length > 0) {
+                    result += 'Barbers table columns:\n';
+                    result += JSON.stringify(Object.keys(barbers[0]), null, 2) + '\n\n';
+                }
+            } catch (e) {
+                result += 'Exception checking barbers: ' + e.message + '\n\n';
+            }
+
+            // Check services table
+            try {
+                const { data: services, error: servicesError } = await supabase
+                    .from('services')
+                    .select('*')
+                    .limit(1);
+
+                if (servicesError) {
+                    result += 'Error querying services: ' + servicesError.message + '\n';
+                } else if (services && services.length > 0) {
+                    result += 'Services table columns:\n';
+                    result += JSON.stringify(Object.keys(services[0]), null, 2) + '\n\n';
+                }
+            } catch (e) {
+                result += 'Exception checking services: ' + e.message + '\n\n';
+            }
+
+            output.textContent = result;
+
+            // Generate correct migration based on actual structure
+            generateCorrectMigration(result);
+        }
+
+        function generateCorrectMigration(checkResult) {
+            const migration = `-- Corrected Migration Script (based on actual table structure)
+
+-- Add missing columns to shops table
+ALTER TABLE shops
+ADD COLUMN IF NOT EXISTS store_hours JSONB DEFAULT '{
+    "monday": {"open": "09:00", "close": "18:00", "closed": false},
+    "tuesday": {"open": "09:00", "close": "18:00", "closed": false},
+    "wednesday": {"open": "09:00", "close": "18:00", "closed": false},
+    "thursday": {"open": "09:00", "close": "18:00", "closed": false},
+    "friday": {"open": "09:00", "close": "18:00", "closed": false},
+    "saturday": {"open": "10:00", "close": "17:00", "closed": false},
+    "sunday": {"open": "10:00", "close": "17:00", "closed": true}
+}'::JSONB;
+
+ALTER TABLE shops
+ADD COLUMN IF NOT EXISTS min_booking_hours INTEGER DEFAULT 2,
+ADD COLUMN IF NOT EXISTS max_booking_days INTEGER DEFAULT 30,
+ADD COLUMN IF NOT EXISTS cancellation_notice_hours INTEGER DEFAULT 24;
+
+ALTER TABLE shops
+ADD COLUMN IF NOT EXISTS display_info JSONB DEFAULT '{"showPhone": true, "showEmail": true, "showAddress": true, "showWechat": false}'::JSONB;
+
+ALTER TABLE shops
+ADD COLUMN IF NOT EXISTS owner_first_name TEXT,
+ADD COLUMN IF NOT EXISTS owner_last_name TEXT,
+ADD COLUMN IF NOT EXISTS address TEXT,
+ADD COLUMN IF NOT EXISTS phone TEXT,
+ADD COLUMN IF NOT EXISTS wechat_id TEXT;
+
+-- Add indexes that can be created
+CREATE INDEX IF NOT EXISTS idx_shops_email ON shops(email);
+CREATE INDEX IF NOT EXISTS idx_barbers_shop_id ON barbers(shop_id);
+CREATE INDEX IF NOT EXISTS idx_services_shop_id ON services(shop_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_shop_id ON appointments(shop_id);
+CREATE INDEX IF NOT EXISTS idx_blocked_times_shop_id ON blocked_times(shop_id);`;
+
+            const button = document.createElement('button');
+            button.textContent = 'Copy Corrected Migration SQL';
+            button.onclick = () => {
+                navigator.clipboard.writeText(migration);
+                button.textContent = 'Copied!';
+            };
+            document.body.appendChild(button);
+
+            const pre = document.createElement('pre');
+            pre.textContent = migration;
+            pre.style.background = '#f0f0f0';
+            pre.style.padding = '10px';
+            document.body.appendChild(pre);
+        }
+
+        checkTables();
+    </script>
+</body>
+</html>

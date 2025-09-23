@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset Setup</title>
+</head>
+<body>
+    <h1>Reset Setup Wizard</h1>
+    <button onclick="resetSetup()">Reset Setup (Allow Setup Wizard to Run)</button>
+    <button onclick="markComplete()">Mark Setup Complete (Skip Wizard)</button>
+    <div id="status"></div>
+
+    <script>
+        function resetSetup() {
+            // Remove the setup complete flag
+            localStorage.removeItem('setupComplete');
+            document.getElementById('status').innerHTML = '<p style="color: green;">Setup reset! You can now run the setup wizard.</p>';
+
+            // Open setup wizard after 1 second
+            setTimeout(() => {
+                window.location.href = 'setup-wizard-app.html';
+            }, 1000);
+        }
+
+        function markComplete() {
+            localStorage.setItem('setupComplete', 'true');
+            document.getElementById('status').innerHTML = '<p style="color: blue;">Setup marked as complete. Setup wizard will be skipped.</p>';
+        }
+
+        // Show current status
+        const isComplete = localStorage.getItem('setupComplete') === 'true';
+        document.getElementById('status').innerHTML = `<p>Current status: Setup is ${isComplete ? 'COMPLETE (wizard will redirect to owner app)' : 'NOT complete (wizard will run)'}</p>`;
+    </script>
+</body>
+</html>

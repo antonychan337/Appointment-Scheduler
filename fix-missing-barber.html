@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fix Missing Owner Barber</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #4A90E2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover { background: #357ABD; }
+    </style>
+</head>
+<body>
+    <h1>Fix Missing Owner Barber</h1>
+    <div id="output"></div>
+    <button onclick="fixBarber()">Create Owner Barber</button>
+
+    <script>
+        const output = document.getElementById('output');
+
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = message;
+            output.appendChild(div);
+        }
+
+        async function fixBarber() {
+            output.innerHTML = '';
+            log('Starting fix process...');
+
+            // Initialize SharedData
+            await SharedData.initialize();
+
+            // Get current user and shop
+            const { data: { user } } = await supabaseClient.auth.getUser();
+            if (!user) {
+                log('Not logged in!', 'error');
+                return;
+            }
+            log(`Logged in as: ${user.email}`, 'success');
+
+            const shopId = SharedData.getCurrentShopId();
+            if (!shopId) {
+                log('No shop ID found!', 'error');
+                return;
+            }
+            log(`Shop ID: ${shopId}`, 'success');
+
+            // Check if barber already exists
+            const barbers = await SharedData.getBarbers();
+            if (barbers.length > 0) {
+                log(`Found ${barbers.length} barber(s). Owner already exists.`, 'info');
+                return;
+            }
+
+            // Get shop data for owner name
+            const profile = await SharedData.getProfile();
+            if (!profile) {
+                log('Could not load profile!', 'error');
+                return;
+            }
+
+            const ownerName = profile.firstName && profile.lastName
+                ? `${profile.firstName} ${profile.lastName}`
+                : profile.storeName + ' Owner';
+
+            log(`Creating owner barber: ${ownerName}`);
+
+            // Create owner barber
+            try {
+                const { data: newBarber, error } = await supabaseClient
+                    .from('barbers')
+                    .insert({
+                        shop_id: shopId,
+                        name: ownerName,
+                        is_owner: true,
+                        profile_id: user.id,
+                        uses_store_hours: true,
+                        service_ids: [],  // Will be populated with services
+                        is_active: true,
+                        display_order: 0
+                    })
+                    .select()
+                    .single();
+
+                if (error) {
+                    log(`Error creating barber: ${error.message}`, 'error');
+                    return;
+                }
+
+                log('Owner barber created successfully!', 'success');
+
+                // Now enable all services for the owner
+                const services = await SharedData.getServices();
+                const serviceIds = Object.keys(services);
+
+                if (serviceIds.length > 0) {
+                    const { error: updateError } = await supabaseClient
+                        .from('barbers')
+                        .update({ service_ids: serviceIds })
+                        .eq('id', newBarber.id);
+
+                    if (updateError) {
+                        log(`Error updating services: ${updateError.message}`, 'error');
+                    } else {
+                        log(`Enabled ${serviceIds.length} services for owner`, 'success');
+                    }
+                }
+
+                log('Fix complete! Reload the owner app to see the barber.', 'success');
+
+            } catch (e) {
+                log(`Exception: ${e.message}`, 'error');
+            }
+        }
+
+        // Run automatically
+        fixBarber();
+    </script>
+</body>
+</html>

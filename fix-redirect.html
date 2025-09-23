@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Redirect Issue</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Bridge -->
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #2C3E50;
+            margin-bottom: 20px;
+        }
+
+        .status-box {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .status-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .status-value {
+            color: #666;
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .status-value.yes {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-value.no {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        button {
+            padding: 12px 24px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #2C3E50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1a252f;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+
+        .message {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+
+        .message.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .message.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+
+        .actions {
+            margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Fix Redirect Issue</h1>
+
+        <div class="status-box">
+            <h2>Current Status</h2>
+            <div id="status-items">
+                <div class="status-item">
+                    <span class="status-label">Checking authentication...</span>
+                    <span class="status-value">...</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="message"></div>
+
+        <div class="actions">
+            <button class="btn-primary" onclick="checkStatus()">🔍 Check Status</button>
+            <button class="btn-warning" onclick="markSetupIncomplete()">📝 Mark Setup Incomplete</button>
+            <button class="btn-success" onclick="markSetupComplete()">✅ Mark Setup Complete</button>
+            <button class="btn-primary" onclick="goToSetupWizard()">🚀 Go to Setup Wizard</button>
+            <button class="btn-primary" onclick="goToOwnerApp()">🏪 Go to Owner App</button>
+            <button class="btn-primary" onclick="goToAuth()">🔐 Go to Login</button>
+        </div>
+    </div>
+
+    <script>
+        async function checkStatus() {
+            const statusContainer = document.getElementById('status-items');
+            let html = '';
+
+            // Check authentication
+            try {
+                const { data: { user } } = await supabaseClient.auth.getUser();
+
+                if (user) {
+                    html += createStatusItem('Authentication', 'Logged In', 'yes');
+                    html += createStatusItem('User Email', user.email);
+                    html += createStatusItem('User ID', user.id.substring(0, 8) + '...');
+
+                    // Check shop ID
+                    const shopId = localStorage.getItem('supabase_shop_id');
+                    if (shopId) {
+                        html += createStatusItem('Shop ID', shopId.substring(0, 8) + '...', 'yes');
+                    } else {
+                        html += createStatusItem('Shop ID', 'Not Set', 'no');
+                    }
+                } else {
+                    html += createStatusItem('Authentication', 'Not Logged In', 'no');
+                }
+            } catch (error) {
+                html += createStatusItem('Authentication', 'Error: ' + error.message, 'no');
+            }
+
+            // Check setup status
+            const setupComplete = localStorage.getItem('setupComplete');
+            if (setupComplete === 'true') {
+                html += createStatusItem('Setup Complete', 'Yes', 'yes');
+            } else if (setupComplete === 'false') {
+                html += createStatusItem('Setup Complete', 'No', 'no');
+            } else {
+                html += createStatusItem('Setup Complete', 'Not Set', 'no');
+            }
+
+            // Check localStorage items
+            const localStorageCount = Object.keys(localStorage).length;
+            html += createStatusItem('LocalStorage Items', localStorageCount.toString());
+
+            // List important localStorage keys
+            const importantKeys = [
+                'setupComplete',
+                'supabase_shop_id',
+                'sb-zpgebfbzdmahlbhjbvvk-auth-token',
+                'initialProfile'
+            ];
+
+            html += '<div style="margin-top: 20px;"><strong>Important Keys:</strong></div>';
+            for (const key of importantKeys) {
+                const value = localStorage.getItem(key);
+                if (value) {
+                    const preview = value.length > 50 ? value.substring(0, 50) + '...' : value;
+                    html += createStatusItem(key, preview, 'yes');
+                } else {
+                    html += createStatusItem(key, 'Not Set', 'no');
+                }
+            }
+
+            statusContainer.innerHTML = html;
+
+            // Show recommendation
+            const { data: { user } } = await supabaseClient.auth.getUser();
+            const setupComplete = localStorage.getItem('setupComplete');
+            const shopId = localStorage.getItem('supabase_shop_id');
+
+            if (!user) {
+                showMessage('info', 'You are not logged in. Click "Go to Login" to authenticate.');
+            } else if (setupComplete === 'true' && shopId) {
+                showMessage('success', 'Everything looks good! You can go to the Owner App.');
+            } else if (!shopId || setupComplete !== 'true') {
+                showMessage('info', 'Setup is not complete. Click "Go to Setup Wizard" to complete setup.');
+            }
+        }
+
+        function createStatusItem(label, value, type = '') {
+            const className = type ? ` class="${type}"` : '';
+            return `
+                <div class="status-item">
+                    <span class="status-label">${label}:</span>
+                    <span class="status-value${className}">${value}</span>
+                </div>
+            `;
+        }
+
+        function markSetupIncomplete() {
+            localStorage.setItem('setupComplete', 'false');
+            showMessage('success', 'Setup marked as incomplete. You will be redirected to Setup Wizard on next login.');
+            checkStatus();
+        }
+
+        function markSetupComplete() {
+            localStorage.setItem('setupComplete', 'true');
+            showMessage('success', 'Setup marked as complete. You will be redirected to Owner App on next login.');
+            checkStatus();
+        }
+
+        function goToSetupWizard() {
+            window.location.href = 'setup-wizard-app.html';
+        }
+
+        function goToOwnerApp() {
+            window.location.href = 'owner-app.html';
+        }
+
+        function goToAuth() {
+            window.location.href = 'auth-app.html';
+        }
+
+        function showMessage(type, text) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.className = 'message ' + type;
+            messageDiv.textContent = text;
+        }
+
+        // Check status on load
+        window.addEventListener('load', () => {
+            checkStatus();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supabase Connection Test & Setup</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #2196F3;
+            padding-bottom: 10px;
+        }
+        .status {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            font-weight: 500;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .form-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input:focus {
+            outline: none;
+            border-color: #2196F3;
+            box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+        h2 {
+            color: #444;
+            margin-top: 0;
+        }
+        .data-display {
+            background: #fff;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            border: 1px solid #e0e0e0;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Supabase Setup & Test</h1>
+
+        <div id="connection-status" class="status info">
+            Checking connection to Supabase...
+        </div>
+
+        <div class="section">
+            <h2>Step 1: Create Shop Owner Account</h2>
+            <form id="signup-form">
+                <div class="form-group">
+                    <label>Shop Name</label>
+                    <input type="text" id="shop-name" value="Demo Barbershop" required>
+                </div>
+                <div class="form-group">
+                    <label>Owner Name</label>
+                    <input type="text" id="owner-name" value="John Doe" required>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="email" value="demo@example.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="password" value="Demo123!" required>
+                </div>
+                <button type="submit">Create Shop & Owner Account</button>
+            </form>
+        </div>
+
+        <div class="section" style="display: none;" id="test-section">
+            <h2>Step 2: Test Data Operations</h2>
+            <button onclick="testBarbers()">Test Barbers</button>
+            <button onclick="testServices()">Test Services</button>
+            <button onclick="testAppointment()">Test Appointment</button>
+            <button onclick="loadOwnerApp()">Open Owner App with Supabase</button>
+
+            <div id="test-results" class="data-display" style="display: none;"></div>
+        </div>
+
+        <div class="section" id="migration-section" style="display: none;">
+            <h2>Step 3: Migrate Existing Data</h2>
+            <p>If you have existing data in localStorage, you can migrate it to Supabase.</p>
+            <button onclick="checkLocalData()">Check Local Data</button>
+            <button onclick="migrateData()">Migrate to Supabase</button>
+
+            <div id="migration-results" class="data-display" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script src="supabase-bridge.js"></script>
+    <script>
+        // Test connection on load
+        async function testConnection() {
+            const status = document.getElementById('connection-status');
+            try {
+                // Test basic connection
+                const { data, error } = await supabaseClient
+                    .from('shops')
+                    .select('count')
+                    .limit(1);
+
+                if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows" which is OK
+                    throw error;
+                }
+
+                status.className = 'status success';
+                status.innerHTML = '✅ Connected to Supabase successfully!';
+
+                // Check if we already have a shop
+                const { data: { user } } = await supabaseClient.auth.getUser();
+                if (user) {
+                    status.innerHTML += '<br>👤 Logged in as: ' + user.email;
+                    document.getElementById('test-section').style.display = 'block';
+                    document.getElementById('migration-section').style.display = 'block';
+                }
+            } catch (error) {
+                status.className = 'status error';
+                status.innerHTML = '❌ Connection failed: ' + error.message;
+            }
+        }
+
+        // Sign up form handler
+        document.getElementById('signup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const status = document.getElementById('connection-status');
+            const button = e.target.querySelector('button');
+            button.disabled = true;
+
+            try {
+                status.className = 'status info';
+                status.innerHTML = 'Creating shop and owner account...';
+
+                // Try a simpler approach first - just create the auth user
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                const shopName = document.getElementById('shop-name').value;
+                const ownerName = document.getElementById('owner-name').value;
+
+                // Step 1: Create auth user
+                const { data: authData, error: authError } = await supabaseClient.auth.signUp({
+                    email: email,
+                    password: password,
+                    options: {
+                        data: {
+                            first_name: ownerName.split(' ')[0],
+                            last_name: ownerName.split(' ').slice(1).join(' ') || ''
+                        }
+                    }
+                });
+
+                if (authError) throw authError;
+
+                status.innerHTML += '<br>✓ User created';
+
+                // Step 2: Wait a moment for trigger to create profile
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Step 3: Create shop
+                const { data: shop, error: shopError } = await supabaseClient
+                    .from('shops')
+                    .insert({
+                        name: shopName,
+                        email: email
+                    })
+                    .select()
+                    .single();
+
+                if (shopError) {
+                    console.error('Shop creation error:', shopError);
+                    throw new Error('Failed to create shop: ' + shopError.message);
+                }
+
+                status.innerHTML += '<br>✓ Shop created';
+
+                // Step 4: Update profile with shop ID
+                const { error: profileError } = await supabaseClient
+                    .from('profiles')
+                    .update({
+                        shop_id: shop.id,
+                        role: 'owner',
+                        first_name: ownerName.split(' ')[0],
+                        last_name: ownerName.split(' ').slice(1).join(' ') || ''
+                    })
+                    .eq('id', authData.user.id);
+
+                if (profileError) {
+                    console.error('Profile update error:', profileError);
+                    // Non-fatal, continue
+                }
+
+                // Step 5: Create shop settings
+                await supabaseClient
+                    .from('shop_settings')
+                    .insert({ shop_id: shop.id });
+
+                // Step 6: Create owner as barber
+                await supabaseClient
+                    .from('barbers')
+                    .insert({
+                        shop_id: shop.id,
+                        name: ownerName,
+                        is_owner: true,
+                        is_active: true
+                    });
+
+                status.className = 'status success';
+                status.innerHTML = '✅ Shop created successfully!<br>';
+                status.innerHTML += '🏪 Shop ID: ' + shop.id + '<br>';
+                status.innerHTML += '👤 User ID: ' + authData.user.id + '<br>';
+                status.innerHTML += '📧 Check your email to confirm your account';
+
+                // Save shop ID for testing
+                localStorage.setItem('supabase_shop_id', shop.id);
+
+                document.getElementById('test-section').style.display = 'block';
+                document.getElementById('migration-section').style.display = 'block';
+
+            } catch (error) {
+                console.error('Full error:', error);
+                status.className = 'status error';
+                status.innerHTML = '❌ Error: ' + error.message;
+
+                if (error.message.includes('already registered') || error.message.includes('already exists')) {
+                    status.innerHTML += '<br>Try signing in instead or use a different email.';
+                }
+                if (error.message.includes('Database error')) {
+                    status.innerHTML += '<br>Make sure you ran the fix-user-creation.sql script.';
+                }
+            } finally {
+                button.disabled = false;
+            }
+        });
+
+        // Test functions
+        async function testBarbers() {
+            const results = document.getElementById('test-results');
+            results.style.display = 'block';
+            results.innerHTML = 'Loading barbers...';
+
+            try {
+                const barbers = await SharedData.getBarbers();
+                results.innerHTML = 'Barbers:\n' + JSON.stringify(barbers, null, 2);
+            } catch (error) {
+                results.innerHTML = 'Error: ' + error.message;
+            }
+        }
+
+        async function testServices() {
+            const results = document.getElementById('test-results');
+            results.style.display = 'block';
+            results.innerHTML = 'Loading services...';
+
+            try {
+                const services = await SharedData.getServices();
+                results.innerHTML = 'Services:\n' + JSON.stringify(services, null, 2);
+            } catch (error) {
+                results.innerHTML = 'Error: ' + error.message;
+            }
+        }
+
+        async function testAppointment() {
+            const results = document.getElementById('test-results');
+            results.style.display = 'block';
+            results.innerHTML = 'Creating test appointment...';
+
+            try {
+                // Get first barber
+                const barbers = await SharedData.getBarbers();
+                if (barbers.length === 0) {
+                    throw new Error('No barbers found. Create a barber first.');
+                }
+
+                // Get first service
+                const services = await SharedData.getServices();
+                const serviceIds = Object.keys(services);
+                if (serviceIds.length === 0) {
+                    throw new Error('No services found. Create services first.');
+                }
+
+                const appointment = {
+                    barberId: barbers[0].id,
+                    customerName: 'Test Customer',
+                    customerPhone: '555-1234',
+                    customerEmail: 'test@example.com',
+                    services: [serviceIds[0]],
+                    date: new Date().toISOString().split('T')[0],
+                    time: '14:00',
+                    notes: 'Test appointment',
+                    totalPrice: services[serviceIds[0]].price
+                };
+
+                const result = await SharedData.addAppointment(appointment);
+                results.innerHTML = 'Appointment created:\n' + JSON.stringify(result, null, 2);
+            } catch (error) {
+                results.innerHTML = 'Error: ' + error.message;
+            }
+        }
+
+        function loadOwnerApp() {
+            // Open owner app in new tab
+            window.open('owner-app.html', '_blank');
+        }
+
+        async function checkLocalData() {
+            const results = document.getElementById('migration-results');
+            results.style.display = 'block';
+
+            const data = {
+                services: localStorage.getItem('services'),
+                barbers: localStorage.getItem('barbers'),
+                appointments: localStorage.getItem('appointments'),
+                storeHours: localStorage.getItem('storeHours'),
+                ownerProfile: localStorage.getItem('ownerProfile')
+            };
+
+            let summary = 'Local Storage Data:\n\n';
+            for (const [key, value] of Object.entries(data)) {
+                if (value) {
+                    try {
+                        const parsed = JSON.parse(value);
+                        const count = Array.isArray(parsed) ? parsed.length : Object.keys(parsed).length;
+                        summary += `${key}: ${count} items\n`;
+                    } catch {
+                        summary += `${key}: Present (not JSON)\n`;
+                    }
+                } else {
+                    summary += `${key}: Empty\n`;
+                }
+            }
+
+            results.innerHTML = summary;
+        }
+
+        async function migrateData() {
+            const results = document.getElementById('migration-results');
+            results.style.display = 'block';
+            results.innerHTML = 'Migration in progress...\n';
+
+            try {
+                // This would need proper implementation based on your needs
+                results.innerHTML += '\n⚠️ Migration requires being logged in with a shop created.\n';
+                results.innerHTML += 'Please create an account first, then run migration.';
+            } catch (error) {
+                results.innerHTML += '\nError: ' + error.message;
+            }
+        }
+
+        // Test connection on load
+        testConnection();
+    </script>
+</body>
+</html>

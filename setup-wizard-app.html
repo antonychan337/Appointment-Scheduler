@@ -1,0 +1,2123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup Wizard</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Configuration (must load before bridge) -->
+    <script src="supabase-config.js"></script>
+    <!-- Supabase Bridge -->
+    <script src="supabase-bridge.js"></script>
+    <!-- QR Code Library -->
+    <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+
+        .phone-container {
+            max-width: 375px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 30px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            height: 812px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #2C3E50;
+            color: white;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .lang-toggle {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid white;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .progress-container {
+            background: #2C3E50;
+            padding: 0 15px 15px;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            color: rgba(255,255,255,0.9);
+            font-size: 12px;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: white;
+            transition: width 0.3s ease;
+            width: 20%;
+        }
+
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .step {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .step.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .step h2 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 22px;
+        }
+
+        .step > p {
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: #2C3E50;
+            outline: none;
+        }
+
+        .language-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .lang-btn {
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            background: white;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .lang-btn:hover {
+            border-color: #2C3E50;
+            background: #f5f5f5;
+        }
+
+        .lang-btn.selected {
+            border-color: #2C3E50;
+            background: #2C3E50;
+            color: white;
+        }
+
+        .hours-grid {
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .day-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            gap: 10px;
+        }
+
+        .day-name {
+            width: 80px;
+            font-weight: 500;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .time-inputs {
+            display: flex;
+            gap: 5px;
+            flex: 1;
+            align-items: center;
+        }
+
+        .time-inputs input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            width: 80px;
+        }
+
+        .time-inputs span {
+            color: #666;
+            font-size: 12px;
+        }
+
+        .closed-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .closed-checkbox input {
+            width: auto;
+        }
+
+        .closed-checkbox label {
+            margin: 0;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .service-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .service-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .delete-service-btn {
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        .delete-service-btn:hover {
+            background: #cc0000;
+        }
+
+        .add-service-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 20px 0;
+            width: 100%;
+        }
+
+        .add-service-btn:hover {
+            background: #45a049;
+        }
+
+        .service-name-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .service-translation-input {
+            flex: 1;
+            padding: 6px 10px;
+            border: 1px solid #e8e8e8;
+            border-radius: 4px;
+            font-size: 13px;
+            font-style: italic;
+            margin-top: 8px;
+            background-color: #fafafa;
+        }
+
+        .translation-hint {
+            font-size: 11px;
+            color: #888;
+            margin-top: 4px;
+            margin-left: 2px;
+        }
+
+        .toggle-switch {
+            width: 50px;
+            height: 26px;
+            background: #ccc;
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: #4CAF50;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(24px);
+        }
+
+        .service-details {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .service-details input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .service-details input[type="number"] {
+            width: 80px;
+        }
+
+        .active-time-section {
+            background: #f0f8ff;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+
+        .active-time-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .active-time-toggle input {
+            width: auto;
+        }
+
+        .active-time-toggle label {
+            margin: 0;
+            font-size: 12px;
+            color: #4A90E2;
+        }
+
+        .active-time-container {
+            display: none;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+        }
+
+        .active-period-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .active-period-item input {
+            width: 50px;
+            padding: 4px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .active-period-item button {
+            padding: 2px 6px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .add-period-btn {
+            padding: 6px 12px;
+            background: #2C3E50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            margin-top: 5px;
+        }
+
+        .quick-fill-btn {
+            width: 100%;
+            padding: 10px;
+            background: #2C3E50;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .info-checkboxes {
+            display: grid;
+            gap: 12px;
+            margin-top: 15px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+
+        .info-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-checkbox input {
+            width: auto;
+        }
+
+        .info-checkbox label {
+            margin: 0;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .policy-card {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .policy-card label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .policy-card input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        .button-group {
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding: 15px 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #2C3E50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1a252f;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .success-screen {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: #4CAF50;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 30px;
+            font-size: 40px;
+            color: white;
+        }
+
+        .booking-url {
+            background: #f0f7ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 13px;
+            word-break: break-all;
+            color: #2C3E50;
+        }
+
+        .note-text {
+            font-size: 12px;
+            color: #888;
+            font-style: italic;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-container">
+        <!-- Header -->
+        <div class="header">
+            <h1 id="wizard-title">Setup Wizard</h1>
+            <button class="lang-toggle" id="lang-toggle-btn" onclick="toggleLanguage()" style="display: none;">中文</button>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-info">
+                <span id="progress-text">Step 1 of 5</span>
+                <span id="progress-percent">20%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress"></div>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="content">
+            <!-- Step 1: Language Selection -->
+            <div class="step active" id="step-1">
+                <h2>Choose Your Language</h2>
+                <p>Select your preferred language for the system</p>
+                <div class="language-buttons">
+                    <button class="lang-btn" onclick="selectLanguage('en', event)">English</button>
+                    <button class="lang-btn" onclick="selectLanguage('zh', event)">中文</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Business Profile -->
+            <div class="step" id="step-2">
+                <h2 id="profile-title">Business Information</h2>
+                <div class="form-group">
+                    <label id="store-name-label">Business Name *</label>
+                    <input type="text" id="store-name" placeholder="e.g., Premium Cuts">
+                </div>
+                <div class="form-group">
+                    <label id="store-address-label">Business Address *</label>
+                    <input type="text" id="store-address" placeholder="e.g., 123 Main St">
+                </div>
+                <div class="form-group">
+                    <label id="owner-name-label">Your Name *</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <input type="text" id="owner-first-name" placeholder="First">
+                        <input type="text" id="owner-last-name" placeholder="Last">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label id="phone-label">Phone Number</label>
+                    <input type="tel" id="phone" placeholder="(555) 123-4567">
+                </div>
+                <div class="form-group">
+                    <label id="email-label">Email</label>
+                    <input type="email" id="email" placeholder="email@example.com">
+                </div>
+                <div class="form-group">
+                    <label id="wechat-label">WeChat ID (Optional)</label>
+                    <input type="text" id="wechat" placeholder="WeChat ID">
+                </div>
+
+                <div class="info-checkboxes">
+                    <p style="margin-bottom: 10px; font-weight: 500;" id="show-on-booking-label">Show on customer booking page:</p>
+                    <div class="info-checkbox">
+                        <input type="checkbox" id="show-phone" checked>
+                        <label for="show-phone" id="show-phone-label">Phone</label>
+                    </div>
+                    <div class="info-checkbox">
+                        <input type="checkbox" id="show-email" checked>
+                        <label for="show-email" id="show-email-label">Email</label>
+                    </div>
+                    <div class="info-checkbox">
+                        <input type="checkbox" id="show-address" checked>
+                        <label for="show-address" id="show-address-label">Address</label>
+                    </div>
+                    <div class="info-checkbox">
+                        <input type="checkbox" id="show-wechat">
+                        <label for="show-wechat" id="show-wechat-label">WeChat</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Business Hours -->
+            <div class="step" id="step-3">
+                <h2 id="hours-title">Business Hours</h2>
+                <p id="hours-subtitle">Set your regular business hours</p>
+
+                <button class="quick-fill-btn" id="quick-fill-btn" onclick="quickFillHours()">
+                    Apply Monday's hours to all days
+                </button>
+
+                <div class="hours-grid">
+                    <!-- Monday -->
+                    <div class="day-row">
+                        <div class="day-name" id="monday-label">Monday</div>
+                        <div class="time-inputs">
+                            <input type="time" id="monday-open" value="09:00">
+                            <span>–</span>
+                            <input type="time" id="monday-close" value="18:00">
+                        </div>
+                        <div class="closed-checkbox">
+                            <input type="checkbox" id="monday-closed">
+                            <label for="monday-closed" id="closed-label-1">Closed</label>
+                        </div>
+                    </div>
+
+                    <!-- Tuesday -->
+                    <div class="day-row">
+                        <div class="day-name" id="tuesday-label">Tuesday</div>
+                        <div class="time-inputs">
+                            <input type="time" id="tuesday-open" value="09:00">
+                            <span>–</span>
+                            <input type="time" id="tuesday-close" value="18:00">
+                        </div>
+                        <div class="closed-checkbox">
+                            <input type="checkbox" id="tuesday-closed">
+                            <label for="tuesday-closed" id="closed-label-2">Closed</label>
+                        </div>
+                    </div>
+
+                    <!-- Wednesday -->
+                    <div class="day-row">
+                        <div class="day-name" id="wednesday-label">Wednesday</div>
+                        <div class="time-inputs">
+                            <input type="time" id="wednesday-open" value="09:00">
+                            <span>–</span>
+                            <input type="time" id="wednesday-close" value="18:00">
+                        </div>
+                        <div class="closed-checkbox">
+                            <input type="checkbox" id="wednesday-closed">
+                            <label for="wednesday-closed" id="closed-label-3">Closed</label>
+                        </div>
+                    </div>
+
+                    <!-- Thursday -->
+                    <div class="day-row">
+                        <div class="day-name" id="thursday-label">Thursday</div>
+                        <div class="time-inputs">
+                            <input type="time" id="thursday-open" value="09:00">
+                            <span>–</span>
+                            <input type="time" id="thursday-close" value="18:00">
+                        </div>
+                        <div class="closed-checkbox">
+                            <input type="checkbox" id="thursday-closed">
+                            <label for="thursday-closed" id="closed-label-4">Closed</label>
+                        </div>
+                    </div>
+
+                    <!-- Friday -->
+                    <div class="day-row">
+                        <div class="day-name" id="friday-label">Friday</div>
+                        <div class="time-inputs">
+                            <input type="time" id="friday-open" value="09:00">
+                            <span>–</span>
+                            <input type="time" id="friday-close" value="18:00">
+                        </div>
+                        <div class="closed-checkbox">
+                            <input type="checkbox" id="friday-closed">
+                            <label for="friday-closed" id="closed-label-5">Closed</label>
+                        </div>
+                    </div>
+
+                    <!-- Saturday -->
+                    <div class="day-row">
+                        <div class="day-name" id="saturday-label">Saturday</div>
+                        <div class="time-inputs">
+                            <input type="time" id="saturday-open" value="10:00">
+                            <span>–</span>
+                            <input type="time" id="saturday-close" value="16:00">
+                        </div>
+                        <div class="closed-checkbox">
+                            <input type="checkbox" id="saturday-closed">
+                            <label for="saturday-closed" id="closed-label-6">Closed</label>
+                        </div>
+                    </div>
+
+                    <!-- Sunday -->
+                    <div class="day-row">
+                        <div class="day-name" id="sunday-label">Sunday</div>
+                        <div class="time-inputs">
+                            <input type="time" id="sunday-open" value="10:00">
+                            <span>–</span>
+                            <input type="time" id="sunday-close" value="16:00">
+                        </div>
+                        <div class="closed-checkbox">
+                            <input type="checkbox" id="sunday-closed" checked>
+                            <label for="sunday-closed" id="closed-label-7">Closed</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4: Services -->
+            <div class="step" id="step-4">
+                <h2 id="services-title">Services Offered</h2>
+                <p id="services-subtitle">Configure your service menu</p>
+
+                <!-- Men's Cut -->
+                <div class="service-card" data-service="mens-cut">
+                    <div class="service-header">
+                        <input type="text" class="service-name-input" id="service-mens-cut"
+                               value="Men's Cut"
+                               data-name-en="Men's Cut"
+                               data-name-zh="男士理发">
+                        <button class="delete-service-btn" onclick="deleteService('mens-cut')">Delete</button>
+                    </div>
+                    <input type="text" class="service-translation-input"
+                           id="translation-mens-cut"
+                           placeholder="Chinese name (optional)"
+                           value="男士理发"
+                           data-lang="zh">
+                    <div class="translation-hint">Provide translation for multi-language support</div>
+                    <div class="service-details">
+                        <input type="number" id="duration-mens-cut" value="30" min="5" max="480" onchange="validatePeriods('mens-cut')">
+                        <span style="font-size: 14px; color: #666;">min</span>
+                        <span style="color: #666;">•</span>
+                        <span style="font-size: 14px; color: #666;">$</span>
+                        <input type="number" id="price-mens-cut" value="25" min="0" step="0.01">
+                    </div>
+                    <div class="active-time-toggle">
+                        <input type="checkbox" id="toggle-active-mens-cut" onchange="toggleActiveTime('mens-cut')">
+                        <label for="toggle-active-mens-cut">Has active time periods</label>
+                    </div>
+                    <div class="active-time-container" id="active-container-mens-cut">
+                        <div class="active-periods-list" id="periods-mens-cut"></div>
+                        <button class="add-period-btn" onclick="addPeriodToService('mens-cut')">Add period</button>
+                    </div>
+                </div>
+
+                <!-- Women's Cut -->
+                <div class="service-card" data-service="womens-cut">
+                    <div class="service-header">
+                        <input type="text" class="service-name-input" id="service-womens-cut"
+                               value="Women's Cut"
+                               data-name-en="Women's Cut"
+                               data-name-zh="女士理发">
+                        <button class="delete-service-btn" onclick="deleteService('womens-cut')">Delete</button>
+                    </div>
+                    <input type="text" class="service-translation-input"
+                           id="translation-womens-cut"
+                           placeholder="Chinese name (optional)"
+                           value="女士理发"
+                           data-lang="zh">
+                    <div class="translation-hint">Provide translation for multi-language support</div>
+                    <div class="service-details">
+                        <input type="number" id="duration-womens-cut" value="45" min="5" max="480" onchange="validatePeriods('womens-cut')">
+                        <span style="font-size: 14px; color: #666;">min</span>
+                        <span style="color: #666;">•</span>
+                        <span style="font-size: 14px; color: #666;">$</span>
+                        <input type="number" id="price-womens-cut" value="35" min="0" step="0.01">
+                    </div>
+                    <div class="active-time-toggle">
+                        <input type="checkbox" id="toggle-active-womens-cut" onchange="toggleActiveTime('womens-cut')">
+                        <label for="toggle-active-womens-cut">Has active time periods</label>
+                    </div>
+                    <div class="active-time-container" id="active-container-womens-cut">
+                        <div class="active-periods-list" id="periods-womens-cut"></div>
+                        <button class="add-period-btn" onclick="addPeriodToService('womens-cut')">Add period</button>
+                    </div>
+                </div>
+
+                <!-- Children's Cut -->
+                <div class="service-card" data-service="kids-cut">
+                    <div class="service-header">
+                        <input type="text" class="service-name-input" id="service-kids-cut"
+                               value="Children's Cut"
+                               data-name-en="Children's Cut"
+                               data-name-zh="儿童理发">
+                        <button class="delete-service-btn" onclick="deleteService('kids-cut')">Delete</button>
+                    </div>
+                    <input type="text" class="service-translation-input"
+                           id="translation-kids-cut"
+                           placeholder="Chinese name (optional)"
+                           value="儿童理发"
+                           data-lang="zh">
+                    <div class="translation-hint">Provide translation for multi-language support</div>
+                    <div class="service-details">
+                        <input type="number" id="duration-kids-cut" value="15" min="5" max="480" onchange="validatePeriods('kids-cut')">
+                        <span style="font-size: 14px; color: #666;">min</span>
+                        <span style="color: #666;">•</span>
+                        <span style="font-size: 14px; color: #666;">$</span>
+                        <input type="number" id="price-kids-cut" value="15" min="0" step="0.01">
+                    </div>
+                    <div class="active-time-toggle">
+                        <input type="checkbox" id="toggle-active-kids-cut" onchange="toggleActiveTime('kids-cut')">
+                        <label for="toggle-active-kids-cut">Has active time periods</label>
+                    </div>
+                    <div class="active-time-container" id="active-container-kids-cut">
+                        <div class="active-periods-list" id="periods-kids-cut"></div>
+                        <button class="add-period-btn" onclick="addPeriodToService('kids-cut')">Add period</button>
+                    </div>
+                </div>
+
+                <!-- Hair Coloring -->
+                <div class="service-card" data-service="coloring">
+                    <div class="service-header">
+                        <input type="text" class="service-name-input" id="service-coloring"
+                               value="Hair Coloring"
+                               data-name-en="Hair Coloring"
+                               data-name-zh="染发">
+                        <button class="delete-service-btn" onclick="deleteService('coloring')">Delete</button>
+                    </div>
+                    <input type="text" class="service-translation-input"
+                           id="translation-coloring"
+                           placeholder="Chinese name (optional)"
+                           value="染发"
+                           data-lang="zh">
+                    <div class="translation-hint">Provide translation for multi-language support</div>
+                    <div class="service-details">
+                        <input type="number" id="duration-coloring" value="90" min="5" max="480" onchange="validatePeriods('coloring')">
+                        <span style="font-size: 14px; color: #666;">min</span>
+                        <span style="color: #666;">•</span>
+                        <span style="font-size: 14px; color: #666;">$</span>
+                        <input type="number" id="price-coloring" value="80" min="0" step="0.01">
+                    </div>
+                    <div class="active-time-toggle">
+                        <input type="checkbox" id="toggle-active-coloring" checked onchange="toggleActiveTime('coloring')">
+                        <label for="toggle-active-coloring">Has active time periods</label>
+                    </div>
+                    <div class="active-time-container" id="active-container-coloring" style="display: block;">
+                        <div class="active-periods-list" id="periods-coloring">
+                            <div class="active-period-item">
+                                <span style="color: #4A90E2;">Period 1:</span>
+                                <input type="number" class="period-start" value="0" min="0" max="90" onchange="validatePeriods('coloring')">
+                                <span style="color: #4A90E2;">to</span>
+                                <input type="number" class="period-end" value="30" min="0" max="90" onchange="validatePeriods('coloring')">
+                                <span style="color: #4A90E2;">min</span>
+                                <button onclick="removePeriodFromService(this, 'coloring')">×</button>
+                            </div>
+                            <div class="active-period-item">
+                                <span style="color: #4A90E2;">Period 2:</span>
+                                <input type="number" class="period-start" value="60" min="0" max="90" onchange="validatePeriods('coloring')">
+                                <span style="color: #4A90E2;">to</span>
+                                <input type="number" class="period-end" value="90" min="0" max="90" onchange="validatePeriods('coloring')">
+                                <span style="color: #4A90E2;">min</span>
+                                <button onclick="removePeriodFromService(this, 'coloring')">×</button>
+                            </div>
+                        </div>
+                        <button class="add-period-btn" onclick="addPeriodToService('coloring')">Add period</button>
+                    </div>
+                </div>
+
+                <!-- Highlights -->
+                <div class="service-card" data-service="highlights">
+                    <div class="service-header">
+                        <input type="text" class="service-name-input" id="service-highlights"
+                               value="Highlights"
+                               data-name-en="Highlights"
+                               data-name-zh="挑染">
+                        <button class="delete-service-btn" onclick="deleteService('highlights')">Delete</button>
+                    </div>
+                    <input type="text" class="service-translation-input"
+                           id="translation-highlights"
+                           placeholder="Chinese name (optional)"
+                           value="挑染"
+                           data-lang="zh">
+                    <div class="translation-hint">Provide translation for multi-language support</div>
+                    <div class="service-details">
+                        <input type="number" id="duration-highlights" value="120" min="5" max="480" onchange="validatePeriods('highlights')">
+                        <span style="font-size: 14px; color: #666;">min</span>
+                        <span style="color: #666;">•</span>
+                        <span style="font-size: 14px; color: #666;">$</span>
+                        <input type="number" id="price-highlights" value="120" min="0" step="0.01">
+                    </div>
+                    <div class="active-time-toggle">
+                        <input type="checkbox" id="toggle-active-highlights" checked onchange="toggleActiveTime('highlights')">
+                        <label for="toggle-active-highlights">Has active time periods</label>
+                    </div>
+                    <div class="active-time-container" id="active-container-highlights" style="display: block;">
+                        <div class="active-periods-list" id="periods-highlights">
+                            <div class="active-period-item">
+                                <span style="color: #4A90E2;">Period 1:</span>
+                                <input type="number" class="period-start" value="0" min="0" max="120" onchange="validatePeriods('highlights')">
+                                <span style="color: #4A90E2;">to</span>
+                                <input type="number" class="period-end" value="45" min="0" max="120" onchange="validatePeriods('highlights')">
+                                <span style="color: #4A90E2;">min</span>
+                                <button onclick="removePeriodFromService(this, 'highlights')">×</button>
+                            </div>
+                            <div class="active-period-item">
+                                <span style="color: #4A90E2;">Period 2:</span>
+                                <input type="number" class="period-start" value="75" min="0" max="120" onchange="validatePeriods('highlights')">
+                                <span style="color: #4A90E2;">to</span>
+                                <input type="number" class="period-end" value="120" min="0" max="120" onchange="validatePeriods('highlights')">
+                                <span style="color: #4A90E2;">min</span>
+                                <button onclick="removePeriodFromService(this, 'highlights')">×</button>
+                            </div>
+                        </div>
+                        <button class="add-period-btn" onclick="addPeriodToService('highlights')">Add period</button>
+                    </div>
+                </div>
+
+                <button class="add-service-btn" onclick="addNewService()">Add New Service</button>
+
+                <p class="note-text" id="services-note">You can add more services later in the Staff tab</p>
+            </div>
+
+            <!-- Step 5: Booking Policies -->
+            <div class="step" id="step-5">
+                <h2 id="policies-title">Booking Policies</h2>
+                <p id="policies-subtitle">Set your booking and cancellation rules</p>
+
+                <div class="policy-card">
+                    <label id="min-booking-label">Minimum booking notice (hours)</label>
+                    <input type="number" id="min-booking" value="2" min="0" max="168">
+                </div>
+
+                <div class="policy-card">
+                    <label id="min-cancel-label">Minimum cancellation notice (hours)</label>
+                    <input type="number" id="min-cancel" value="4" min="0" max="168">
+                </div>
+
+                <div class="policy-card">
+                    <label id="max-advance-label">Maximum advance booking (days)</label>
+                    <input type="number" id="max-advance" value="30" min="1" max="365">
+                </div>
+
+                <p class="note-text" id="policies-note">You can change these settings anytime in Settings > Policies</p>
+            </div>
+
+            <!-- Success Screen -->
+            <div class="step" id="step-success">
+                <div class="success-screen">
+                    <div class="success-icon">✓</div>
+                    <h2 id="success-title">Setup Complete!</h2>
+                    <p id="success-subtitle">Share this link with your customers:</p>
+                    <div class="booking-url" id="booking-url">https://yourdomain.com/book/</div>
+
+                    <!-- QR Code Section -->
+                    <div style="margin: 20px 0; text-align: center;">
+                        <p style="font-size: 14px; color: #666; margin-bottom: 10px;" id="qr-label">Scan or share this QR code:</p>
+                        <div style="background: white; padding: 15px; border-radius: 10px; display: inline-block; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                            <canvas id="qr-code-canvas"></canvas>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <button class="btn btn-secondary" onclick="downloadQRCode()" style="font-size: 14px; padding: 8px 15px;">
+                                <span id="download-qr-btn">Download QR Code</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" id="copy-btn" onclick="copyUrl()">Copy Link</button>
+                    <button class="btn btn-primary" id="dashboard-btn" onclick="goToDashboard()">Go to Dashboard</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Buttons -->
+        <div class="button-group" id="nav-buttons">
+            <button class="btn btn-secondary" onclick="previousStep()" id="back-btn">Back</button>
+            <button class="btn btn-primary" onclick="nextStep()" id="continue-btn">Continue</button>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 1;
+        let totalSteps = 5;
+        let selectedLang = 'en';
+        let setupServices = {};
+
+        const translations = {
+            en: {
+                wizardTitle: "Setup Your Appointment System",
+                progressText: (step, total) => `Step ${step} of ${total}`,
+                langTitle: "Choose Language",
+                langSubtitle: "Select your preferred language for the system",
+                profileTitle: "Business Information",
+                storeNameLabel: "Business Name *",
+                storeAddressLabel: "Business Address *",
+                ownerNameLabel: "Your Name *",
+                phoneLabel: "Phone Number",
+                emailLabel: "Email",
+                wechatLabel: "WeChat ID (Optional)",
+                showOnBookingLabel: "Show on customer booking page:",
+                hoursTitle: "Business Hours",
+                hoursSubtitle: "Set your regular business hours",
+                days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+                closedLabel: "Closed",
+                quickFillBtn: "Apply Monday's hours to all days",
+                servicesTitle: "Services Offered",
+                servicesSubtitle: "Configure your service menu",
+                servicesNote: "You can add more services later in the Staff tab",
+                mensCutName: "Men's Cut",
+                womensCutName: "Women's Cut",
+                kidsCutName: "Children's Cut",
+                coloringName: "Hair Coloring",
+                highlightsName: "Highlights",
+                minLabel: "min",
+                hasActivePeriodsLabel: "Has active time periods",
+                deleteBtn: "Delete",
+                periodLabel: "Period",
+                toLabel: "to",
+                addPeriodBtn: "Add period",
+                addNewServiceBtn: "Add New Service",
+                translationPlaceholder: "Chinese name (optional)",
+                translationHint: "Provide translation for multi-language support",
+                periodValidationError: "Please fix validation errors in active time periods before proceeding",
+                policiesTitle: "Booking Policies",
+                policiesSubtitle: "Set your booking and cancellation rules",
+                minBookingLabel: "Minimum booking notice (hours)",
+                minCancelLabel: "Minimum cancellation notice (hours)",
+                maxAdvanceLabel: "Maximum advance booking (days)",
+                policiesNote: "You can change these settings anytime in Settings > Policies",
+                backBtn: "Back",
+                continueBtn: "Continue",
+                completeBtn: "Complete Setup",
+                successTitle: "Setup Complete!",
+                successSubtitle: "Share this link with your customers:",
+                qrLabel: "Scan or share this QR code:",
+                downloadQRBtn: "Download QR Code",
+                copyBtn: "Copy Link",
+                dashboardBtn: "Go to Dashboard"
+            },
+            zh: {
+                wizardTitle: "设置您的预约系统",
+                progressText: (step, total) => `第 ${step} 步，共 ${total} 步`,
+                langTitle: "选择语言",
+                langSubtitle: "选择系统的首选语言",
+                profileTitle: "商家信息",
+                storeNameLabel: "商家名称 *",
+                storeAddressLabel: "商家地址 *",
+                ownerNameLabel: "您的姓名 *",
+                phoneLabel: "电话号码",
+                emailLabel: "电子邮箱",
+                wechatLabel: "微信ID（可选）",
+                showOnBookingLabel: "在客户预约页面显示：",
+                hoursTitle: "营业时间",
+                hoursSubtitle: "设置您的常规营业时间",
+                days: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+                closedLabel: "休息",
+                quickFillBtn: "将周一的时间应用到所有天",
+                servicesTitle: "服务项目",
+                servicesSubtitle: "配置您的服务菜单",
+                servicesNote: "您可以稍后在员工标签中添加更多服务",
+                mensCutName: "男士理发",
+                womensCutName: "女士理发",
+                kidsCutName: "儿童理发",
+                coloringName: "染发",
+                highlightsName: "挑染",
+                minLabel: "分钟",
+                hasActivePeriodsLabel: "有活动时间段",
+                deleteBtn: "删除",
+                periodLabel: "时段",
+                toLabel: "到",
+                addPeriodBtn: "添加时段",
+                addNewServiceBtn: "添加新服务",
+                translationPlaceholder: "英文名称（可选）",
+                translationHint: "提供翻译以支持多语言",
+                periodValidationError: "请在继续之前修正活动时间段的验证错误",
+                policiesTitle: "预约政策",
+                policiesSubtitle: "设置您的预约和取消规则",
+                minBookingLabel: "最短预约通知时间（小时）",
+                minCancelLabel: "最短取消通知时间（小时）",
+                maxAdvanceLabel: "最长提前预约时间（天）",
+                policiesNote: "您可以随时在 设置 > 政策 中更改这些设置",
+                backBtn: "返回",
+                continueBtn: "继续",
+                completeBtn: "完成设置",
+                successTitle: "设置完成！",
+                successSubtitle: "与您的客户分享此链接：",
+                qrLabel: "扫描或分享此二维码：",
+                downloadQRBtn: "下载二维码",
+                copyBtn: "复制链接",
+                dashboardBtn: "进入控制台"
+            }
+        };
+
+        function selectLanguage(lang, event) {
+            selectedLang = lang;
+            SharedData.setPreferredLanguage(lang);
+
+            // Update button styles
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            if (event && event.target) {
+                event.target.classList.add('selected');
+            }
+
+            // Update all text
+            updateLanguage();
+
+            // Show language toggle in header
+            document.getElementById('lang-toggle-btn').style.display = 'block';
+
+            // Advance to next step after a brief delay
+            setTimeout(() => {
+                nextStep();
+            }, 300);
+        }
+
+        function toggleLanguage() {
+            selectedLang = selectedLang === 'en' ? 'zh' : 'en';
+            SharedData.setPreferredLanguage(selectedLang);
+            updateLanguage();
+        }
+
+        function updateLanguage() {
+            const t = translations[selectedLang];
+
+            // Update header
+            document.getElementById('wizard-title').textContent = t.wizardTitle;
+            document.getElementById('lang-toggle-btn').textContent = selectedLang === 'en' ? '中文' : 'EN';
+
+            // Update progress text
+            document.getElementById('progress-text').textContent = t.progressText(currentStep, totalSteps);
+
+            // Update step 2
+            document.getElementById('profile-title').textContent = t.profileTitle;
+            document.getElementById('store-name-label').textContent = t.storeNameLabel;
+            document.getElementById('store-address-label').textContent = t.storeAddressLabel;
+            document.getElementById('owner-name-label').textContent = t.ownerNameLabel;
+            document.getElementById('phone-label').textContent = t.phoneLabel;
+            document.getElementById('email-label').textContent = t.emailLabel;
+            document.getElementById('wechat-label').textContent = t.wechatLabel;
+            document.getElementById('show-on-booking-label').textContent = t.showOnBookingLabel;
+            document.getElementById('show-phone-label').textContent = t.phoneLabel.replace(':', '');
+            document.getElementById('show-email-label').textContent = t.emailLabel.replace(':', '');
+            document.getElementById('show-address-label').textContent = t.storeAddressLabel.replace(' *', '');
+            document.getElementById('show-wechat-label').textContent = t.wechatLabel.replace(' (Optional)', '').replace('（可选）', '');
+
+            // Update step 3
+            document.getElementById('hours-title').textContent = t.hoursTitle;
+            document.getElementById('hours-subtitle').textContent = t.hoursSubtitle;
+            document.getElementById('quick-fill-btn').textContent = t.quickFillBtn;
+
+            // Update day labels
+            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+            days.forEach((day, i) => {
+                const label = document.getElementById(`${day}-label`);
+                if (label) label.textContent = t.days[i];
+            });
+
+            // Update closed labels
+            for (let i = 1; i <= 7; i++) {
+                const label = document.getElementById(`closed-label-${i}`);
+                if (label) label.textContent = t.closedLabel;
+            }
+
+            // Update step 4
+            document.getElementById('services-title').textContent = t.servicesTitle;
+            document.getElementById('services-subtitle').textContent = t.servicesSubtitle;
+            document.getElementById('services-note').textContent = t.servicesNote;
+
+            // Update service names for default services with translation support
+            const defaultServiceIds = ['mens-cut', 'womens-cut', 'kids-cut', 'coloring', 'highlights'];
+            defaultServiceIds.forEach(serviceId => {
+                const nameInput = document.getElementById(`service-${serviceId}`);
+                const translationInput = document.getElementById(`translation-${serviceId}`);
+
+                if (nameInput && translationInput) {
+                    // Get stored translations
+                    let enName = nameInput.getAttribute('data-name-en') || '';
+                    let zhName = nameInput.getAttribute('data-name-zh') || '';
+
+                    // If no custom translations, use defaults
+                    if (!enName && serviceId === 'mens-cut') enName = 'Men\'s Cut';
+                    if (!zhName && serviceId === 'mens-cut') zhName = '男士理发';
+                    if (!enName && serviceId === 'womens-cut') enName = 'Women\'s Cut';
+                    if (!zhName && serviceId === 'womens-cut') zhName = '女士理发';
+                    if (!enName && serviceId === 'kids-cut') enName = 'Children\'s Cut';
+                    if (!zhName && serviceId === 'kids-cut') zhName = '儿童理发';
+                    if (!enName && serviceId === 'coloring') enName = 'Hair Coloring';
+                    if (!zhName && serviceId === 'coloring') zhName = '染发';
+                    if (!enName && serviceId === 'highlights') enName = 'Highlights';
+                    if (!zhName && serviceId === 'highlights') zhName = '挑染';
+
+                    if (selectedLang === 'en') {
+                        nameInput.value = enName;
+                        nameInput.style.fontStyle = 'normal';
+                        translationInput.placeholder = t.translationPlaceholder;
+                        translationInput.setAttribute('data-lang', 'zh');
+                        translationInput.value = zhName || '';
+                    } else {
+                        nameInput.value = zhName;
+                        nameInput.style.fontStyle = 'normal';
+                        translationInput.placeholder = t.translationPlaceholder;
+                        translationInput.setAttribute('data-lang', 'en');
+                        translationInput.value = enName || '';
+                    }
+                }
+            });
+
+            // Update all service-related labels
+            document.querySelectorAll('.service-card span').forEach(span => {
+                if (span.textContent === 'min' || span.textContent === '分钟') {
+                    span.textContent = t.minLabel;
+                }
+                if (span.textContent === 'to' || span.textContent === '到') {
+                    span.textContent = t.toLabel;
+                }
+            });
+
+            // Update delete buttons
+            document.querySelectorAll('.delete-service-btn').forEach(btn => {
+                btn.textContent = t.deleteBtn;
+            });
+
+            // Update active time labels
+            document.querySelectorAll('.active-time-toggle label').forEach(label => {
+                label.textContent = t.hasActivePeriodsLabel;
+            });
+
+            // Update period labels
+            document.querySelectorAll('.active-period-item > span:first-child').forEach(span => {
+                const match = span.textContent.match(/\d+/);
+                if (match) {
+                    span.textContent = `${t.periodLabel} ${match[0]}:`;
+                }
+            });
+
+            // Update add period buttons
+            document.querySelectorAll('.add-period-btn').forEach(btn => {
+                btn.textContent = t.addPeriodBtn;
+            });
+
+            // Update add new service button
+            const addServiceBtn = document.querySelector('.add-service-btn');
+            if (addServiceBtn) {
+                addServiceBtn.textContent = t.addNewServiceBtn;
+            }
+
+            // Handle custom services translations
+            document.querySelectorAll('.service-card').forEach(card => {
+                const serviceId = card.dataset.service;
+                // Skip default services (they're already handled above)
+                if (serviceId.startsWith('custom-service-')) {
+                    const nameInput = document.getElementById(`service-${serviceId}`);
+                    const translationInput = document.getElementById(`translation-${serviceId}`);
+
+                    if (nameInput && translationInput) {
+                        // Get stored translations
+                        const enName = nameInput.getAttribute('data-name-en') || '';
+                        const zhName = nameInput.getAttribute('data-name-zh') || '';
+
+                        if (selectedLang === 'en') {
+                            // Switch to English
+                            if (enName) {
+                                nameInput.value = enName;
+                                nameInput.style.fontStyle = 'normal';
+                            } else if (zhName && !enName) {
+                                // Keep Chinese name if no English translation
+                                nameInput.value = zhName;
+                                nameInput.style.fontStyle = 'italic'; // Visual indicator
+                            }
+                            translationInput.placeholder = t.translationPlaceholder;
+                            translationInput.setAttribute('data-lang', 'zh');
+                            translationInput.value = zhName || '';
+                        } else {
+                            // Switch to Chinese
+                            if (zhName) {
+                                nameInput.value = zhName;
+                                nameInput.style.fontStyle = 'normal';
+                            } else if (enName && !zhName) {
+                                // Keep English name if no Chinese translation
+                                nameInput.value = enName;
+                                nameInput.style.fontStyle = 'italic'; // Visual indicator
+                            }
+                            translationInput.placeholder = t.translationPlaceholder;
+                            translationInput.setAttribute('data-lang', 'en');
+                            translationInput.value = enName || '';
+                        }
+                    }
+                }
+            });
+
+            // Update translation hints
+            document.querySelectorAll('.translation-hint').forEach(hint => {
+                hint.textContent = t.translationHint;
+            });
+
+            // Update step 5
+            document.getElementById('policies-title').textContent = t.policiesTitle;
+            document.getElementById('policies-subtitle').textContent = t.policiesSubtitle;
+            document.getElementById('min-booking-label').textContent = t.minBookingLabel;
+            document.getElementById('min-cancel-label').textContent = t.minCancelLabel;
+            document.getElementById('max-advance-label').textContent = t.maxAdvanceLabel;
+            document.getElementById('policies-note').textContent = t.policiesNote;
+
+            // Update success screen
+            document.getElementById('success-title').textContent = t.successTitle;
+            document.getElementById('success-subtitle').textContent = t.successSubtitle;
+            document.getElementById('qr-label').textContent = t.qrLabel;
+            document.getElementById('download-qr-btn').textContent = t.downloadQRBtn;
+            document.getElementById('copy-btn').textContent = t.copyBtn;
+            document.getElementById('dashboard-btn').textContent = t.dashboardBtn;
+
+            // Update navigation buttons
+            document.getElementById('back-btn').textContent = t.backBtn;
+            const continueBtn = document.getElementById('continue-btn');
+            if (currentStep === totalSteps) {
+                continueBtn.textContent = t.completeBtn;
+            } else {
+                continueBtn.textContent = t.continueBtn;
+            }
+        }
+
+        function nextStep() {
+            if (currentStep === 5) {
+                // Complete setup
+                completeSetup();
+            } else if (currentStep < totalSteps) {
+                // Validate current step
+                if (!validateStep(currentStep)) {
+                    return;
+                }
+
+                document.getElementById(`step-${currentStep}`).classList.remove('active');
+                currentStep++;
+                document.getElementById(`step-${currentStep}`).classList.add('active');
+                updateProgress();
+                updateNavigationButtons();
+            }
+        }
+
+        function previousStep() {
+            if (currentStep > 1) {
+                document.getElementById(`step-${currentStep}`).classList.remove('active');
+                currentStep--;
+                document.getElementById(`step-${currentStep}`).classList.add('active');
+                updateProgress();
+                updateNavigationButtons();
+            }
+        }
+
+        function updateProgress() {
+            const progress = (currentStep / totalSteps) * 100;
+            document.getElementById('progress').style.width = progress + '%';
+            document.getElementById('progress-percent').textContent = Math.round(progress) + '%';
+
+            const t = translations[selectedLang];
+            document.getElementById('progress-text').textContent = t.progressText(currentStep, totalSteps);
+        }
+
+        function updateNavigationButtons() {
+            const backBtn = document.getElementById('back-btn');
+            const continueBtn = document.getElementById('continue-btn');
+            const navButtons = document.getElementById('nav-buttons');
+            const t = translations[selectedLang];
+
+            // Hide nav for success screen
+            if (document.getElementById('step-success').classList.contains('active')) {
+                navButtons.style.display = 'none';
+            } else {
+                navButtons.style.display = 'flex';
+            }
+
+            // Hide back button on first step
+            backBtn.style.display = currentStep === 1 ? 'none' : 'block';
+
+            // Update continue button text
+            if (currentStep === totalSteps) {
+                continueBtn.textContent = t.completeBtn;
+            } else {
+                continueBtn.textContent = t.continueBtn;
+            }
+        }
+
+        function validateStep(step) {
+            if (step === 2) {
+                // Validate business profile
+                const storeName = document.getElementById('store-name').value.trim();
+                const storeAddress = document.getElementById('store-address').value.trim();
+                const firstName = document.getElementById('owner-first-name').value.trim();
+                const lastName = document.getElementById('owner-last-name').value.trim();
+
+                if (!storeName || !storeAddress || !firstName || !lastName) {
+                    alert(selectedLang === 'zh' ? '请填写所有必填字段' : 'Please fill in all required fields');
+                    return false;
+                }
+            }
+
+            if (step === 3) {
+                // Validate store hours
+                const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                for (let day of days) {
+                    const closed = document.getElementById(`${day}-closed`).checked;
+                    if (!closed) {
+                        const openTime = document.getElementById(`${day}-open`).value;
+                        const closeTime = document.getElementById(`${day}-close`).value;
+
+                        if (!openTime || !closeTime) {
+                            alert(selectedLang === 'zh' ?
+                                `请为${day}设置营业时间` :
+                                `Please set hours for ${day}`);
+                            return false;
+                        }
+
+                        if (openTime >= closeTime) {
+                            alert(selectedLang === 'zh' ?
+                                `${day}的关闭时间必须晚于开放时间` :
+                                `Closing time must be after opening time for ${day}`);
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            if (step === 4) {
+                // Validate services with active time periods
+                const t = translations[selectedLang];
+                const serviceCards = document.querySelectorAll('.service-card');
+
+                for (let card of serviceCards) {
+                    const serviceId = card.dataset.service;
+                    const checkbox = document.getElementById(`toggle-active-${serviceId}`);
+
+                    // Only validate if active periods are enabled
+                    if (checkbox && checkbox.checked) {
+                        const serviceName = document.getElementById(`service-${serviceId}`).value;
+                        const isValid = validatePeriods(serviceId);
+
+                        if (!isValid) {
+                            alert(`${serviceName}: ${t.periodValidationError}`);
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        function quickFillHours() {
+            const mondayOpen = document.getElementById('monday-open').value;
+            const mondayClose = document.getElementById('monday-close').value;
+            const mondayClosed = document.getElementById('monday-closed').checked;
+
+            const allDays = ['tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+            allDays.forEach(day => {
+                document.getElementById(`${day}-open`).value = mondayOpen;
+                document.getElementById(`${day}-close`).value = mondayClose;
+                document.getElementById(`${day}-closed`).checked = mondayClosed;
+            });
+        }
+
+        function toggleActiveTime(serviceId) {
+            const checkbox = document.getElementById(`toggle-active-${serviceId}`);
+            const container = document.getElementById(`active-container-${serviceId}`);
+            const t = translations[selectedLang];
+
+            if (checkbox.checked) {
+                container.style.display = 'block';
+                // If no periods exist, add a default one
+                const periodsList = document.getElementById(`periods-${serviceId}`);
+                if (!periodsList || periodsList.children.length === 0) {
+                    const duration = parseInt(document.getElementById(`duration-${serviceId}`).value) || 30;
+                    periodsList.innerHTML = `
+                        <div class="active-period-item">
+                            <span style="color: #4A90E2;">${t.periodLabel} 1:</span>
+                            <input type="number" class="period-start" value="0" min="0" max="${duration}">
+                            <span style="color: #4A90E2;">${t.toLabel}</span>
+                            <input type="number" class="period-end" value="${Math.min(duration, 15)}" min="0" max="${duration}">
+                            <span style="color: #4A90E2;">${t.minLabel}</span>
+                            <button onclick="removePeriodFromService(this, '${serviceId}')">×</button>
+                        </div>
+                    `;
+                }
+            } else {
+                container.style.display = 'none';
+            }
+        }
+
+        function addPeriodToService(serviceId) {
+            const periodsList = document.getElementById(`periods-${serviceId}`);
+            const duration = parseInt(document.getElementById(`duration-${serviceId}`).value) || 30;
+            const periodCount = periodsList.children.length + 1;
+
+            // Calculate smart defaults based on existing periods
+            let startValue = 0;
+            let endValue = Math.min(duration, 15);
+
+            if (periodCount > 1) {
+                // Get the last period's end time
+                const lastPeriod = periodsList.lastElementChild;
+                const lastEnd = parseInt(lastPeriod.querySelector('.period-end').value) || 0;
+
+                // Smart defaults for new periods
+                if (periodCount === 2) {
+                    startValue = Math.min(lastEnd + 15, duration - 15);
+                    endValue = Math.min(startValue + 15, duration);
+                } else if (periodCount === 3) {
+                    startValue = Math.min(lastEnd + 15, duration - 15);
+                    endValue = Math.min(startValue + 15, duration);
+                } else {
+                    // For period 4+, just continue from last period
+                    startValue = Math.min(lastEnd + 5, duration - 5);
+                    endValue = Math.min(startValue + 10, duration);
+                }
+            }
+
+            const t = translations[selectedLang];
+            const newPeriod = document.createElement('div');
+            newPeriod.className = 'active-period-item';
+            newPeriod.innerHTML = `
+                <span style="color: #4A90E2;">${t.periodLabel} ${periodCount}:</span>
+                <input type="number" class="period-start" value="${startValue}" min="0" max="${duration}" onchange="validatePeriods('${serviceId}')">
+                <span style="color: #4A90E2;">${t.toLabel}</span>
+                <input type="number" class="period-end" value="${endValue}" min="0" max="${duration}" onchange="validatePeriods('${serviceId}')">
+                <span style="color: #4A90E2;">${t.minLabel}</span>
+                <button onclick="removePeriodFromService(this, '${serviceId}')">×</button>
+            `;
+            periodsList.appendChild(newPeriod);
+            validatePeriods(serviceId);
+        }
+
+        function validatePeriods(serviceId) {
+            const periodsList = document.getElementById(`periods-${serviceId}`);
+            const periods = Array.from(periodsList.children);
+            const duration = parseInt(document.getElementById(`duration-${serviceId}`).value) || 30;
+
+            let hasErrors = false;
+            let previousEnd = -1;
+
+            periods.forEach((period, index) => {
+                const startInput = period.querySelector('.period-start');
+                const endInput = period.querySelector('.period-end');
+                const start = parseInt(startInput.value) || 0;
+                const end = parseInt(endInput.value) || 0;
+
+                // Reset error styles
+                startInput.style.borderColor = '';
+                endInput.style.borderColor = '';
+
+                // Validation rules
+                let periodHasError = false;
+
+                // 1. Start must be less than end
+                if (start >= end) {
+                    startInput.style.borderColor = 'red';
+                    endInput.style.borderColor = 'red';
+                    periodHasError = true;
+                }
+
+                // 2. Start must be after previous period's end
+                if (previousEnd >= 0 && start <= previousEnd) {
+                    startInput.style.borderColor = 'red';
+                    periodHasError = true;
+                }
+
+                // 3. End must not exceed service duration
+                if (end > duration) {
+                    endInput.style.borderColor = 'red';
+                    periodHasError = true;
+                }
+
+                if (periodHasError) {
+                    hasErrors = true;
+                } else {
+                    previousEnd = end;
+                }
+            });
+
+            return !hasErrors;
+        }
+
+        function removePeriodFromService(button, serviceId) {
+            button.parentElement.remove();
+            // Renumber remaining periods
+            const t = translations[selectedLang];
+            const periodsList = document.getElementById(`periods-${serviceId}`);
+            const periods = periodsList.querySelectorAll('.active-period-item');
+            periods.forEach((period, index) => {
+                const label = period.querySelector('span');
+                if (label) {
+                    label.textContent = `${t.periodLabel} ${index + 1}:`;
+                }
+            });
+            // Validate after removal
+            validatePeriods(serviceId);
+        }
+
+        function deleteService(serviceId) {
+            // Count how many services we have
+            const serviceCards = document.querySelectorAll('.service-card');
+            if (serviceCards.length <= 1) {
+                alert('You must have at least one service');
+                return;
+            }
+
+            if (confirm('Are you sure you want to delete this service?')) {
+                const serviceCard = document.querySelector(`[data-service="${serviceId}"]`);
+                if (serviceCard) {
+                    serviceCard.remove();
+                }
+            }
+        }
+
+        let serviceCounter = 5; // Starting after the 5 default services
+        function addNewService() {
+            serviceCounter++;
+            const newServiceId = `custom-service-${serviceCounter}`;
+            const t = translations[selectedLang];
+
+            const servicesContainer = document.getElementById('step-4');
+            const addButton = servicesContainer.querySelector('.add-service-btn');
+
+            const newServiceCard = document.createElement('div');
+            newServiceCard.className = 'service-card';
+            newServiceCard.dataset.service = newServiceId;
+
+            newServiceCard.innerHTML = `
+                <div class="service-header">
+                    <input type="text" class="service-name-input" id="service-${newServiceId}"
+                           value="${selectedLang === 'zh' ? '新服务' : 'New Service'}"
+                           placeholder="${selectedLang === 'zh' ? '服务名称' : 'Service name'}"
+                           data-name-en="${selectedLang === 'en' ? 'New Service' : ''}"
+                           data-name-zh="${selectedLang === 'zh' ? '新服务' : ''}">
+                    <button class="delete-service-btn" onclick="deleteService('${newServiceId}')">${t.deleteBtn}</button>
+                </div>
+                <input type="text" class="service-translation-input"
+                       id="translation-${newServiceId}"
+                       placeholder="${t.translationPlaceholder}"
+                       data-lang="${selectedLang === 'zh' ? 'en' : 'zh'}">
+                <div class="translation-hint">${t.translationHint}</div>
+                <div class="service-details">
+                    <input type="number" id="duration-${newServiceId}" value="30" min="5" max="480" onchange="validatePeriods('${newServiceId}')">
+                    <span style="font-size: 14px; color: #666;">${t.minLabel}</span>
+                    <span style="color: #666;">•</span>
+                    <span style="font-size: 14px; color: #666;">$</span>
+                    <input type="number" id="price-${newServiceId}" value="25" min="0" step="0.01">
+                </div>
+                <div class="active-time-toggle">
+                    <input type="checkbox" id="toggle-active-${newServiceId}" onchange="toggleActiveTime('${newServiceId}')">
+                    <label for="toggle-active-${newServiceId}">${t.hasActivePeriodsLabel}</label>
+                </div>
+                <div class="active-time-container" id="active-container-${newServiceId}">
+                    <div class="active-periods-list" id="periods-${newServiceId}"></div>
+                    <button class="add-period-btn" onclick="addPeriodToService('${newServiceId}')">${t.addPeriodBtn}</button>
+                </div>
+            `;
+
+            // Insert before the Add button
+            servicesContainer.insertBefore(newServiceCard, addButton);
+
+            // Add event listeners for translation updates
+            const nameInput = newServiceCard.querySelector('.service-name-input');
+            const translationInput = newServiceCard.querySelector('.service-translation-input');
+
+            nameInput.addEventListener('input', function() {
+                // Update the appropriate data attribute
+                if (selectedLang === 'en') {
+                    this.setAttribute('data-name-en', this.value);
+                } else {
+                    this.setAttribute('data-name-zh', this.value);
+                }
+            });
+
+            translationInput.addEventListener('input', function() {
+                // Update the opposite language data attribute
+                const targetLang = this.getAttribute('data-lang');
+                if (targetLang === 'en') {
+                    nameInput.setAttribute('data-name-en', this.value);
+                } else {
+                    nameInput.setAttribute('data-name-zh', this.value);
+                }
+            });
+
+            // Focus on the name input
+            nameInput.select();
+        }
+
+        function collectServices() {
+            // Dynamically collect all services from the DOM
+            const serviceCards = document.querySelectorAll('.service-card');
+            setupServices = {};
+
+            serviceCards.forEach(card => {
+                const serviceId = card.dataset.service;
+                const name = document.getElementById(`service-${serviceId}`).value;
+                const duration = parseInt(document.getElementById(`duration-${serviceId}`).value) || 30;
+                const price = parseFloat(document.getElementById(`price-${serviceId}`).value) || 0;
+                const hasActiveTime = document.getElementById(`toggle-active-${serviceId}`).checked;
+
+                const service = {
+                    name: name,
+                    duration: duration,
+                    price: price,
+                    enabled: true,
+                    hasActiveTime: hasActiveTime
+                };
+
+                if (hasActiveTime) {
+                    const periodsList = document.getElementById(`periods-${serviceId}`);
+                    const periods = [];
+                    const periodItems = periodsList.querySelectorAll('.active-period-item');
+
+                    periodItems.forEach(item => {
+                        const start = parseInt(item.querySelector('.period-start').value) || 0;
+                        const end = parseInt(item.querySelector('.period-end').value) || 0;
+                        if (end > start) {
+                            periods.push({ start, end });
+                        }
+                    });
+
+                    if (periods.length > 0) {
+                        service.activePeriods = periods;
+                    }
+                }
+
+                setupServices[serviceId] = service;
+            });
+        }
+
+        async function completeSetup() {
+            // Show loading state
+            const continueBtn = document.getElementById('continue-btn');
+            continueBtn.disabled = true;
+            continueBtn.textContent = selectedLang === 'zh' ? '保存中...' : 'Saving...';
+
+            // Gather all data
+            const setupData = {
+                language: selectedLang,
+                profile: {
+                    storeName: document.getElementById('store-name').value,
+                    storeAddress: document.getElementById('store-address').value,
+                    firstName: document.getElementById('owner-first-name').value,
+                    lastName: document.getElementById('owner-last-name').value,
+                    phone: document.getElementById('phone').value,
+                    email: document.getElementById('email').value,
+                    wechatId: document.getElementById('wechat').value
+                },
+                displayInfo: {
+                    showPhone: document.getElementById('show-phone').checked,
+                    showEmail: document.getElementById('show-email').checked,
+                    showAddress: document.getElementById('show-address').checked,
+                    showWechat: document.getElementById('show-wechat').checked
+                },
+                storeHours: {},
+                services: {},
+                policies: {
+                    minBookingHours: parseInt(document.getElementById('min-booking').value),
+                    minCancelHours: parseInt(document.getElementById('min-cancel').value),
+                    maxAdvanceDays: parseInt(document.getElementById('max-advance').value)
+                }
+            };
+
+            // Collect store hours
+            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+            days.forEach(day => {
+                setupData.storeHours[day] = {
+                    open: document.getElementById(`${day}-open`).value,
+                    close: document.getElementById(`${day}-close`).value,
+                    closed: document.getElementById(`${day}-closed`).checked
+                };
+            });
+
+            // Collect services and enable all by default
+            collectServices();
+            // Enable all services by default after setup
+            Object.keys(setupServices).forEach(id => {
+                setupServices[id].enabled = true;
+            });
+            setupData.services = setupServices;
+
+            try {
+                // Save to Supabase using SharedData bridge
+                // Save store hours
+                await SharedData.saveStoreHours(setupData.storeHours);
+
+                // Save services and get actual database IDs
+                const actualServiceIds = await SharedData.saveServices(setupData.services);
+                console.log('Services saved with IDs:', actualServiceIds);
+
+                // Save booking policies
+                await SharedData.saveBookingPolicies({
+                    minBookingHours: setupData.policies.minBookingHours,
+                    maxBookingDays: setupData.policies.maxAdvanceDays,
+                    cancellationHours: setupData.policies.minCancelHours
+                });
+
+                // Display info will be saved with profile
+
+                // Save complete profile and display info to Supabase
+                await SharedData.saveProfile({
+                    storeName: setupData.profile.storeName,
+                    storeAddress: setupData.profile.storeAddress,
+                    firstName: setupData.profile.firstName,
+                    lastName: setupData.profile.lastName,
+                    phone: setupData.profile.phone,
+                    email: setupData.profile.email,
+                    wechatId: setupData.profile.wechatId,
+                    displayInfo: setupData.displayInfo
+                });
+
+                // Ensure owner exists as first barber
+                const barbers = await SharedData.getBarbers();
+                const ownerName = `${setupData.profile.firstName} ${setupData.profile.lastName}`;
+
+                if (barbers.length === 0) {
+                    console.log('No barbers found, creating owner as first barber');
+
+                    // Create the owner as the first barber
+                    const { data: { user } } = await supabaseClient.auth.getUser();
+                    const shopId = SharedData.getCurrentShopId();
+
+                    if (user && shopId) {
+                        const { data: newBarber, error } = await supabaseClient
+                            .from('barbers')
+                            .insert({
+                                shop_id: shopId,
+                                name: ownerName,
+                                is_owner: true,
+                                uses_store_hours: true,
+                                service_ids: actualServiceIds || [],
+                                is_active: true,
+                                display_order: 0
+                            })
+                            .select()
+                            .single();
+
+                        if (error) {
+                            console.error('Error creating owner barber:', error);
+                        } else {
+                            console.log('Owner barber created successfully:', newBarber);
+                        }
+                    }
+                } else {
+                    // Update existing owner barber
+                    const owner = barbers[0];
+                    console.log('Updating existing owner barber:', owner);
+
+                    // Update with actual service IDs from database
+                    const { error } = await supabaseClient
+                        .from('barbers')
+                        .update({
+                            name: ownerName,
+                            service_ids: actualServiceIds || [],
+                            uses_store_hours: true
+                        })
+                        .eq('id', owner.id);
+
+                    if (error) {
+                        console.error('Error updating owner barber:', error);
+                    } else {
+                        console.log('Owner barber updated with services');
+                    }
+                }
+
+                // Generate booking URL
+                const slug = setupData.profile.storeName
+                    .toLowerCase()
+                    .replace(/'/g, '')
+                    .replace(/[^a-z0-9]+/g, '_')
+                    .replace(/^_|_$/g, '');
+
+                const bookingUrl = `https://yourdomain.com/book/${slug}`;
+                document.getElementById('booking-url').textContent = bookingUrl;
+
+                // Generate QR Code
+                generateQRCode(bookingUrl);
+
+                // Update shop with slug in Supabase
+                const shopId = localStorage.getItem('supabase_shop_id');
+                if (shopId) {
+                    const { error } = await supabaseClient
+                        .from('shops')
+                        .update({ slug: slug })
+                        .eq('id', shopId);
+
+                    if (error) {
+                        console.error('Failed to save slug to Supabase:', error);
+                    } else {
+                        console.log('Slug saved to Supabase:', slug);
+                    }
+                }
+
+                // Also save slug to localStorage as backup
+                const ownerProfile = JSON.parse(localStorage.getItem('ownerProfile') || '{}');
+                ownerProfile.bookingSlug = slug;
+                localStorage.setItem('ownerProfile', JSON.stringify(ownerProfile));
+                console.log('Slug saved to localStorage:', slug);
+
+                // Save language preference
+                SharedData.setPreferredLanguage(selectedLang);
+
+                // Mark setup as complete
+                localStorage.setItem('setupComplete', 'true');
+
+                // Show success screen
+                document.getElementById(`step-${currentStep}`).classList.remove('active');
+                document.getElementById('step-success').classList.add('active');
+                updateNavigationButtons();
+
+            } catch (error) {
+                console.error('Setup error:', error);
+                alert(selectedLang === 'zh' ?
+                    '设置保存失败，请重试' :
+                    'Failed to save setup, please try again');
+
+                continueBtn.disabled = false;
+                continueBtn.textContent = selectedLang === 'zh' ? '完成设置' : 'Complete Setup';
+            }
+        }
+
+        function generateQRCode(url) {
+            console.log('Generating QR code for URL:', url);
+            const canvas = document.getElementById('qr-code-canvas');
+            console.log('Canvas element:', canvas);
+            console.log('QRCode library available:', typeof QRCode !== 'undefined');
+
+            if (canvas && typeof QRCode !== 'undefined') {
+                QRCode.toCanvas(canvas, url, {
+                    width: 200,
+                    margin: 2,
+                    color: {
+                        dark: '#000000',
+                        light: '#ffffff'
+                    }
+                }, function (error) {
+                    if (error) {
+                        console.error('QR Code generation error:', error);
+                        alert('Failed to generate QR code. Please refresh and try again.');
+                    } else {
+                        console.log('QR Code generated successfully');
+                        canvas.style.display = 'block'; // Ensure canvas is visible
+                    }
+                });
+            } else {
+                console.error('QR Code generation failed - canvas or library missing');
+                if (!canvas) console.error('Canvas element not found');
+                if (typeof QRCode === 'undefined') console.error('QRCode library not loaded');
+            }
+        }
+
+        function downloadQRCode() {
+            const canvas = document.getElementById('qr-code-canvas');
+            const storeName = JSON.parse(localStorage.getItem('ownerProfile') || '{}').storeName || 'shop';
+            const fileName = `${storeName.replace(/[^a-z0-9]/gi, '_')}_qrcode.png`;
+
+            canvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                // Show feedback
+                const btn = event.target.closest('button');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = selectedLang === 'zh' ? '已下载!' : 'Downloaded!';
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                }, 2000);
+            });
+        }
+
+        function copyUrl() {
+            const url = document.getElementById('booking-url').textContent;
+            navigator.clipboard.writeText(url).then(() => {
+                const btn = document.getElementById('copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = selectedLang === 'zh' ? '已复制!' : 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            });
+        }
+
+        function goToDashboard() {
+            window.location.href = 'owner-app.html';
+        }
+
+        // Check authentication status on load
+        async function checkAuthAndInit() {
+            try {
+                // Initialize SharedData first
+                await SharedData.initialize();
+
+                // Check if user is authenticated
+                const { data: { user } } = await supabaseClient.auth.getUser();
+
+                if (!user) {
+                    // Not authenticated, redirect to auth page
+                    window.location.href = 'auth-app.html';
+                    return;
+                }
+
+                // Ensure we have a shop ID
+                const shopId = SharedData.getCurrentShopId() || localStorage.getItem('supabase_shop_id');
+                if (!shopId) {
+                    console.error('No shop ID found after authentication');
+                    alert('Error: No shop found. Please sign up again.');
+                    window.location.href = 'auth-app.html';
+                    return;
+                }
+
+                console.log('Setup wizard initialized with shop ID:', shopId);
+
+                // Check if setup is already complete
+                if (localStorage.getItem('setupComplete') === 'true') {
+                    window.location.href = 'owner-app.html';
+                    return;
+                }
+
+                // Load profile data from Supabase
+                const profile = await SharedData.getProfile();
+                if (profile) {
+                    document.getElementById('store-name').value = profile.storeName || '';
+                    document.getElementById('owner-first-name').value = profile.firstName || '';
+                    document.getElementById('owner-last-name').value = profile.lastName || '';
+                    document.getElementById('email').value = profile.email || '';
+                    document.getElementById('store-address').value = profile.storeAddress || '';
+                    document.getElementById('phone').value = profile.phone || '';
+                    document.getElementById('wechat').value = profile.wechatId || '';
+
+                    // Load display settings if available
+                    if (profile.displayInfo) {
+                        document.getElementById('show-phone').checked = profile.displayInfo.showPhone !== false;
+                        document.getElementById('show-email').checked = profile.displayInfo.showEmail !== false;
+                        document.getElementById('show-address').checked = profile.displayInfo.showAddress !== false;
+                        document.getElementById('show-wechat').checked = profile.displayInfo.showWechat === true;
+                    }
+                }
+
+                // Initialize the wizard
+                updateNavigationButtons();
+
+                // Add event listeners for default services translation inputs
+                const defaultServices = ['mens-cut', 'womens-cut', 'kids-cut', 'coloring', 'highlights'];
+                defaultServices.forEach(serviceId => {
+                    const nameInput = document.getElementById(`service-${serviceId}`);
+                    const translationInput = document.getElementById(`translation-${serviceId}`);
+
+                    if (nameInput) {
+                        nameInput.addEventListener('input', function() {
+                            // Update the appropriate data attribute
+                            if (selectedLang === 'en') {
+                                this.setAttribute('data-name-en', this.value);
+                            } else {
+                                this.setAttribute('data-name-zh', this.value);
+                            }
+                        });
+                    }
+
+                    if (translationInput) {
+                        translationInput.addEventListener('input', function() {
+                            // Update the opposite language data attribute
+                            const targetLang = this.getAttribute('data-lang');
+                            if (targetLang === 'en') {
+                                nameInput.setAttribute('data-name-en', this.value);
+                            } else {
+                                nameInput.setAttribute('data-name-zh', this.value);
+                            }
+                        });
+                    }
+                });
+            } catch (error) {
+                console.error('Auth check error:', error);
+                // Redirect to auth page on error
+                window.location.href = 'auth-app.html';
+            }
+        }
+
+        // Initialize
+        checkAuthAndInit();
+    </script>
+</body>
+</html>

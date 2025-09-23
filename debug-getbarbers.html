@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Debug getBarbers()</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #00ff00;
+        }
+        .section {
+            background: #000;
+            border: 1px solid #00ff00;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .error { color: #ff0000; }
+        .success { color: #00ff00; }
+        .warning { color: #ffff00; }
+        button {
+            background: #003300;
+            color: #00ff00;
+            padding: 10px 20px;
+            border: 2px solid #00ff00;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #00ff00;
+            color: #000;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <h1>Debug getBarbers() Function</h1>
+
+    <div class="section">
+        <h3>Step 1: Check Shop ID</h3>
+        <pre id="shop-id"></pre>
+    </div>
+
+    <div class="section">
+        <h3>Step 2: Direct Supabase Query</h3>
+        <pre id="direct-query"></pre>
+    </div>
+
+    <div class="section">
+        <h3>Step 3: SharedData.getBarbers() Result</h3>
+        <pre id="shared-data"></pre>
+    </div>
+
+    <div class="section">
+        <h3>Step 4: Debug Info</h3>
+        <pre id="debug-info"></pre>
+    </div>
+
+    <div class="section">
+        <button onclick="runDebug()">Run Debug</button>
+        <button onclick="testWithShopId()">Test with Manual Shop ID</button>
+        <button onclick="initAndTest()">Initialize SharedData and Test</button>
+    </div>
+
+    <script>
+        async function runDebug() {
+            console.log('Starting debug...');
+
+            // Step 1: Check shop ID
+            const shopIdDiv = document.getElementById('shop-id');
+            const shopId = localStorage.getItem('supabase_shop_id');
+            const customerShopId = localStorage.getItem('customer_shop_id');
+
+            shopIdDiv.innerHTML = `localStorage['supabase_shop_id']: ${shopId || 'NOT SET'}\n`;
+            shopIdDiv.innerHTML += `localStorage['customer_shop_id']: ${customerShopId || 'NOT SET'}\n`;
+            shopIdDiv.innerHTML += `SharedData.getCurrentShopId(): ${SharedData.getCurrentShopId()}\n`;
+
+            // Step 2: Direct Supabase query
+            const directDiv = document.getElementById('direct-query');
+
+            if (shopId) {
+                try {
+                    console.log('Querying barbers directly for shop:', shopId);
+
+                    // Query ALL barbers first
+                    const { data: allBarbers, error: allError } = await supabaseClient
+                        .from('barbers')
+                        .select('*')
+                        .eq('shop_id', shopId);
+
+                    directDiv.innerHTML = `All barbers for shop ${shopId}:\n`;
+                    directDiv.innerHTML += `Count: ${allBarbers ? allBarbers.length : 0}\n\n`;
+
+                    if (allBarbers) {
+                        allBarbers.forEach(b => {
+                            directDiv.innerHTML += `${b.name} - Active: ${b.is_active}, Owner: ${b.is_owner}\n`;
+                        });
+                    }
+
+                    // Query active barbers only
+                    const { data: activeBarbers, error: activeError } = await supabaseClient
+                        .from('barbers')
+                        .select('*')
+                        .eq('shop_id', shopId)
+                        .eq('is_active', true);
+
+                    directDiv.innerHTML += `\nActive barbers only:\n`;
+                    directDiv.innerHTML += `Count: ${activeBarbers ? activeBarbers.length : 0}\n`;
+
+                    if (activeError) {
+                        directDiv.innerHTML += `<span class="error">Error: ${JSON.stringify(activeError)}</span>\n`;
+                    } else if (activeBarbers && activeBarbers.length > 0) {
+                        directDiv.innerHTML += `<span class="success">✅ Found ${activeBarbers.length} active barber(s)</span>\n`;
+                        activeBarbers.forEach(b => {
+                            directDiv.innerHTML += JSON.stringify(b, null, 2) + '\n';
+                        });
+                    } else {
+                        directDiv.innerHTML += `<span class="error">❌ No active barbers found!</span>\n`;
+                    }
+                } catch (error) {
+                    directDiv.innerHTML = `<span class="error">Exception: ${error.message}</span>`;
+                }
+            } else {
+                directDiv.innerHTML = '<span class="warning">No shop ID to query</span>';
+            }
+
+            // Step 3: SharedData.getBarbers()
+            const sharedDiv = document.getElementById('shared-data');
+            try {
+                console.log('Calling SharedData.getBarbers()...');
+                const barbers = await SharedData.getBarbers();
+
+                sharedDiv.innerHTML = `SharedData.getBarbers() returned: ${barbers.length} barber(s)\n\n`;
+
+                if (barbers.length > 0) {
+                    sharedDiv.innerHTML += '<span class="success">✅ SharedData returned barbers:</span>\n';
+                    sharedDiv.innerHTML += JSON.stringify(barbers, null, 2);
+                } else {
+                    sharedDiv.innerHTML += '<span class="error">❌ SharedData returned empty array!</span>\n';
+
+                    // Check if it's returning default barber
+                    if (barbers[0] && barbers[0].id === 'owner') {
+                        sharedDiv.innerHTML += '<span class="warning">Returned default barber (not from database)</span>\n';
+                    }
+                }
+            } catch (error) {
+                sharedDiv.innerHTML = `<span class="error">Error calling getBarbers(): ${error.message}</span>`;
+            }
+
+            // Step 4: Debug info
+            const debugDiv = document.getElementById('debug-info');
+            debugDiv.innerHTML = 'Checking SharedData internals:\n';
+            debugDiv.innerHTML += `currentShopId in SharedData: ${SharedData.getCurrentShopId()}\n`;
+            debugDiv.innerHTML += `barbersCache: ${SharedData.barbersCache ? SharedData.barbersCache.length + ' items' : 'null/undefined'}\n`;
+
+            // Check auth status
+            try {
+                const { data: { user } } = await supabaseClient.auth.getUser();
+                debugDiv.innerHTML += `\nAuthenticated user: ${user ? user.email : 'None'}\n`;
+            } catch (e) {
+                debugDiv.innerHTML += `\nAuth check failed: ${e.message}\n`;
+            }
+        }
+
+        async function testWithShopId() {
+            const shopId = localStorage.getItem('supabase_shop_id');
+            if (shopId) {
+                console.log('Setting shop ID manually:', shopId);
+                SharedData.setCurrentShopId(shopId);
+                await runDebug();
+            } else {
+                alert('No shop ID in localStorage!');
+            }
+        }
+
+        async function initAndTest() {
+            console.log('Initializing SharedData...');
+            const debugDiv = document.getElementById('debug-info');
+            debugDiv.innerHTML = 'Initializing SharedData...\n';
+
+            await SharedData.initialize();
+
+            debugDiv.innerHTML += 'SharedData initialized.\n';
+            debugDiv.innerHTML += `Shop ID after init: ${SharedData.getCurrentShopId()}\n`;
+
+            await runDebug();
+        }
+
+        // Run debug on load
+        setTimeout(runDebug, 1000);
+    </script>
+</body>
+</html>

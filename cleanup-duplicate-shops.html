@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Cleanup Duplicate Shops</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <script src="shared-data.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .shop-item {
+            padding: 15px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+        .shop-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .shop-details {
+            font-size: 14px;
+            color: #666;
+        }
+        .latest {
+            background: #e8f4fd;
+            border-color: #4A90E2;
+        }
+        button {
+            padding: 10px 20px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #c82333;
+        }
+        button.safe {
+            background: #28a745;
+        }
+        button.safe:hover {
+            background: #218838;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cleanup Duplicate Shops</h1>
+    <p>This will remove older duplicate shops and keep only the latest one.</p>
+
+    <div id="status"></div>
+
+    <h2>All Shops Found:</h2>
+    <div id="shops-list"></div>
+
+    <div style="margin-top: 30px;">
+        <button class="safe" onclick="loadShops()">Refresh List</button>
+        <button onclick="deleteOlderShops()">Delete Older Shops (Keep Latest Antony's Salon)</button>
+    </div>
+
+    <script>
+        async function loadShops() {
+            const container = document.getElementById('shops-list');
+            const status = document.getElementById('status');
+
+            try {
+                // Get all shops
+                const { data: shops, error } = await supabaseClient
+                    .from('shops')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error) {
+                    status.innerHTML = `<div class="status error">Error loading shops: ${error.message}</div>`;
+                    return;
+                }
+
+                if (!shops || shops.length === 0) {
+                    container.innerHTML = '<div class="shop-item">No shops found</div>';
+                    return;
+                }
+
+                // Find the latest Antony's Salon
+                const antonySalons = shops.filter(s => s.name === "Antony's Salon");
+                const latestAntonys = antonySalons[0]; // First one is latest due to ordering
+
+                container.innerHTML = '';
+                shops.forEach(shop => {
+                    const isLatest = shop.id === latestAntonys?.id;
+                    const shopDiv = document.createElement('div');
+                    shopDiv.className = `shop-item ${isLatest ? 'latest' : ''}`;
+
+                    shopDiv.innerHTML = `
+                        <div class="shop-name">${shop.name} ${isLatest ? '(LATEST - WILL KEEP)' : '(WILL DELETE)'}</div>
+                        <div class="shop-details">
+                            ID: ${shop.id}<br>
+                            Created: ${new Date(shop.created_at).toLocaleString()}<br>
+                            Owner: ${shop.owner_id || 'Not set'}
+                        </div>
+                    `;
+
+                    container.appendChild(shopDiv);
+                });
+
+                status.innerHTML = `<div class="status success">Found ${shops.length} shops. Latest Antony's Salon highlighted in blue.</div>`;
+
+            } catch (error) {
+                console.error('Error:', error);
+                status.innerHTML = `<div class="status error">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function deleteOlderShops() {
+            const status = document.getElementById('status');
+
+            if (!confirm("Are you sure you want to delete the older shops? This will keep only the latest Antony's Salon.")) {
+                return;
+            }
+
+            try {
+                // Get all shops
+                const { data: shops, error: fetchError } = await supabaseClient
+                    .from('shops')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (fetchError) {
+                    status.innerHTML = `<div class="status error">Error fetching shops: ${fetchError.message}</div>`;
+                    return;
+                }
+
+                // Find the latest Antony's Salon
+                const antonySalons = shops.filter(s => s.name === "Antony's Salon");
+                if (antonySalons.length === 0) {
+                    status.innerHTML = `<div class="status error">No Antony's Salon found!</div>`;
+                    return;
+                }
+
+                const latestAntonys = antonySalons[0];
+                const shopsToDelete = shops.filter(s => s.id !== latestAntonys.id);
+
+                if (shopsToDelete.length === 0) {
+                    status.innerHTML = `<div class="status success">No shops to delete. Only one shop exists.</div>`;
+                    return;
+                }
+
+                console.log('Latest shop to keep:', latestAntonys.id);
+                console.log('Shops to delete:', shopsToDelete.map(s => s.id));
+
+                let deleteCount = 0;
+                let errors = [];
+
+                // Delete all shops except the latest Antony's Salon
+                for (const shop of shopsToDelete) {
+                    console.log(`Deleting shop ${shop.id} (${shop.name})...`);
+
+                    // Delete appointments
+                    const { error: apptError, count: apptCount } = await supabaseClient
+                        .from('appointments')
+                        .delete()
+                        .eq('shop_id', shop.id);
+
+                    if (apptError) {
+                        console.error('Error deleting appointments:', apptError);
+                    } else {
+                        console.log(`Deleted ${apptCount || 0} appointments`);
+                    }
+
+                    // Delete employees
+                    const { error: empError, count: empCount } = await supabaseClient
+                        .from('employees')
+                        .delete()
+                        .eq('shop_id', shop.id);
+
+                    if (empError) {
+                        console.error('Error deleting employees:', empError);
+                    } else {
+                        console.log(`Deleted ${empCount || 0} employees`);
+                    }
+
+                    // Delete services
+                    const { error: svcError, count: svcCount } = await supabaseClient
+                        .from('services')
+                        .delete()
+                        .eq('shop_id', shop.id);
+
+                    if (svcError) {
+                        console.error('Error deleting services:', svcError);
+                    } else {
+                        console.log(`Deleted ${svcCount || 0} services`);
+                    }
+
+                    // Delete email_templates
+                    const { error: emailError } = await supabaseClient
+                        .from('email_templates')
+                        .delete()
+                        .eq('shop_id', shop.id);
+
+                    if (emailError) {
+                        console.error('Error deleting email templates:', emailError);
+                    }
+
+                    // Finally delete the shop
+                    const { error: deleteError, data: deleteData } = await supabaseClient
+                        .from('shops')
+                        .delete()
+                        .eq('id', shop.id)
+                        .select();
+
+                    if (deleteError) {
+                        console.error(`Error deleting shop ${shop.id}:`, deleteError);
+                        errors.push(`${shop.name} (${shop.id}): ${deleteError.message}`);
+                    } else {
+                        console.log(`Successfully deleted shop:`, deleteData);
+                        deleteCount++;
+                    }
+                }
+
+                if (errors.length > 0) {
+                    status.innerHTML = `<div class="status error">
+                        Deleted ${deleteCount} shops, but errors occurred:<br>
+                        ${errors.join('<br>')}
+                        <br><br>Check browser console for details.
+                    </div>`;
+                } else {
+                    status.innerHTML = `<div class="status success">
+                        Successfully deleted ${deleteCount} shops.
+                        Kept the latest Antony's Salon (ID: ${latestAntonys.id})
+                    </div>`;
+                }
+
+                // Reload the list
+                await loadShops();
+
+            } catch (error) {
+                console.error('Error:', error);
+                status.innerHTML = `<div class="status error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Load shops on page load
+        loadShops();
+    </script>
+</body>
+</html>

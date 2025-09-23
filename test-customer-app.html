@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Customer App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            padding: 20px 40px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 18px;
+            margin: 10px;
+            width: 100%;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Launch Customer App</h1>
+
+    <button onclick="launchCustomer()">Open Customer App</button>
+
+    <script>
+        function launchCustomer() {
+            const shopId = localStorage.getItem('supabase_shop_id');
+
+            if (shopId) {
+                // Set customer context
+                localStorage.setItem('customer_shop_id', shopId);
+                localStorage.setItem('customer_shop_slug', 'antonys_salon');
+
+                // Launch customer app
+                window.location.href = 'customer-app.html?shop=antonys_salon';
+            } else {
+                alert('No shop ID found! Complete setup first.');
+            }
+        }
+    </script>
+</body>
+</html>

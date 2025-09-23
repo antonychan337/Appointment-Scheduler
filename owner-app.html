@@ -4,7 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shop Owner Dashboard</title>
-    <script src="shared-data.js"></script>
+    <!-- QR Code Library -->
+    <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.js"></script>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Config -->
+    <script src="supabase-config.js"></script>
+    <!-- Supabase Bridge (replaces shared-data.js) -->
+    <script src="supabase-bridge.js"></script>
     <!-- EmailJS SDK -->
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script type="text/javascript">
@@ -838,17 +845,33 @@
     <div id="cancellation-policy-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="max-width: 500px;">
             <div class="modal-header">
-                <h3 id="cancel-policy-modal-title">Cancellation Policy</h3>
+                <h3 id="cancel-policy-modal-title">Policies</h3>
                 <button class="modal-close" onclick="closeCancellationPolicy()">×</button>
             </div>
             <div style="padding: 20px;">
                 <p id="cancel-policy-intro" style="color: #666; margin-bottom: 20px;">
-                    Set the minimum notice period required for customers to cancel or reschedule appointments.
+                    Set booking rules and requirements for your customers.
                 </p>
 
                 <div style="margin-bottom: 20px;">
+                    <label id="min-booking-label" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                        Minimum Booking Notice (hours):
+                    </label>
+                    <input type="number"
+                           id="min-booking-hours"
+                           min="0"
+                           max="168"
+                           step="1"
+                           placeholder="e.g., 0"
+                           style="width: 100%; padding: 10px; border: 1px solid #e0e0e0; border-radius: 5px;">
+                    <small style="color: #666; display: block; margin-top: 5px;">
+                        Minimum booking notice
+                    </small>
+                </div>
+
+                <div style="margin-bottom: 20px;">
                     <label id="min-notice-label" style="display: block; margin-bottom: 8px; font-weight: bold;">
-                        Minimum Notice Period (hours):
+                        Minimum Cancellation Notice (hours):
                     </label>
                     <input type="number"
                            id="min-notice-hours"
@@ -859,6 +882,22 @@
                            style="width: 100%; padding: 10px; border: 1px solid #e0e0e0; border-radius: 5px;">
                     <small id="policy-hint" style="color: #666; display: block; margin-top: 5px;">
                         Enter 0 to allow cancellations anytime, or up to 168 hours (1 week)
+                    </small>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label id="max-advance-label" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                        Maximum Advance Booking (days):
+                    </label>
+                    <input type="number"
+                           id="max-advance-days"
+                           min="1"
+                           max="365"
+                           step="1"
+                           placeholder="e.g., 60"
+                           style="width: 100%; padding: 10px; border: 1px solid #e0e0e0; border-radius: 5px;">
+                    <small style="color: #666; display: block; margin-top: 5px;">
+                        How far into the future can customers book? (1-365 days)
                     </small>
                 </div>
 
@@ -1233,7 +1272,7 @@
                     <label id="url-label" style="display: block; margin-bottom: 8px; font-weight: bold;">Your Custom URL</label>
                     <div style="display: flex; align-items: center; gap: 5px;">
                         <span style="background: #f5f5f5; padding: 10px; border-radius: 4px 0 0 4px; border: 1px solid #e0e0e0;">
-                            mycompany.com/
+                            yourdomain.com/book/
                         </span>
                         <input type="text"
                                id="custom-url-slug"
@@ -1273,9 +1312,11 @@
                 <div id="qr-code-section" style="display: none; margin-top: 20px; text-align: center;">
                     <div style="font-weight: bold; margin-bottom: 10px;" id="qr-code-title">QR Code</div>
                     <div id="qr-code" style="padding: 20px; background: white; border: 1px solid #e0e0e0; border-radius: 8px;">
-                        <!-- QR code would be generated here -->
-                        <div style="width: 150px; height: 150px; margin: 0 auto; background: #f5f5f5; display: flex; align-items: center; justify-content: center; color: #999;">
-                            QR Code
+                        <canvas id="booking-qr-canvas"></canvas>
+                        <div style="margin-top: 10px;">
+                            <button onclick="downloadBookingQRCode()" style="padding: 8px 15px; background: #4A90E2; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">
+                                <span id="download-booking-qr-btn">Download QR Code</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1382,7 +1423,7 @@
             </div>
 
             <!-- Staff Section -->
-            <div id="services-section" class="section">
+            <div id="staff-section" class="section">
                 <!-- Staff List Section -->
                 <div id="staff-list-section" style="margin-bottom: 20px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -1398,9 +1439,51 @@
 
                 <!-- Current Staff Configuration (hidden by default, shown when staff member selected) -->
                 <div id="current-staff-config" style="display: none;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h3 style="margin: 0;"><span id="config-for-text">Configuration for:</span> <span id="selected-staff-name">Owner</span></h3>
-                        <button id="back-to-staff-btn" onclick="backToStaffList()" style="padding: 8px 15px; background: #666; color: white; border: none; border-radius: 5px; cursor: pointer;">← Back to Staff List</button>
+                    <div style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <button onclick="backToStaffList()" style="
+                                background: none;
+                                border: none;
+                                color: #4A90E2;
+                                cursor: pointer;
+                                font-size: 14px;
+                                padding: 5px 0;
+                                display: flex;
+                                align-items: center;
+                                gap: 5px;
+                            ">
+                                <span style="font-size: 18px;">←</span>
+                                <span id="back-to-staff-text">Back to Staff List</span>
+                            </button>
+                        </div>
+                        <div style="text-align: center; margin-bottom: 15px;">
+                            <div id="selected-staff-first-name" style="font-size: 22px; font-weight: bold;">First</div>
+                            <div id="selected-staff-last-name" style="font-size: 22px; font-weight: bold; margin-top: 2px;">Name</div>
+                        </div>
+                        <div style="display: flex; justify-content: center; gap: 0; background: #f0f0f0; border-radius: 8px; padding: 3px; width: fit-content; margin: 0 auto;">
+                            <button id="services-tab" onclick="switchServicesPage(0)" style="
+                                padding: 8px 20px;
+                                border: none;
+                                background: #4A90E2;
+                                color: white;
+                                cursor: pointer;
+                                border-radius: 5px;
+                                font-size: 14px;
+                                font-weight: 500;
+                                transition: all 0.3s;
+                            ">Services</button>
+                            <button id="staff-hours-tab" onclick="switchServicesPage(1)" style="
+                                padding: 8px 20px;
+                                border: none;
+                                background: transparent;
+                                color: #666;
+                                cursor: pointer;
+                                border-radius: 5px;
+                                font-size: 14px;
+                                font-weight: 500;
+                                transition: all 0.3s;
+                            ">Staff Hours</button>
+                        </div>
                     </div>
                 </div>
 
@@ -1410,7 +1493,8 @@
                         <div class="services-page">
                             <h2 id="services-title">Services</h2>
                             <div class="service-list" style="margin-top: 20px;">
-                                <div class="service-item" data-service="mens-cut">
+                                <!-- Services will be loaded dynamically from database -->
+                                <!-- <div class="service-item" data-service="mens-cut">
                                     <div style="flex: 1;">
                                         <div style="display: flex; align-items: center; gap: 8px;">
                                             <div class="service-color-indicator" style="width: 20px; height: 20px; background: #2196F3; border-radius: 4px;"></div>
@@ -1442,7 +1526,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="toggle-switch active" onclick="toggleService(this)"></div>
+                                    <div class="toggle-switch" onclick="toggleService(this)"></div>
                                 </div>
                                 <div class="service-item" data-service="womens-cut">
                                     <div style="flex: 1;">
@@ -1476,7 +1560,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="toggle-switch active" onclick="toggleService(this)"></div>
+                                    <div class="toggle-switch" onclick="toggleService(this)"></div>
                                 </div>
                                 <div class="service-item" data-service="kids-cut">
                                     <div style="flex: 1;">
@@ -1510,7 +1594,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="toggle-switch active" onclick="toggleService(this)"></div>
+                                    <div class="toggle-switch" onclick="toggleService(this)"></div>
                                 </div>
                                 <div class="service-item" data-service="coloring">
                                     <div style="flex: 1;">
@@ -1553,7 +1637,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="toggle-switch active" onclick="toggleService(this)"></div>
+                                    <div class="toggle-switch" onclick="toggleService(this)"></div>
                                 </div>
                                 <div class="service-item" data-service="highlights">
                                     <div style="flex: 1;">
@@ -1604,8 +1688,8 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="toggle-switch active" onclick="toggleService(this)"></div>
-                                </div>
+                                    <div class="toggle-switch" onclick="toggleService(this)"></div>
+                                </div> -->
                             </div>
                             <button class="add-button" id="add-service-btn" onclick="openAddServiceModal()">Add New Service</button>
                         </div>
@@ -1744,11 +1828,7 @@
                     </div>
                 </div>
 
-                <!-- Page dots -->
-                <div class="page-dots">
-                    <div class="dot active" onclick="switchServicesPage(0)"></div>
-                    <div class="dot" onclick="switchServicesPage(1)"></div>
-                </div>
+                <!-- Page dots removed - using tabs instead -->
             </div>
 
             <!-- Settings Section -->
@@ -1847,7 +1927,7 @@
                 <span>📅</span>
                 <div id="nav-calendar">Calendar</div>
             </div>
-            <div class="nav-item" onclick="showSection('services')">
+            <div class="nav-item" onclick="showSection('staff')">
                 <span>👥</span>
                 <div id="nav-services">Staff</div>
             </div>
@@ -1859,9 +1939,14 @@
     </div>
 
     <script>
+        // Initialize global variables first
         let isZh = false;
+        let barbers = [];
         let currentWeekStart = new Date();
         let touchStartX = null;
+
+        // Language will be set in initializePage function
+        // Don't call SharedData here as it may not be ready yet
 
         // Variables for drag selection
         let isSelecting = false;
@@ -1921,8 +2006,14 @@
                 navSettings: '设置',
                 addService: '添加新服务',
                 saveSettings: '保存设置',
-                configurationFor: '配置：',
-                backToStaffList: '← 返回员工列表',
+                backToStaffList: '返回员工列表',
+                staffHoursBtn: '员工|时间',
+                servicesTab: '服务项目',
+                staffHoursTab: '员工时间',
+                minLabel: '分钟',
+                hasActivePeriodsLabel: '有活动时间段',
+                periodLabel: '时段',
+                addPeriodBtn: '添加时段',
                 services: {
                     mensCut: '男士理发',
                     womensCut: '女士理发',
@@ -1982,11 +2073,13 @@
                 bookingLinkDesc: '分享您的自定义预约网址',
                 bookingLinkModalTitle: '预约链接',
                 bookingLinkIntro: '创建一个自定义网址，客户可以使用它来预约。',
-                cancelPolicyTitle: '取消政策',
-                cancelPolicyDesc: '设置更改的最短通知期',
-                cancelPolicyModalTitle: '取消政策',
-                cancelPolicyIntro: '设置客户取消或重新安排预约所需的最短通知期。',
-                minNoticeLabel: '最短通知期（小时）：',
+                cancelPolicyTitle: '预订政策',
+                cancelPolicyDesc: '预订和取消规则',
+                cancelPolicyModalTitle: '预订政策',
+                cancelPolicyIntro: '为您的客户设置预订规则和要求。',
+                minBookingLabel: '最短预订通知时间（小时）：',
+                minNoticeLabel: '最短取消通知时间（小时）：',
+                maxAdvanceLabel: '最长提前预订时间（天）：',
                 policyHint: '输入0允许随时取消，或最多168小时（1周）',
                 // Email Settings translations
                 emailSettingsTitle: '邮件通知',
@@ -2028,6 +2121,7 @@
                 yourBookingLink: '您的预约链接：',
                 copyBtn: '复制',
                 qrCodeTitle: '二维码',
+                downloadQRBtn: '下载二维码',
                 saveUrl: '保存网址',
                 urlAvailable: '网址可用！',
                 urlTaken: '此网址已被使用',
@@ -2074,8 +2168,8 @@
                 navSettings: 'Settings',
                 addService: 'Add New Service',
                 saveSettings: 'Save Settings',
-                configurationFor: 'Configuration for:',
-                backToStaffList: '← Back to Staff List',
+                backToStaffList: 'Back to Staff List',
+                staffHoursBtn: 'Staff|Hours',
                 services: {
                     mensCut: "Men's Cut",
                     womensCut: "Women's Cut",
@@ -2135,11 +2229,13 @@
                 bookingLinkDesc: 'Share your custom booking URL',
                 bookingLinkModalTitle: 'Booking Link',
                 bookingLinkIntro: 'Create a custom URL that customers can use to book appointments with you.',
-                cancelPolicyTitle: 'Cancellation Policy',
-                cancelPolicyDesc: 'Set minimum notice period for changes',
-                cancelPolicyModalTitle: 'Cancellation Policy',
-                cancelPolicyIntro: 'Set the minimum notice period required for customers to cancel or reschedule appointments.',
-                minNoticeLabel: 'Minimum Notice Period (hours):',
+                cancelPolicyTitle: 'Policies',
+                cancelPolicyDesc: 'Booking and cancellation rules',
+                cancelPolicyModalTitle: 'Policies',
+                cancelPolicyIntro: 'Set booking rules and requirements for your customers.',
+                minBookingLabel: 'Minimum Booking Notice (hours):',
+                minNoticeLabel: 'Minimum Cancellation Notice (hours):',
+                maxAdvanceLabel: 'Maximum Advance Booking (days):',
                 policyHint: 'Enter 0 to allow cancellations anytime, or up to 168 hours (1 week)',
                 // Email Settings translations
                 emailSettingsTitle: 'Email Notifications',
@@ -2181,6 +2277,7 @@
                 yourBookingLink: 'Your Booking Link:',
                 copyBtn: 'Copy',
                 qrCodeTitle: 'QR Code',
+                downloadQRBtn: 'Download QR Code',
                 saveUrl: 'Save URL',
                 urlAvailable: 'URL is available!',
                 urlTaken: 'This URL is already taken',
@@ -2192,6 +2289,8 @@
 
         function toggleLang() {
             isZh = !isZh;
+            // Save language preference globally
+            SharedData.setPreferredLanguage(isZh ? 'zh' : 'en');
             updateLanguage();
 
             // Force update of dropdown text for "All Staff"
@@ -2298,11 +2397,19 @@
             const sameAsStoreHoursText = document.getElementById('same-as-store-hours-text');
             if (sameAsStoreHoursText) sameAsStoreHoursText.textContent = t.sameAsStoreHours;
 
-            // Configuration for text
-            updateElement('config-for-text', t.configurationFor);
+            // Update Back to Staff List text
+            const backText = document.getElementById('back-to-staff-text');
+            if (backText) {
+                backText.textContent = t.backToStaffList;
+            }
 
-            // Back to Staff List button
-            updateElement('back-to-staff-btn', t.backToStaffList);
+            // Update tab texts
+            const servicesTab = document.getElementById('services-tab');
+            if (servicesTab) servicesTab.textContent = t.servicesTabText || 'Services';
+            const staffHoursTab = document.getElementById('staff-hours-tab');
+            if (staffHoursTab) staffHoursTab.textContent = t.staffHoursTabText || 'Staff Hours';
+
+            // Old button code removed - using tabs now
 
             // Store hours labels in Profile modal
             updateElement('store-hours-heading', t.storeHoursTitle);
@@ -2401,10 +2508,12 @@
             updateElement('url-label', t.urlLabel);
             updateElement('cancel-booking-link-btn', t.cancelBtn);
 
-            // Cancellation Policy Modal translations
+            // Policies Modal translations
             updateElement('cancel-policy-modal-title', t.cancelPolicyModalTitle);
             updateElement('cancel-policy-intro', t.cancelPolicyIntro);
+            updateElement('min-booking-label', t.minBookingLabel);
             updateElement('min-notice-label', t.minNoticeLabel);
+            updateElement('max-advance-label', t.maxAdvanceLabel);
             updateElement('policy-hint', t.policyHint);
             updateElement('policy-preview-title', t.policyPreviewTitle);
             updateElement('policy-important', t.policyImportant);
@@ -2474,6 +2583,12 @@
         }
 
         function updateStoreTabTranslations() {
+            // Update Services and Staff Hours tabs
+            const servicesTab = document.getElementById('services-tab');
+            const staffHoursTab = document.getElementById('staff-hours-tab');
+            if (servicesTab) servicesTab.textContent = isZh ? '服务项目' : 'Services';
+            if (staffHoursTab) staffHoursTab.textContent = isZh ? '员工时间' : 'Staff Hours';
+
             // Update "min" labels
             document.querySelectorAll('.min-label').forEach(label => {
                 label.textContent = isZh ? '分钟' : 'min';
@@ -2536,6 +2651,20 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             event.target.closest('.nav-item').classList.add('active');
 
+            // If showing staff section, ensure we show the staff list, not service configuration
+            if (section === 'staff') {
+                const staffList = document.getElementById('staff-list-section');
+                const configHeader = document.getElementById('current-staff-config');
+                const configContainer = document.getElementById('services-config-container');
+
+                if (staffList) staffList.style.display = 'block';
+                if (configHeader) configHeader.style.display = 'none';
+                if (configContainer) configContainer.style.display = 'none';
+
+                // Clear any selected barber to ensure we're on the list view
+                window.currentBarberId = null;
+            }
+
             // Generate calendar if showing calendar section
             if (section === 'calendar') {
                 // Generate appropriate view based on selected barber
@@ -2550,16 +2679,20 @@
 
             // Update dashboard metrics if showing dashboard section
             if (section === 'dashboard') {
-                updateDashboardMetrics();
+                updateDashboardMetrics().catch(console.error);
             }
 
             // Re-populate barber selectors with translated "All Staff" option
-            populateBarberSelectors();
+            populateBarberSelectors().catch(err => console.error('Error populating barber selectors:', err));
         }
 
         function toggleService(element) {
+            // Toggle the visual state
             element.classList.toggle('active');
+            console.log('Service toggled, active state:', element.classList.contains('active'));
+            // Save services (which will read the new state)
             saveServices();
+            // Don't call loadServices here - it would reset the toggle
         }
 
         function deleteService(serviceId) {
@@ -2596,7 +2729,9 @@
                 // If no periods exist, add a default one
                 const periodsList = container.querySelector('.active-periods-list');
                 if (!periodsList || periodsList.children.length === 0) {
-                    const duration = parseInt(document.querySelector(`[data-service="${serviceId}"] .service-duration`).value) || 30;
+                    // Find the service item by either actual-service-id or service attribute
+                    const serviceItem = document.querySelector(`[data-actual-service-id="${serviceId}"], [data-service="${serviceId}"]`);
+                    const duration = parseInt(serviceItem?.querySelector('.service-duration')?.value) || 30;
                     periodsList.innerHTML = `
                         <div class="active-period-item" style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
                             <span style="font-size: 12px; color: #4A90E2; min-width: 50px;">Period 1:</span>
@@ -2653,12 +2788,15 @@
             const newPeriod = document.createElement('div');
             newPeriod.className = 'active-period-item';
             newPeriod.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 5px;';
+            const periodLabel = isZh ? `时段 ${periodCount}:` : `Period ${periodCount}:`;
+            const toLabel = isZh ? '到' : 'to';
+            const minLabel = isZh ? '分钟' : 'min';
             newPeriod.innerHTML = `
-                <span style="font-size: 12px; color: #4A90E2; min-width: 50px;">Period ${periodCount}:</span>
+                <span class="period-label" style="font-size: 12px; color: #4A90E2; min-width: 50px;">${periodLabel}</span>
                 <input type="number" class="period-start" value="${defaultStart}" min="0" max="${duration}" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px; background: #F5FBFF;" onchange="saveServices()">
-                <span style="font-size: 12px; color: #4A90E2;">to</span>
+                <span class="to-label" style="font-size: 12px; color: #4A90E2;">${toLabel}</span>
                 <input type="number" class="period-end" value="${defaultEnd}" min="0" max="${duration}" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px; background: #F5FBFF;" onchange="saveServices()">
-                <span style="font-size: 12px; color: #4A90E2;">min</span>
+                <span style="font-size: 12px; color: #4A90E2;">${minLabel}</span>
                 <button onclick="removePeriodFromService(this, '${serviceId}')" style="padding: 2px 6px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">×</button>
             `;
 
@@ -2727,16 +2865,15 @@
             return hours * 60 + minutes;
         }
 
-        function toggleSameAsStoreHours() {
+        async function toggleSameAsStoreHours() {
             const checkbox = document.getElementById('same-as-store-hours');
             const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
             if (checkbox.checked) {
-                // Get store hours from owner profile
-                const ownerProfile = JSON.parse(localStorage.getItem('ownerProfile') || '{}');
-                const storeHours = ownerProfile.storeHours;
+                // Get store hours from SharedData (Supabase)
+                const storeHours = await SharedData.getStoreHours();
 
-                if (storeHours) {
+                if (storeHours && Object.keys(storeHours).length > 0) {
                     // Apply store hours to employee
                     days.forEach(day => {
                         const dayCheckbox = document.getElementById(`${day}-closed`);
@@ -2777,8 +2914,8 @@
                     // Save immediately
                     saveStoreHours();
                 } else {
-                    // No store hours set, use defaults
-                    alert('Store hours not set. Please configure store hours in Settings > Profile first.');
+                    // No store hours found - don't show alert on initial load
+                    console.log('Store hours not found, unchecking checkbox');
                     checkbox.checked = false;
                 }
             } else {
@@ -2796,10 +2933,33 @@
             }
         }
 
-        function loadStoreHours() {
-            // Get hours for current barber
-            const barber = SharedData.getBarberById(window.currentBarberId || 'owner');
-            const hours = barber ? (barber.hours || SharedData.getStoreHours()) : SharedData.getStoreHours();
+        async function loadStoreHours() {
+            // Get hours - if no barber selected or owner, use store hours
+            let hours;
+
+            if (!window.currentBarberId || barbers.length === 0) {
+                // No barber selected or no barbers exist, use store hours
+                hours = await SharedData.getStoreHours();
+            } else {
+                // Get hours for current barber
+                const barber = barbers.find(b => b.id === window.currentBarberId);
+                if (barber && barber.isOwner) {
+                    // Owner always uses store hours
+                    hours = await SharedData.getStoreHours();
+                } else if (barber && barber.hours) {
+                    // Staff barber with custom hours
+                    hours = barber.hours;
+                } else {
+                    // Fallback to store hours
+                    hours = await SharedData.getStoreHours();
+                }
+            }
+
+            // Ensure we have valid hours
+            if (!hours || typeof hours !== 'object') {
+                console.warn('Invalid store hours, using defaults');
+                hours = SharedData.defaultStoreHours;
+            }
             const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
             // Also check for existing time off
@@ -2831,7 +2991,7 @@
             });
         }
 
-        function saveStoreHours() {
+        async function saveStoreHours() {
             const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
             const hours = {};
             let hasError = false;
@@ -3275,20 +3435,107 @@
         }
 
         // Booking Link Management Functions
-        function openBookingLink() {
+        async function openBookingLink() {
             document.getElementById('booking-link-modal').style.display = 'flex';
 
-            // Load existing URL if saved
-            const savedUrl = localStorage.getItem('bookingUrl');
-            if (savedUrl) {
-                const urlData = JSON.parse(savedUrl);
-                document.getElementById('custom-url-slug').value = urlData.slug;
-                document.getElementById('full-url').value = `mycompany.com/${urlData.slug}`;
-                document.getElementById('url-display').style.display = 'block';
-                document.getElementById('qr-code-section').style.display = 'block';
-                document.getElementById('save-url-btn').disabled = false;
-                document.getElementById('url-success').textContent = isZh ? '网址已保存' : 'URL saved';
-                document.getElementById('url-success').style.display = 'block';
+            // Load booking slug directly from Supabase
+            await SharedData.initialize();
+            const shopId = localStorage.getItem('supabase_shop_id');
+            console.log('Loading booking link for shop:', shopId);
+
+            if (shopId && typeof supabaseClient !== 'undefined') {
+                try {
+                    console.log('Querying Supabase for shop slug...');
+                    const { data: shop, error } = await supabaseClient
+                        .from('shops')
+                        .select('slug, name')
+                        .eq('id', shopId)
+                        .single();
+
+                    console.log('Supabase query result:', { shop, error });
+
+                    if (!error && shop) {
+                        if (shop.slug) {
+                            document.getElementById('custom-url-slug').value = shop.slug;
+                            const fullUrl = `https://yourdomain.com/book/${shop.slug}`;
+                            document.getElementById('full-url').value = fullUrl;
+                            document.getElementById('url-display').style.display = 'block';
+                            document.getElementById('qr-code-section').style.display = 'block';
+                            document.getElementById('save-url-btn').disabled = false;
+                            document.getElementById('url-success').textContent = isZh ? '网址已保存' : 'URL saved';
+                            document.getElementById('url-success').style.display = 'block';
+
+                            // Generate QR code for existing slug
+                            generateBookingQRCode(fullUrl);
+                        } else if (shop.name) {
+                            // Generate slug from store name if not set
+                            const slug = shop.name
+                                .toLowerCase()
+                                .replace(/'/g, '')
+                                .replace(/[^a-z0-9]+/g, '_')
+                                .replace(/^_|_$/g, '');
+                            document.getElementById('custom-url-slug').value = slug;
+                            validateUrlSlug(); // Validate the generated slug
+                        }
+                    } else if (error) {
+                        console.error('Supabase error:', error);
+                        // Fallback to localStorage
+                        const ownerProfile = JSON.parse(localStorage.getItem('ownerProfile') || '{}');
+                        if (ownerProfile.bookingSlug) {
+                            document.getElementById('custom-url-slug').value = ownerProfile.bookingSlug;
+                        } else if (ownerProfile.storeName) {
+                            const slug = ownerProfile.storeName
+                                .toLowerCase()
+                                .replace(/'/g, '')
+                                .replace(/[^a-z0-9]+/g, '_')
+                                .replace(/^_|_$/g, '');
+                            document.getElementById('custom-url-slug').value = slug;
+                            validateUrlSlug();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error loading shop slug:', error);
+                    // Fallback to localStorage
+                    const ownerProfile = JSON.parse(localStorage.getItem('ownerProfile') || '{}');
+                    if (ownerProfile.bookingSlug) {
+                        document.getElementById('custom-url-slug').value = ownerProfile.bookingSlug;
+                        const fullUrl = `https://yourdomain.com/book/${ownerProfile.bookingSlug}`;
+                        document.getElementById('full-url').value = fullUrl;
+                        document.getElementById('url-display').style.display = 'block';
+                        document.getElementById('qr-code-section').style.display = 'block';
+                        document.getElementById('save-url-btn').disabled = false;
+                        generateBookingQRCode(fullUrl);
+                    } else if (ownerProfile.storeName) {
+                        const slug = ownerProfile.storeName
+                            .toLowerCase()
+                            .replace(/'/g, '')
+                            .replace(/[^a-z0-9]+/g, '_')
+                            .replace(/^_|_$/g, '');
+                        document.getElementById('custom-url-slug').value = slug;
+                        validateUrlSlug();
+                    }
+                }
+            } else {
+                console.log('Supabase not available or no shop ID, using localStorage');
+                // Fallback to localStorage
+                const ownerProfile = JSON.parse(localStorage.getItem('ownerProfile') || '{}');
+                if (ownerProfile.bookingSlug) {
+                    document.getElementById('custom-url-slug').value = ownerProfile.bookingSlug;
+                    const fullUrl = `https://yourdomain.com/book/${ownerProfile.bookingSlug}`;
+                    document.getElementById('full-url').value = fullUrl;
+                    document.getElementById('url-display').style.display = 'block';
+                    document.getElementById('qr-code-section').style.display = 'block';
+                    document.getElementById('save-url-btn').disabled = false;
+                    generateBookingQRCode(fullUrl);
+                } else if (ownerProfile.storeName) {
+                    const slug = ownerProfile.storeName
+                        .toLowerCase()
+                        .replace(/'/g, '')
+                        .replace(/[^a-z0-9]+/g, '_')
+                        .replace(/^_|_$/g, '');
+                    document.getElementById('custom-url-slug').value = slug;
+                    validateUrlSlug();
+                }
             }
         }
 
@@ -3354,38 +3601,120 @@
                 saveBtn.disabled = false;
 
                 // Show the full URL preview
-                const fullUrl = `mycompany.com/${slug}`;
+                const fullUrl = `https://yourdomain.com/book/${slug}`;
                 document.getElementById('full-url').value = fullUrl;
                 document.getElementById('url-display').style.display = 'block';
                 document.getElementById('qr-code-section').style.display = 'block';
+
+                // Generate QR code
+                generateBookingQRCode(fullUrl);
             }
         }
 
-        function saveBookingUrl() {
+        async function saveBookingUrl() {
             const slug = document.getElementById('custom-url-slug').value;
 
-            // Save to localStorage
-            const urlData = {
-                slug: slug,
-                createdAt: new Date().toISOString()
-            };
-            localStorage.setItem('bookingUrl', JSON.stringify(urlData));
+            // Save slug directly to Supabase
+            await SharedData.initialize();
+            const shopId = localStorage.getItem('supabase_shop_id');
 
-            // Add to taken URLs list
-            const takenUrls = JSON.parse(localStorage.getItem('takenUrls') || '[]');
-            if (!takenUrls.includes(slug)) {
-                takenUrls.push(slug);
-                localStorage.setItem('takenUrls', JSON.stringify(takenUrls));
+            if (shopId && typeof supabaseClient !== 'undefined') {
+                try {
+                    const { error } = await supabaseClient
+                        .from('shops')
+                        .update({ slug: slug })
+                        .eq('id', shopId);
+
+                    if (error) {
+                        console.error('Error saving slug:', error);
+                        const errorDiv = document.getElementById('url-error');
+                        errorDiv.textContent = isZh ? '保存失败，请重试' : 'Failed to save, please try again';
+                        errorDiv.style.display = 'block';
+                        return;
+                    }
+
+                    // Update display
+                    const fullUrl = `https://yourdomain.com/book/${slug}`;
+                    document.getElementById('full-url').value = fullUrl;
+                    document.getElementById('url-display').style.display = 'block';
+                    document.getElementById('qr-code-section').style.display = 'block';
+
+                    // Generate QR code
+                    generateBookingQRCode(fullUrl);
+
+                    // Show success message
+                    const successDiv = document.getElementById('url-success');
+                    successDiv.textContent = isZh ? '网址已保存成功！' : 'URL saved successfully!';
+                    successDiv.style.display = 'block';
+
+                    setTimeout(() => {
+                        closeBookingLinkModal();
+                    }, 1500);
+                } catch (error) {
+                    console.error('Error saving slug:', error);
+                }
+            } else {
+                // Fallback to localStorage if Supabase not available
+                const ownerProfile = JSON.parse(localStorage.getItem('ownerProfile') || '{}');
+                ownerProfile.bookingSlug = slug;
+                localStorage.setItem('ownerProfile', JSON.stringify(ownerProfile));
+
+                // Update display
+                document.getElementById('full-url').value = `yourdomain.com/book/${slug}`;
+                document.getElementById('url-display').style.display = 'block';
+                document.getElementById('qr-code-section').style.display = 'block';
+
+                // Show success message
+                const successDiv = document.getElementById('url-success');
+                successDiv.textContent = isZh ? '网址已保存成功！' : 'URL saved successfully!';
+                successDiv.style.display = 'block';
+
+                setTimeout(() => {
+                    closeBookingLinkModal();
+                }, 1500);
             }
+        }
 
-            // Show success message
-            const successDiv = document.getElementById('url-success');
-            successDiv.textContent = isZh ? '网址已保存成功！' : 'URL saved successfully!';
-            successDiv.style.display = 'block';
+        function generateBookingQRCode(url) {
+            const canvas = document.getElementById('booking-qr-canvas');
+            if (canvas && typeof QRCode !== 'undefined') {
+                QRCode.toCanvas(canvas, url, {
+                    width: 200,
+                    margin: 2,
+                    color: {
+                        dark: '#000000',
+                        light: '#ffffff'
+                    }
+                }, function (error) {
+                    if (error) console.error('QR Code generation error:', error);
+                    else console.log('QR Code generated successfully for:', url);
+                });
+            }
+        }
 
-            setTimeout(() => {
-                closeBookingLinkModal();
-            }, 1500);
+        function downloadBookingQRCode() {
+            const canvas = document.getElementById('booking-qr-canvas');
+            const storeName = JSON.parse(localStorage.getItem('ownerProfile') || '{}').storeName || 'shop';
+            const fileName = `${storeName.replace(/[^a-z0-9]/gi, '_')}_booking_qrcode.png`;
+
+            canvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                // Show feedback
+                const btn = event.target.closest('button');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = isZh ? '已下载!' : 'Downloaded!';
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                }, 2000);
+            });
         }
 
         function copyToClipboard() {
@@ -3407,20 +3736,24 @@
         }
 
         // Cancellation Policy Functions
-        function openCancellationPolicy() {
+        async function openCancellationPolicy() {
             document.getElementById('cancellation-policy-modal').style.display = 'flex';
 
-            // Load existing policy
-            const policy = JSON.parse(localStorage.getItem('cancellationPolicy') || '{}');
-            const hoursInput = document.getElementById('min-notice-hours');
+            // Load policies from SharedData (Supabase)
+            await SharedData.initialize();
+            const policies = await SharedData.getBookingPolicies() || {};
 
-            if (policy.minNoticeHours !== undefined) {
-                hoursInput.value = policy.minNoticeHours;
-                updatePolicyPreview();
-            }
+            // Set values with defaults
+            document.getElementById('min-booking-hours').value = policies.minBookingHours || 0;
+            document.getElementById('min-notice-hours').value = policies.cancellationHours || 24;
+            document.getElementById('max-advance-days').value = policies.maxBookingDays || 60;
 
-            // Add event listener for live preview
-            hoursInput.addEventListener('input', updatePolicyPreview);
+            updatePolicyPreview();
+
+            // Add event listeners for live preview
+            document.getElementById('min-booking-hours').addEventListener('input', updatePolicyPreview);
+            document.getElementById('min-notice-hours').addEventListener('input', updatePolicyPreview);
+            document.getElementById('max-advance-days').addEventListener('input', updatePolicyPreview);
         }
 
         function closeCancellationPolicy() {
@@ -3457,15 +3790,18 @@
             }
         }
 
-        function saveCancellationPolicy() {
-            const hours = parseInt(document.getElementById('min-notice-hours').value) || 0;
+        async function saveCancellationPolicy() {
+            const minBookingHours = parseInt(document.getElementById('min-booking-hours').value) || 0;
+            const cancellationHours = parseInt(document.getElementById('min-notice-hours').value) || 0;
+            const maxBookingDays = parseInt(document.getElementById('max-advance-days').value) || 60;
 
-            // Save policy
-            const policy = {
-                minNoticeHours: hours,
-                updatedAt: new Date().toISOString()
+            // Save policies to SharedData (Supabase)
+            const policies = {
+                minBookingHours: minBookingHours,
+                cancellationHours: cancellationHours,
+                maxBookingDays: maxBookingDays
             };
-            localStorage.setItem('cancellationPolicy', JSON.stringify(policy));
+            await SharedData.saveBookingPolicies(policies);
 
             // Show success message
             const messageDiv = document.getElementById('policy-message');
@@ -3593,53 +3929,65 @@
             return { valid: true, periods: sortedPeriods };
         }
 
-        function saveServices() {
-            // Get services for current barber
+        async function saveServices() {
+            console.log('saveServices called');
+            // Always work with the full services object from SharedData
+            const services = SharedData.getServices();
+
+            // Get current barber to update their service list later if needed
             const barber = SharedData.getBarberById(window.currentBarberId || 'owner');
-            const services = barber ? barber.services : SharedData.getServices();
             let hasErrors = false;
 
             // Get all service items
-            document.querySelectorAll('.service-item[data-service]').forEach(item => {
-                const serviceId = item.dataset.service;
-                if (!services[serviceId]) return;
+            const serviceItems = document.querySelectorAll('.service-item[data-service]');
+            console.log('Found service items:', serviceItems.length);
+
+            serviceItems.forEach(item => {
+                // Use the actual service ID that was stored during loadServices
+                const actualServiceId = item.dataset.actualServiceId || item.dataset.service;
+                if (!services[actualServiceId]) {
+                    console.warn(`Service not found for ID: ${actualServiceId}`);
+                    return;
+                }
 
                 // Get service name
                 const nameInput = item.querySelector('.service-name-input');
                 if (nameInput && nameInput.value.trim()) {
-                    services[serviceId].name = nameInput.value.trim();
+                    services[actualServiceId].name = nameInput.value.trim();
                 }
 
                 // Get enabled state
                 const toggleSwitch = item.querySelector('.toggle-switch');
-                services[serviceId].enabled = toggleSwitch.classList.contains('active');
+                const isEnabled = toggleSwitch.classList.contains('active');
+                console.log(`Service ${actualServiceId}: enabled = ${isEnabled}`);
+                services[actualServiceId].enabled = isEnabled;
 
                 // Get duration
                 const durationInput = item.querySelector('.service-duration');
                 if (durationInput) {
-                    const duration = parseInt(durationInput.value) || services[serviceId].duration;
+                    const duration = parseInt(durationInput.value) || services[actualServiceId].duration;
                     if (duration > 0 && duration <= 480) {
-                        services[serviceId].duration = duration;
+                        services[actualServiceId].duration = duration;
                     } else {
-                        durationInput.value = services[serviceId].duration;
+                        durationInput.value = services[actualServiceId].duration;
                     }
                 }
 
                 // Get price
                 const priceInput = item.querySelector('.service-price');
                 if (priceInput) {
-                    const price = parseFloat(priceInput.value) || services[serviceId].price;
+                    const price = parseFloat(priceInput.value) || services[actualServiceId].price;
                     if (price >= 0) {
-                        services[serviceId].price = Math.round(price * 100) / 100; // Round to 2 decimals
+                        services[actualServiceId].price = Math.round(price * 100) / 100; // Round to 2 decimals
                     } else {
-                        priceInput.value = services[serviceId].price;
+                        priceInput.value = services[actualServiceId].price;
                     }
                 }
 
                 // Get active time toggle state and periods
                 const activeToggle = item.querySelector('.active-time-toggle');
                 if (activeToggle) {
-                    services[serviceId].hasActiveTime = activeToggle.checked;
+                    services[actualServiceId].hasActiveTime = activeToggle.checked;
 
                     // Only save active periods if the toggle is checked
                     if (activeToggle.checked) {
@@ -3660,28 +4008,51 @@
                             });
 
                             if (periods.length > 0) {
-                                const validation = validateActivePeriods(periods, services[serviceId].duration);
+                                const validation = validateActivePeriods(periods, services[actualServiceId].duration);
                                 if (validation.valid) {
-                                    services[serviceId].activePeriods = validation.periods;
+                                    services[actualServiceId].activePeriods = validation.periods;
                                 } else {
                                     hasErrors = true;
-                                    alert(`${services[serviceId].name}: ${validation.error}`);
+                                    alert(`${services[actualServiceId].name}: ${validation.error}`);
                                     return;
                                 }
                             }
                             // Remove old single activeTime if it exists
-                            delete services[serviceId].activeTime;
+                            delete services[actualServiceId].activeTime;
                         }
                     } else {
                         // Clear active time data if toggle is unchecked
-                        delete services[serviceId].activeTime;
-                        delete services[serviceId].activePeriods;
+                        delete services[actualServiceId].activeTime;
+                        delete services[actualServiceId].activePeriods;
                     }
                 }
             });
 
             if (!hasErrors) {
                 SharedData.saveServices(services);
+
+                // ALWAYS update all barbers to have access to all enabled services
+                // This ensures customer app shows correct services
+                const enabledServiceIds = Object.keys(services).filter(id => services[id].enabled);
+                const serviceAssignment = {};
+                enabledServiceIds.forEach(id => {
+                    serviceAssignment[id] = true;
+                });
+
+                // Update all barbers with the new service assignment
+                const barbers = await SharedData.getBarbers();
+                console.log('Updating barbers with enabled services:', enabledServiceIds);
+                console.log('Service assignment object:', serviceAssignment);
+
+                barbers.forEach(barber => {
+                    console.log(`Updating ${barber.name} (${barber.id}) with ${enabledServiceIds.length} services`);
+                    SharedData.updateBarber(barber.id, { services: serviceAssignment });
+                });
+
+                // Verify the update
+                const updatedBarber = SharedData.getBarberById(barbers[0]?.id || 'owner');
+                console.log('Verified barber services after update:', updatedBarber.services);
+
                 // Show save feedback
                 showServiceSaveMessage();
             }
@@ -3708,12 +4079,7 @@
                 document.body.appendChild(messageDiv);
             }
 
-            // Save services for current barber
-            if (window.currentBarberId && window.currentBarberId !== 'owner') {
-                SharedData.updateBarber(window.currentBarberId, { services });
-            } else {
-                SharedData.saveServices(services);
-            }
+            // Just show the success message - services are already saved in saveServices()
             messageDiv.textContent = isZh ? '服务已保存' : 'Services saved';
             messageDiv.style.display = 'block';
 
@@ -3722,22 +4088,135 @@
             }, 2000);
         }
 
+        function createServiceItemElement(serviceId, service) {
+            const div = document.createElement('div');
+            div.className = 'service-item';
+            div.dataset.service = serviceId;
+            div.dataset.actualServiceId = serviceId;
+
+            // Build active periods HTML if any exist
+            let activePeriodsHtml = '';
+            if (service.activePeriods && service.activePeriods.length > 0) {
+                service.activePeriods.forEach((period, index) => {
+                    const periodLabel = isZh ? `时段 ${index + 1}:` : `Period ${index + 1}:`;
+                    const toLabel = isZh ? '到' : 'to';
+                    const minLabel = isZh ? '分钟' : 'min';
+                    activePeriodsHtml += `
+                        <div class="active-period-item" style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                            <span class="period-label" style="font-size: 12px; color: #4A90E2; min-width: 50px;">${periodLabel}</span>
+                            <input type="number" class="period-start" value="${period.start}" min="0" max="${service.duration}" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px; background: #F5FBFF;" onchange="saveServices()">
+                            <span class="to-label" style="font-size: 12px; color: #4A90E2;">${toLabel}</span>
+                            <input type="number" class="period-end" value="${period.end}" min="0" max="${service.duration}" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px; background: #F5FBFF;" onchange="saveServices()">
+                            <span style="font-size: 12px; color: #4A90E2;">${minLabel}</span>
+                        </div>
+                    `;
+                });
+            }
+
+            const color = SharedData.getServiceColor ? SharedData.getServiceColor(serviceId) : '#999';
+
+            // Translate known service names
+            let displayName = service.name;
+            if (isZh) {
+                const serviceTranslations = {
+                    "Men's Cut": '男士理发',
+                    "Women's Cut": '女士理发',
+                    "Children's Cut": '儿童理发',
+                    "Hair Coloring": '染发',
+                    "Highlights": '挑染'
+                };
+                displayName = serviceTranslations[service.name] || service.name;
+            }
+
+            div.innerHTML = `
+                <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div class="service-color-indicator" style="width: 20px; height: 20px; background: ${color}; border-radius: 4px;"></div>
+                        <input type="text" class="service-name-input" id="service-${serviceId}" value="${displayName}" onchange="saveServices()" style="flex: 1;">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
+                        <input type="number" class="service-duration" id="duration-${serviceId}" value="${service.duration}" min="5" max="480" style="width: 50px; padding: 4px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;" onchange="saveServices()">
+                        <span class="min-label" style="font-size: 13px; color: #666;">${isZh ? '分钟' : 'min'}</span>
+                        <span style="color: #666;">•</span>
+                        <span style="font-size: 13px; color: #666;">$</span>
+                        <input type="number" class="service-price" id="price-${serviceId}" value="${service.price}" min="0" step="0.01" style="width: 60px; padding: 4px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;" onchange="saveServices()">
+                    </div>
+                    <div style="margin-top: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" class="active-time-toggle" id="toggle-active-${serviceId}" ${service.hasActiveTime ? 'checked' : ''} onchange="toggleActiveTime('${serviceId}')" style="cursor: pointer;">
+                            <label for="toggle-active-${serviceId}" class="active-periods-label" style="font-size: 12px; color: #666; cursor: pointer;">${isZh ? '有活动时间段' : 'Has active time periods'}</label>
+                        </div>
+                        <div class="active-time-container" id="active-container-${serviceId}" style="${service.hasActiveTime ? 'display: block;' : 'display: none;'} margin-left: 24px; margin-top: 8px;">
+                            <div class="active-periods-list" id="periods-${serviceId}">
+                                ${activePeriodsHtml}
+                            </div>
+                            <button class="add-period-btn" onclick="addPeriodToService('${serviceId}')" style="margin-top: 5px; padding: 3px 8px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">${isZh ? '添加时段' : 'Add period'}</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="toggle-switch ${service.enabled ? 'active' : ''}" onclick="toggleService(this)"></div>
+            `;
+
+            return div;
+        }
+
         function loadServices() {
-            // Get services for current barber
-            const barber = SharedData.getBarberById(window.currentBarberId || 'owner');
-            const services = barber ? (barber.services || SharedData.getServices()) : SharedData.getServices();
+            console.log('=== loadServices() called ===');
+            console.trace(); // Show call stack
 
-            // Load service data for each item
-            document.querySelectorAll('.service-item[data-service]').forEach(item => {
-                const serviceId = item.dataset.service;
-                if (!services[serviceId]) return;
+            // Always get the full service objects from SharedData
+            const allServices = SharedData.getServices();
 
-                const service = services[serviceId];
+            // Get current barber to check which services they offer
+            const barber = SharedData.getBarberById(window.currentBarberId);
+
+            console.log('loadServices - currentBarberId:', window.currentBarberId);
+            console.log('loadServices - barber:', barber);
+            console.log('loadServices - all services from DB:', allServices);
+            console.log('Number of services in DB:', Object.keys(allServices).length);
+            console.log('Service IDs:', Object.keys(allServices));
+
+            // If no barber or barber is owner, enable all services
+            const isOwner = !barber || barber.isOwner;
+            const barberServices = barber ? barber.services : {};
+
+            console.log('loadServices - barberServices:', barberServices);
+            console.log('loadServices - isOwner:', isOwner);
+
+            // First, clear all existing hardcoded service items and rebuild from database
+            const serviceList = document.querySelector('.service-list');
+            console.log('Service list before clearing:', serviceList?.children.length, 'items');
+
+            if (serviceList && Object.keys(allServices).length > 0) {
+                // Clear all existing service items
+                // Note: The add button is outside the service-list div, not inside
+                serviceList.innerHTML = '';
+                console.log('Service list after clearing:', serviceList.children.length, 'items');
+
+                // Regenerate service items from database
+                let count = 0;
+                for (const [serviceId, service] of Object.entries(allServices)) {
+                    console.log(`Creating service item ${++count}: ${serviceId} - ${service.name}`);
+                    const serviceItem = createServiceItemElement(serviceId, service);
+                    serviceList.appendChild(serviceItem);
+                }
+                console.log('Service list after adding services:', serviceList.children.length, 'items');
+            }
+
+            // Removed redundant DOM update code - services are already properly created by createServiceItemElement
+            /* document.querySelectorAll('.service-item[data-service]').forEach(item => {
+                const actualServiceId = item.dataset.actualServiceId || item.dataset.service;
+                const service = allServices[actualServiceId];
+
+                if (!service) {
+                    console.warn(`Service not found for ${actualServiceId}`);
+                    return;
+                }
 
                 // Update color indicator
                 const colorIndicator = item.querySelector('.service-color-indicator');
                 if (colorIndicator) {
-                    const color = SharedData.getServiceColor(serviceId);
+                    const color = SharedData.getServiceColor(actualServiceId);
                     colorIndicator.style.background = color;
                 }
 
@@ -3747,9 +4226,23 @@
                     nameInput.value = service.name || '';
                 }
 
-                // Set enabled state
+                // Set enabled state based on service's enabled property from database
                 const toggleSwitch = item.querySelector('.toggle-switch');
-                if (service.enabled) {
+
+                // Use the service's enabled state from the database
+                let isEnabled = service.enabled || false;
+
+                // For staff members, also check if they have this service enabled
+                if (!isOwner && barberServices) {
+                    // Staff: only enable if both service is enabled AND barber has it
+                    isEnabled = service.enabled && (barberServices[actualServiceId] === true);
+                }
+
+                console.log(`Service ${service.name}: enabled=${isEnabled}`);
+
+                console.log(`Service ${actualServiceId} - enabled: ${isEnabled}`);
+
+                if (isEnabled) {
                     toggleSwitch.classList.add('active');
                 } else {
                     toggleSwitch.classList.remove('active');
@@ -3805,7 +4298,7 @@
                         activeContainer.style.display = 'none';
                     }
                 }
-            });
+            }); */
         }
 
         function showMessage(message, type) {
@@ -3825,23 +4318,40 @@
 
         function switchServicesPage(pageIndex) {
             const pages = document.getElementById('services-pages');
-            const dots = document.querySelectorAll('#services-section .dot');
-
             pages.style.transform = `translateX(-${pageIndex * 50}%)`;
 
-            dots.forEach((dot, i) => {
-                if (i === pageIndex) {
-                    dot.classList.add('active');
-                } else {
-                    dot.classList.remove('active');
+            // Update tab styles
+            const servicesTab = document.getElementById('services-tab');
+            const staffHoursTab = document.getElementById('staff-hours-tab');
+
+            if (pageIndex === 0) {
+                // Services tab active
+                if (servicesTab) {
+                    servicesTab.style.background = '#4A90E2';
+                    servicesTab.style.color = 'white';
                 }
-            });
+                if (staffHoursTab) {
+                    staffHoursTab.style.background = 'transparent';
+                    staffHoursTab.style.color = '#666';
+                }
+            } else if (pageIndex === 1) {
+                // Staff Hours tab active
+                if (servicesTab) {
+                    servicesTab.style.background = 'transparent';
+                    servicesTab.style.color = '#666';
+                }
+                if (staffHoursTab) {
+                    staffHoursTab.style.background = '#4A90E2';
+                    staffHoursTab.style.color = 'white';
+                }
+            }
         }
 
         // Settings page functions
-        function openProfile() {
-            // Load existing profile data
-            const profile = JSON.parse(localStorage.getItem('ownerProfile') || '{}');
+        async function openProfile() {
+            // Load profile data from SharedData (Supabase)
+            await SharedData.initialize();
+            const profile = await SharedData.getProfile() || {};
             
             // Populate form fields
             document.getElementById('owner-first-name').value = profile.firstName || '';
@@ -3852,9 +4362,12 @@
             document.getElementById('store-name').value = profile.storeName || 'Premium Cuts Barbershop';
             document.getElementById('store-address').value = profile.storeAddress || '';
 
-            // Load store hours (new per-day format)
+            // Skip booking slug - field doesn't exist in profile modal
+            // The booking-slug field is in the booking link modal, not profile modal
+
+            // Load store hours separately using SharedData.getStoreHours()
             const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-            const storeHours = profile.storeHours || {};
+            const storeHours = await SharedData.getStoreHours() || {};
 
             days.forEach(day => {
                 const dayHours = storeHours[day] || { open: '09:00', close: '18:00', closed: false };
@@ -3925,7 +4438,7 @@
             return cleaned.length === 10;
         }
 
-        function saveOwnerProfile() {
+        async function saveOwnerProfile() {
             const firstName = document.getElementById('owner-first-name').value.trim();
             const lastName = document.getElementById('owner-last-name').value.trim();
             const phone = document.getElementById('owner-phone').value.trim();
@@ -4001,14 +4514,18 @@
                 updatedAt: new Date().toISOString()
             };
 
+            // Save to SharedData (Supabase)
+            await SharedData.saveProfile(profile);
+            await SharedData.saveStoreHours(storeHours);
+
+            // Also save to localStorage for backwards compatibility
             localStorage.setItem('ownerProfile', JSON.stringify(profile));
 
             // If there's only the owner (no other staff), sync their hours with store hours
-            const barbers = SharedData.getBarbers();
+            const barbers = await SharedData.getBarbers();
             if (barbers.length === 1 && barbers[0].id === 'owner') {
-                // Store hours are already in the correct format
-                SharedData.updateBarber('owner', { hours: storeHours });
-                SharedData.saveStoreHours(storeHours);
+                // Update owner's working hours to match store hours
+                await SharedData.updateBarber('owner', { hours: storeHours });
             }
 
             // Show success message
@@ -4359,9 +4876,7 @@
             // Save to services
             services[serviceId] = newService;
             SharedData.saveServices(services);
-
-            // Add to UI
-            addServiceToUI(serviceId, newService);
+            // Don't add to UI - let loadServices() handle it via storage event
 
             // Close modal
             closeAddServiceModal();
@@ -4929,9 +5444,9 @@
         }
 
         // Helper function for opening booking modal with specific barber
-        function openOwnerBookingModalForBarber(day, hour, minutes, barberId) {
+        async function openOwnerBookingModalForBarber(day, hour, minutes, barberId) {
             // Pass the barberId to the modal
-            openOwnerBookingModal(day, hour, minutes, barberId);
+            await openOwnerBookingModal(day, hour, minutes, barberId);
         }
 
         function generateWeeklyCalendar() {
@@ -5893,7 +6408,7 @@
             }
         }
 
-        function loadAppointments() {
+        async function loadAppointments() {
             const appointmentsList = document.getElementById('appointments-list');
             if (!appointmentsList) return;
 
@@ -5901,6 +6416,8 @@
             const todayStr = today.toLocaleDateString('en-US');
 
             try {
+                // Ensure appointments are loaded first
+                await SharedData.getAppointments();
                 const appointments = SharedData.getAppointmentsByDate(today);
 
                 if (appointments.length === 0) {
@@ -5958,10 +6475,11 @@
         }
 
         // Dashboard update functions
-        function updateDashboardMetrics() {
+        async function updateDashboardMetrics() {
             try {
                 const today = new Date();
-                let appointments = SharedData.getAppointments();
+                let appointments = await SharedData.getAppointments();
+                appointments = appointments || [];
 
                 // Filter by selected barber if one is selected
                 if (dashboardBarberId) {
@@ -5990,7 +6508,7 @@
                 console.log('Week start:', weekStart.toDateString());
                 console.log('Week end:', weekEnd.toDateString());
 
-                const weekRevenue = calculateWeekRevenue(weekStart, weekEnd);
+                const weekRevenue = await calculateWeekRevenue(weekStart, weekEnd);
                 const weekRevenueEl = document.getElementById('week-revenue');
                 if (weekRevenueEl) {
                     weekRevenueEl.textContent = '$' + weekRevenue.toFixed(0);
@@ -6004,14 +6522,14 @@
                 const nextWeekEnd = new Date(nextWeekStart);
                 nextWeekEnd.setDate(nextWeekStart.getDate() + 6);
                 nextWeekEnd.setHours(23, 59, 59, 999);
-                const nextWeekRevenue = calculateWeekRevenue(nextWeekStart, nextWeekEnd);
+                const nextWeekRevenue = await calculateWeekRevenue(nextWeekStart, nextWeekEnd);
                 const nextWeekRevenueEl = document.getElementById('next-week-revenue');
                 if (nextWeekRevenueEl) {
                     nextWeekRevenueEl.textContent = '$' + nextWeekRevenue.toFixed(0);
                 }
 
                 // Calculate Utilization Rate
-                const utilizationRate = calculateUtilizationRate();
+                const utilizationRate = await calculateUtilizationRate();
                 const utilizationRateEl = document.getElementById('utilization-rate');
                 if (utilizationRateEl) {
                     utilizationRateEl.textContent = utilizationRate.toFixed(0) + '%';
@@ -6021,7 +6539,7 @@
                 updateWeeklyRevenueChart();
 
                 // Update Service Breakdown
-                updateServiceBreakdownChart();
+                await updateServiceBreakdownChart();
             } catch (error) {
                 console.error('Error updating dashboard metrics:', error);
             }
@@ -6036,8 +6554,11 @@
             return result;
         }
 
-        function calculateWeekRevenue(startDate, endDate) {
-            let appointments = SharedData.getAppointments();
+        async function calculateWeekRevenue(startDate, endDate) {
+            let appointments = await SharedData.getAppointments();
+
+            // Ensure appointments is an array
+            appointments = appointments || [];
 
             // Filter by selected barber if one is selected
             if (dashboardBarberId) {
@@ -6067,18 +6588,25 @@
             return totalRevenue;
         }
 
-        function calculateUtilizationRate() {
+        async function calculateUtilizationRate() {
             const today = new Date();
             const startOfWeek = getWeekStart(today);
             const endOfWeek = getWeekEnd(today);
-            let appointments = SharedData.getAppointments();
+            let appointments = await SharedData.getAppointments();
+            appointments = appointments || [];
 
             // Filter by selected barber if one is selected
             if (dashboardBarberId) {
                 appointments = appointments.filter(apt => apt.barberId === dashboardBarberId);
             }
 
-            const storeHours = SharedData.getStoreHours();
+            const storeHours = await SharedData.getStoreHours();
+
+            // Ensure storeHours is valid
+            if (!storeHours || typeof storeHours !== 'object') {
+                console.warn('Invalid store hours for utilization calculation');
+                return 0;
+            }
 
             let totalAvailableMinutes = 0;
             let totalBookedMinutes = 0;
@@ -6165,13 +6693,14 @@
             });
         }
 
-        function updateServiceBreakdownChart() {
+        async function updateServiceBreakdownChart() {
             const canvas = document.getElementById('service-pie-chart');
             const legendContainer = document.getElementById('service-legend-pie');
             if (!canvas || !legendContainer) return;
 
             const ctx = canvas.getContext('2d');
-            let appointments = SharedData.getAppointments();
+            let appointments = await SharedData.getAppointments();
+            appointments = appointments || [];
 
             // Filter by selected barber if one is selected
             if (dashboardBarberId) {
@@ -6270,7 +6799,7 @@
             date: null
         };
 
-        function openOwnerBookingModal(day, hour, minutes = 0, barberId = null) {
+        async function openOwnerBookingModal(day, hour, minutes = 0, barberId = null) {
             // Calculate the date based on current week and day
             const date = new Date(currentWeekStart);
             date.setDate(currentWeekStart.getDate() + day);
@@ -6310,16 +6839,16 @@
             document.getElementById('booking-summary').style.display = 'none';
 
             // Populate dropdowns
-            populateOwnerBarberDropdown(barberId);
+            await populateOwnerBarberDropdown(barberId);
             populateOwnerServiceDropdown();
 
             // Show modal
             document.getElementById('owner-booking-modal').style.display = 'flex';
         }
 
-        function populateOwnerBarberDropdown(barberId = null) {
+        async function populateOwnerBarberDropdown(barberId = null) {
             const select = document.getElementById('owner-booking-barber');
-            const barbers = SharedData.getBarbers();
+            const barbers = await SharedData.getBarbers();
 
             // Clear existing options
             select.innerHTML = '';
@@ -6946,20 +7475,124 @@
 
 
         // Staff Management Variables
-        window.currentBarberId = 'owner';
-        let barbers = [];
+        window.currentBarberId = null;  // Will be set to first barber (owner)
+        // barbers and isZh are already declared globally at the top
 
         // Calendar and Dashboard barber selection
         let calendarBarberId = '';  // Empty string means all staff
         let dashboardBarberId = '';  // Empty string means all staff
         let calendarViewMode = 'week';  // 'week' or 'day'
 
+        // Initialize settings tab with booking policies
+        async function initializeSettings() {
+            try {
+                const policies = await SharedData.getBookingPolicies();
+                console.log('Loaded booking policies from database:', policies);
+
+                // Set booking policy values in settings tab
+                const minBookingInput = document.getElementById('min-booking-hours');
+                const minCancelInput = document.getElementById('min-notice-hours');
+                const maxAdvanceInput = document.getElementById('max-advance-days');
+
+                if (minBookingInput) {
+                    minBookingInput.value = policies.minBookingHours !== undefined ? policies.minBookingHours : 0;
+                    console.log('Set min booking hours to:', minBookingInput.value);
+                }
+                if (minCancelInput) {
+                    minCancelInput.value = policies.cancellationHours !== undefined ? policies.cancellationHours : 24;
+                    console.log('Set cancellation hours to:', minCancelInput.value);
+                }
+                if (maxAdvanceInput) {
+                    maxAdvanceInput.value = policies.maxBookingDays !== undefined ? policies.maxBookingDays : 60;
+                    console.log('Set max advance days to:', maxAdvanceInput.value);
+                }
+
+                // Load store information
+                const profile = await SharedData.getProfile();
+                if (profile) {
+                    // Set store information in settings
+                    const storeNameInput = document.getElementById('store-name-input');
+                    const storeAddressInput = document.getElementById('store-address-input');
+                    const storePhoneInput = document.getElementById('store-phone-input');
+                    const storeEmailInput = document.getElementById('store-email-input');
+
+                    if (storeNameInput) storeNameInput.value = profile.storeName || '';
+                    if (storeAddressInput) storeAddressInput.value = profile.storeAddress || '';
+                    if (storePhoneInput) storePhoneInput.value = profile.phone || '';
+                    if (storeEmailInput) storeEmailInput.value = profile.email || '';
+                }
+
+                // Load store hours for Settings > Profile
+                const storeHours = await SharedData.getStoreHours();
+                if (storeHours) {
+                    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+                    days.forEach(day => {
+                        const dayHours = storeHours[day];
+                        if (dayHours) {
+                            const openInput = document.getElementById(`store-${day}-open`);
+                            const closeInput = document.getElementById(`store-${day}-close`);
+                            const closedCheckbox = document.getElementById(`store-${day}-closed`);
+
+                            if (openInput && closeInput && closedCheckbox) {
+                                if (dayHours.closed) {
+                                    closedCheckbox.checked = true;
+                                    openInput.disabled = true;
+                                    closeInput.disabled = true;
+                                } else {
+                                    closedCheckbox.checked = false;
+                                    openInput.disabled = false;
+                                    closeInput.disabled = false;
+                                    openInput.value = dayHours.open || '09:00';
+                                    closeInput.value = dayHours.close || '18:00';
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error initializing settings:', error);
+            }
+        }
+
         // Initialize and load staff
-        function initializeStaff() {
-            barbers = SharedData.getBarbers();
-            renderStaffTabs();
-            selectBarber('owner');
-            populateBarberSelectors();  // Populate calendar and dashboard dropdowns
+        async function initializeStaff() {
+            try {
+                // Load barbers asynchronously
+                const loadedBarbers = await SharedData.getBarbers();
+                barbers = Array.isArray(loadedBarbers) ? loadedBarbers : [];
+                isZh = SharedData.getPreferredLanguage() === 'zh';
+
+                // If there's only one barber (owner), ensure they use store hours
+                if (barbers.length === 1 && barbers[0].isOwner) {
+                    barbers[0].usesStoreHours = true;
+                }
+            } catch (error) {
+                console.error('Error loading barbers:', error);
+                barbers = [];
+            }
+
+            // Only proceed if we have barbers
+            if (barbers.length > 0) {
+                renderStaffTabs();
+                // Don't auto-select any barber - show the staff list
+                // const firstBarberId = barbers[0].id;
+                // selectBarber(firstBarberId);
+                populateBarberSelectors().catch(err => console.error('Error populating barber selectors:', err));  // Populate calendar and dashboard dropdowns
+            } else {
+                console.log('No barbers found, creating default owner');
+                // Create a default owner barber if none exist
+                barbers = [{
+                    id: 'owner',
+                    name: 'Owner',
+                    isOwner: true,
+                    services: {},
+                    hours: {}
+                }];
+                renderStaffTabs();
+                // Don't auto-select a barber - let user click on one
+                // selectBarber('owner');
+                populateBarberSelectors();
+            }
 
             // Set initial calendar view to day view for "All Staff"
             if (calendarBarberId === '') {
@@ -6968,7 +7601,19 @@
         }
 
         // Populate barber selectors for calendar and dashboard
-        function populateBarberSelectors() {
+        window.populateBarberSelectors = async function populateBarberSelectors() {
+            // Ensure barbers is an array
+            if (!Array.isArray(barbers)) {
+                console.warn('Barbers not initialized, loading...');
+                try {
+                    const loadedBarbers = await SharedData.getBarbers();
+                    barbers = Array.isArray(loadedBarbers) ? loadedBarbers : [];
+                } catch (error) {
+                    console.error('Error loading barbers:', error);
+                    barbers = [];
+                    return;
+                }
+            }
             const calendarSelect = document.getElementById('calendar-barber-select');
             const dashboardSelect = document.getElementById('dashboard-barber-select');
 
@@ -6976,7 +7621,12 @@
 
             // Ensure barbers array is initialized
             if (barbers.length === 0) {
-                barbers = SharedData.getBarbers();
+                try {
+                    barbers = await SharedData.getBarbers();
+                } catch (error) {
+                    console.error('Error loading barbers:', error);
+                    barbers = [];
+                }
             }
 
             // Preserve current selections before rebuilding
@@ -7045,11 +7695,20 @@
         // Dashboard barber selection
         function selectDashboardBarber(barberId) {
             dashboardBarberId = barberId;
-            updateDashboardMetrics();
+            updateDashboardMetrics().catch(console.error);
         }
 
         // Render staff list
-        function renderStaffTabs() {
+        window.renderStaffTabs = function renderStaffTabs() {
+            console.log('renderStaffTabs called, barbers:', barbers);
+
+            // Ensure barbers is an array
+            if (!Array.isArray(barbers)) {
+                console.warn('Barbers is not an array, initializing empty');
+                barbers = [];
+            }
+
+            console.log('After check, barbers:', barbers);
             // First try to render in the new staff-list container
             let container = document.getElementById('staff-list');
 
@@ -7058,12 +7717,17 @@
                 container = document.getElementById('staff-tabs');
             }
 
-            if (!container) return;
+            if (!container) {
+                console.error('No container found for staff list');
+                return;
+            }
 
+            console.log('Found container:', container.id);
             container.innerHTML = '';
 
             // If using the new staff-list layout
             if (container.id === 'staff-list') {
+                console.log('Rendering', barbers.length, 'barbers');
                 barbers.forEach(barber => {
                     const item = document.createElement('div');
                     item.className = 'staff-item';
@@ -7137,11 +7801,40 @@
 
             // Select a barber
             function selectBarber(barberId) {
-                window.currentBarberId = barberId;
-                const barber = SharedData.getBarberById(barberId);
+                // If no barberId provided or it's 'owner', select the first barber (owner)
+                if (!barberId || barberId === 'owner') {
+                    if (barbers.length > 0) {
+                        barberId = barbers[0].id;
+                    }
+                }
 
-                // Update UI
-                document.getElementById('selected-staff-name').textContent = barber.name;
+                window.currentBarberId = barberId;
+
+                // Try to find barber from local array first
+                let barber = barbers.find(b => b.id === barberId);
+
+                // If not found, try SharedData
+                if (!barber) {
+                    barber = SharedData.getBarberById(barberId);
+                }
+
+                // If still not found, use default
+                if (!barber) {
+                    console.warn(`Barber ${barberId} not found, using default`);
+                    barber = barbers[0] || { id: 'owner', name: 'Owner', isOwner: true };
+                }
+
+                // Update UI - split name into first and last
+                const nameParts = (barber.name || 'Owner').split(' ');
+                const firstName = nameParts[0] || '';
+                const lastName = nameParts.slice(1).join(' ') || '';
+
+                const firstNameEl = document.getElementById('selected-staff-first-name');
+                const lastNameEl = document.getElementById('selected-staff-last-name');
+
+                if (firstNameEl) firstNameEl.textContent = firstName;
+                if (lastNameEl) lastNameEl.textContent = lastName;
+
                 renderStaffTabs();
 
                 // Hide staff list and show configuration sections
@@ -7152,6 +7845,9 @@
                 if (staffList) staffList.style.display = 'none';
                 if (configHeader) configHeader.style.display = 'block';
                 if (configContainer) configContainer.style.display = 'block';
+
+                // Always start on the Services page (page 0) when selecting a staff member
+                switchServicesPage(0);
 
                 // Show "Same as store hours?" checkbox for everyone
                 const sameAsStoreContainer = document.getElementById('same-as-store-hours-container');
@@ -7172,15 +7868,23 @@
             }
 
             // Add new staff
-            function addNewStaff() {
+            async function addNewStaff() {
+                // Ensure barbers are loaded
+                if (!Array.isArray(barbers)) {
+                    const loadedBarbers = await SharedData.getBarbers();
+                    barbers = Array.isArray(loadedBarbers) ? loadedBarbers : [];
+                }
+
                 const name = prompt('Enter staff member name:');
                 if (!name) return;
 
                 // Ask if they want to copy settings
                 const copyOptions = ['Start with default settings'];
-                barbers.forEach(b => {
-                    copyOptions.push(`Copy from ${b.name}`);
-                });
+                if (Array.isArray(barbers)) {
+                    barbers.forEach(b => {
+                        copyOptions.push(`Copy from ${b.name}`);
+                    });
+                }
 
                 const choice = confirm(`Copy settings from another staff member?\nOK = Choose who to copy from\nCancel = Start with defaults`);
 
@@ -7192,21 +7896,36 @@
                     }
                 }
 
-                const newBarberId = SharedData.addBarber(name, copyFromId);
-                barbers = SharedData.getBarbers();
-                renderStaffTabs();
-                populateBarberSelectors();  // Update dropdowns
-                selectBarber(newBarberId);
+                const newBarberId = await SharedData.addBarber(name, copyFromId);
+                if (newBarberId) {
+                    barbers = await SharedData.getBarbers();
+                    renderStaffTabs();
+                    await populateBarberSelectors();  // Update dropdowns
+                    // Don't select the new barber - stay on staff list
+                    // selectBarber(newBarberId);
+                }
             }
 
             // Delete staff
-            function deleteStaff(barberId) {
+            async function deleteStaff(barberId) {
                 if (confirm('Delete this staff member? Their configuration will be lost.')) {
-                    SharedData.deleteBarber(barberId);
-                    barbers = SharedData.getBarbers();
-                    renderStaffTabs();
-                    populateBarberSelectors();  // Update dropdowns
-                    selectBarber('owner');
+                    const deleted = await SharedData.deleteBarber(barberId);
+                    if (deleted) {
+                        barbers = await SharedData.getBarbers();
+                        renderStaffTabs();
+                        await populateBarberSelectors();  // Update dropdowns
+                        // Don't select owner - stay on staff list
+                        // selectBarber('owner');
+
+                        // Make sure we stay on the staff list view
+                        const staffList = document.getElementById('staff-list-section');
+                        const configHeader = document.getElementById('current-staff-config');
+                        const configContainer = document.getElementById('services-config-container');
+
+                        if (staffList) staffList.style.display = 'block';
+                        if (configHeader) configHeader.style.display = 'none';
+                        if (configContainer) configContainer.style.display = 'none';
+                    }
                 }
             }
 
@@ -7229,8 +7948,8 @@
                 const checkbox = document.getElementById('same-as-store-hours');
                 if (checkbox && barber.usesStoreHours) {
                     checkbox.checked = true;
-                    // Trigger to apply store hours
-                    toggleSameAsStoreHours();
+                    // Don't trigger toggleSameAsStoreHours here - let loadStoreHours handle it
+                    // The store hours will be loaded by loadStoreHours() which is called after this
                 } else {
                     // Update the existing loadStoreHours function to use barber's hours
                     window.currentBarberHours = barber.hours || {};
@@ -7271,13 +7990,15 @@
                         }
                     });
 
-                    SharedData.updateBarber(window.currentBarberId, { services });
+                    SharedData.updateBarber(window.currentBarberId, { services: Object.keys(services) });
+                    // Show save message
+                    showServiceSaveMessage();
                 } else {
                     // Save to main store services (owner)
                     originalSaveServices();
                     // Also update owner barber
                     const services = SharedData.getServices();
-                    SharedData.updateBarber('owner', { services });
+                    SharedData.updateBarber('owner', { services: Object.keys(services) });
                 }
             };
 
@@ -7285,47 +8006,84 @@
             // with proper validation and feedback, so no override is needed
 
         // Initialize on DOM ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', function() {
-                updateLanguage();
-                // Don't generate calendar on page load - only when calendar tab is clicked
-                setupSwipeNavigation();
-                initializeStaff();  // Initialize staff management
-                loadStoreHours();
-                loadServices();
-                loadAppointments();
+        async function initializePage() {
+            // Wait for SharedData to be ready
+            await SharedData.initialize();
 
-                // Delay dashboard update to ensure DOM and data are ready
-                setTimeout(() => {
-                    updateDashboardMetrics();
-                }, 100);
-            });
-        } else {
-            // DOM is already loaded
+            // Check if user is authenticated
+            const { data: { user } } = await supabaseClient.auth.getUser();
+            if (!user) {
+                // Not authenticated, redirect to auth page
+                window.location.href = 'auth-app.html';
+                return;
+            }
+
+            // Check if setup is complete
+            const shopId = SharedData.getCurrentShopId() || localStorage.getItem('supabase_shop_id');
+            if (!shopId) {
+                // No shop ID, redirect to auth to create one
+                alert('No shop found. Please sign up or contact support.');
+                window.location.href = 'auth-app.html';
+                return;
+            }
+
+            if (localStorage.getItem('setupComplete') !== 'true') {
+                // Setup not complete, redirect to setup wizard
+                window.location.href = 'setup-wizard-app.html';
+                return;
+            }
+
+            // Load initial data
+            try {
+                const loadedBarbers = await SharedData.getBarbers();
+                barbers = Array.isArray(loadedBarbers) ? loadedBarbers : [];
+            } catch (error) {
+                console.error('Error loading initial barbers:', error);
+                barbers = [];
+            }
+            isZh = SharedData.getPreferredLanguage() === 'zh';
+
             updateLanguage();
             // Don't generate calendar on page load - only when calendar tab is clicked
             setupSwipeNavigation();
-            initializeStaff();  // Initialize staff management
-            loadStoreHours();
+            await initializeStaff();  // Initialize staff management
+            await loadStoreHours();
             loadServices();
-            loadAppointments();
+            await loadAppointments();
+            await initializeSettings();  // Initialize settings with booking policies
 
             // Delay dashboard update to ensure DOM and data are ready
-            setTimeout(() => {
-                updateDashboardMetrics();
+            setTimeout(async () => {
+                await updateDashboardMetrics();
             }, 100);
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializePage);
+        } else {
+            // DOM is already loaded
+            initializePage();
         }
 
         // Listen for changes from other tabs
         window.addEventListener('storage', (e) => {
+            // Only process real storage events from other tabs, not our dispatched ones
+            if (!e.isTrusted) return; // Skip manually dispatched events
+
+            // Handle language preference changes
+            if (e.key === 'preferredLanguage') {
+                const newLang = e.newValue;
+                if (newLang) {
+                    isZh = newLang === 'zh';
+                    updateLanguage();
+                }
+            }
+
             if (e.key === 'storeHours') {
                 loadStoreHours();
                 updateDashboardMetrics();
             } else if (e.key === 'services') {
-                // Only reload if changed from another tab (not this one)
-                if (e.storageArea !== localStorage) {
-                    loadServices();
-                }
+                loadServices();
                 updateDashboardMetrics();
             } else if (e.key === 'appointments' || e.key === 'blockedTimes') {
                 // Just reload appointments, not services

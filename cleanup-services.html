@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Clean Up Duplicate Services</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .service-item {
+            background: #f5f5f5;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .duplicate {
+            background: #ffebee;
+        }
+        button {
+            background: #f44336;
+            color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #d32f2f;
+        }
+        .main-button {
+            background: #4CAF50;
+            padding: 15px 30px;
+            font-size: 16px;
+            margin: 20px 0;
+            width: 100%;
+        }
+        .main-button:hover {
+            background: #45a049;
+        }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Clean Up Duplicate Services</h1>
+
+    <div id="status"></div>
+
+    <button class="main-button" onclick="scanServices()">Scan for Duplicates</button>
+    <button class="main-button" onclick="autoCleanup()">Auto-Clean Duplicates</button>
+
+    <div id="services-list"></div>
+
+    <script>
+        let allServices = [];
+
+        async function scanServices() {
+            const shopId = localStorage.getItem('supabase_shop_id');
+            const statusDiv = document.getElementById('status');
+            const listDiv = document.getElementById('services-list');
+
+            if (!shopId) {
+                statusDiv.innerHTML = '<div class="error">No shop ID found!</div>';
+                return;
+            }
+
+            try {
+                const { data: services, error } = await supabaseClient
+                    .from('services')
+                    .select('*')
+                    .eq('shop_id', shopId)
+                    .order('created_at');
+
+                if (error) {
+                    statusDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                    return;
+                }
+
+                allServices = services;
+
+                // Group services by name
+                const servicesByName = {};
+                services.forEach(service => {
+                    if (!servicesByName[service.name]) {
+                        servicesByName[service.name] = [];
+                    }
+                    servicesByName[service.name].push(service);
+                });
+
+                // Display services
+                listDiv.innerHTML = '<h3>Services Found:</h3>';
+
+                for (const [name, serviceList] of Object.entries(servicesByName)) {
+                    if (serviceList.length > 1) {
+                        listDiv.innerHTML += `<h4 style="color: red;">⚠️ Duplicate: ${name} (${serviceList.length} copies)</h4>`;
+                        serviceList.forEach((service, index) => {
+                            listDiv.innerHTML += `
+                                <div class="service-item duplicate">
+                                    <div>
+                                        ${index === 0 ? '✅ KEEP:' : '❌ DELETE:'}
+                                        ${service.name}
+                                        (ID: ${service.id.slice(0, 8)}...)
+                                        Created: ${new Date(service.created_at).toLocaleString()}
+                                    </div>
+                                    ${index > 0 ? `<button onclick="deleteService('${service.id}')">Delete</button>` : ''}
+                                </div>
+                            `;
+                        });
+                    } else {
+                        listDiv.innerHTML += `
+                            <div class="service-item">
+                                ✅ ${name} (ID: ${serviceList[0].id.slice(0, 8)}...)
+                            </div>
+                        `;
+                    }
+                }
+
+                // Count duplicates
+                let duplicateCount = 0;
+                for (const serviceList of Object.values(servicesByName)) {
+                    if (serviceList.length > 1) {
+                        duplicateCount += serviceList.length - 1;
+                    }
+                }
+
+                if (duplicateCount > 0) {
+                    statusDiv.innerHTML = `<div class="error">Found ${duplicateCount} duplicate services!</div>`;
+                } else {
+                    statusDiv.innerHTML = `<div class="success">No duplicates found! All ${services.length} services are unique.</div>`;
+                }
+
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">Exception: ${error.message}</div>`;
+            }
+        }
+
+        async function deleteService(serviceId) {
+            if (!confirm('Delete this service?')) return;
+
+            try {
+                const { error } = await supabaseClient
+                    .from('services')
+                    .delete()
+                    .eq('id', serviceId);
+
+                if (error) {
+                    alert('Error: ' + error.message);
+                } else {
+                    scanServices(); // Refresh list
+                }
+            } catch (error) {
+                alert('Exception: ' + error.message);
+            }
+        }
+
+        async function autoCleanup() {
+            const shopId = localStorage.getItem('supabase_shop_id');
+            const statusDiv = document.getElementById('status');
+
+            if (!confirm('This will automatically delete all duplicate services, keeping only the oldest of each. Continue?')) {
+                return;
+            }
+
+            try {
+                const { data: services, error } = await supabaseClient
+                    .from('services')
+                    .select('*')
+                    .eq('shop_id', shopId)
+                    .order('created_at');
+
+                if (error) throw error;
+
+                // Group by name
+                const servicesByName = {};
+                services.forEach(service => {
+                    if (!servicesByName[service.name]) {
+                        servicesByName[service.name] = [];
+                    }
+                    servicesByName[service.name].push(service);
+                });
+
+                // Delete duplicates
+                let deleted = 0;
+                for (const [name, serviceList] of Object.entries(servicesByName)) {
+                    if (serviceList.length > 1) {
+                        // Keep the first (oldest), delete the rest
+                        for (let i = 1; i < serviceList.length; i++) {
+                            const { error } = await supabaseClient
+                                .from('services')
+                                .delete()
+                                .eq('id', serviceList[i].id);
+
+                            if (!error) {
+                                deleted++;
+                                console.log(`Deleted duplicate: ${name} (${serviceList[i].id})`);
+                            }
+                        }
+                    }
+                }
+
+                statusDiv.innerHTML = `<div class="success">✅ Cleanup complete! Deleted ${deleted} duplicate services.</div>`;
+
+                // Update barber's service IDs to use only the remaining ones
+                const { data: remainingServices } = await supabaseClient
+                    .from('services')
+                    .select('id')
+                    .eq('shop_id', shopId);
+
+                if (remainingServices) {
+                    const serviceIds = remainingServices.map(s => s.id);
+
+                    // Update the owner barber to have all remaining services
+                    const { data: barbers } = await supabaseClient
+                        .from('barbers')
+                        .select('id')
+                        .eq('shop_id', shopId)
+                        .eq('is_owner', true);
+
+                    if (barbers && barbers.length > 0) {
+                        await supabaseClient
+                            .from('barbers')
+                            .update({ service_ids: serviceIds })
+                            .eq('id', barbers[0].id);
+
+                        statusDiv.innerHTML += '<br>✅ Updated owner barber with cleaned service list.';
+                    }
+                }
+
+                // Refresh the list
+                setTimeout(scanServices, 1000);
+
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Scan on load
+        setTimeout(scanServices, 500);
+    </script>
+</body>
+</html>

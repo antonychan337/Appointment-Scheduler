@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Direct Shop Deletion</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .shop-item {
+            padding: 15px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .shop-info {
+            flex: 1;
+        }
+        .shop-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .shop-details {
+            font-size: 12px;
+            color: #666;
+        }
+        .latest {
+            background: #e8f4fd;
+            border-color: #4A90E2;
+        }
+        button {
+            padding: 8px 15px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 12px;
+        }
+        button:hover {
+            background: #c82333;
+        }
+        button.safe {
+            background: #28a745;
+        }
+        button.safe:hover {
+            background: #218838;
+        }
+        button.refresh {
+            background: #007bff;
+        }
+        button.refresh:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Direct Shop Deletion</h1>
+    <p>Delete shops one by one. Keep only the latest Antony's Salon.</p>
+
+    <div id="status"></div>
+
+    <button class="refresh" onclick="loadShops()">Refresh List</button>
+
+    <h2>All Shops:</h2>
+    <div id="shops-list"></div>
+
+    <h3>Debug Info:</h3>
+    <pre id="debug"></pre>
+
+    <script>
+        let allShops = [];
+
+        async function loadShops() {
+            const container = document.getElementById('shops-list');
+            const status = document.getElementById('status');
+            const debug = document.getElementById('debug');
+
+            try {
+                // Get all shops
+                const { data: shops, error } = await supabaseClient
+                    .from('shops')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error) {
+                    status.innerHTML = `<div class="status error">Error loading shops: ${error.message}</div>`;
+                    debug.textContent = JSON.stringify(error, null, 2);
+                    return;
+                }
+
+                allShops = shops || [];
+
+                if (allShops.length === 0) {
+                    container.innerHTML = '<div class="shop-item">No shops found</div>';
+                    return;
+                }
+
+                // Find the latest Antony's Salon
+                const antonySalons = allShops.filter(s => s.name === "Antony's Salon");
+                const latestAntonys = antonySalons.length > 0 ? antonySalons[0] : null;
+
+                container.innerHTML = '';
+                allShops.forEach(shop => {
+                    const isLatest = latestAntonys && shop.id === latestAntonys.id;
+                    const shopDiv = document.createElement('div');
+                    shopDiv.className = `shop-item ${isLatest ? 'latest' : ''}`;
+
+                    shopDiv.innerHTML = `
+                        <div class="shop-info">
+                            <div class="shop-name">${shop.name} ${isLatest ? '(KEEP - LATEST)' : ''}</div>
+                            <div class="shop-details">
+                                ID: ${shop.id}<br>
+                                Created: ${new Date(shop.created_at).toLocaleString()}<br>
+                                Owner: ${shop.owner_id || 'Not set'}
+                            </div>
+                        </div>
+                        <div>
+                            ${!isLatest ? `<button onclick="deleteShop('${shop.id}', '${shop.name.replace(/'/g, "\\'")}')">Delete This Shop</button>` : '<span style="color: green;">✓ Keep</span>'}
+                        </div>
+                    `;
+
+                    container.appendChild(shopDiv);
+                });
+
+                status.innerHTML = `<div class="status success">Found ${allShops.length} shops</div>`;
+                debug.textContent = `Total shops: ${allShops.length}\nLatest Antony's Salon ID: ${latestAntonys?.id || 'None found'}`;
+
+            } catch (error) {
+                console.error('Error:', error);
+                status.innerHTML = `<div class="status error">Error: ${error.message}</div>`;
+                debug.textContent = JSON.stringify(error, null, 2);
+            }
+        }
+
+        async function deleteShop(shopId, shopName) {
+            const status = document.getElementById('status');
+            const debug = document.getElementById('debug');
+
+            if (!confirm(`Are you sure you want to delete "${shopName}"?`)) {
+                return;
+            }
+
+            try {
+                status.innerHTML = `<div class="status">Deleting ${shopName}...</div>`;
+
+                // First, try to delete related data
+
+                // Delete appointments
+                const { data: appts, error: apptError } = await supabaseClient
+                    .from('appointments')
+                    .delete()
+                    .eq('shop_id', shopId)
+                    .select();
+
+                console.log('Appointments deleted:', appts);
+                if (apptError) console.error('Appointment delete error:', apptError);
+
+                // Delete services
+                const { data: svcs, error: svcError } = await supabaseClient
+                    .from('services')
+                    .delete()
+                    .eq('shop_id', shopId)
+                    .select();
+
+                console.log('Services deleted:', svcs);
+                if (svcError) console.error('Service delete error:', svcError);
+
+                // Now delete the shop
+                const { data: deletedShop, error: deleteError, count } = await supabaseClient
+                    .from('shops')
+                    .delete()
+                    .eq('id', shopId)
+                    .select();
+
+                console.log('Delete response:', { data: deletedShop, error: deleteError, count });
+
+                if (deleteError) {
+                    status.innerHTML = `<div class="status error">Failed to delete shop: ${deleteError.message}</div>`;
+                    debug.textContent = `Delete error:\n${JSON.stringify(deleteError, null, 2)}`;
+                    return;
+                }
+
+                if (deletedShop && deletedShop.length > 0) {
+                    status.innerHTML = `<div class="status success">Successfully deleted "${shopName}"</div>`;
+                    debug.textContent = `Deleted shop:\n${JSON.stringify(deletedShop[0], null, 2)}`;
+                } else {
+                    // Check if shop still exists
+                    const { data: checkShop, error: checkError } = await supabaseClient
+                        .from('shops')
+                        .select('*')
+                        .eq('id', shopId)
+                        .single();
+
+                    if (checkError && checkError.code === 'PGRST116') {
+                        // Shop doesn't exist, so it was deleted
+                        status.innerHTML = `<div class="status success">Shop "${shopName}" has been deleted</div>`;
+                    } else if (checkShop) {
+                        // Shop still exists
+                        status.innerHTML = `<div class="status error">Shop still exists. May be a permissions issue.</div>`;
+                        debug.textContent = `Shop still in DB:\n${JSON.stringify(checkShop, null, 2)}`;
+                    } else {
+                        status.innerHTML = `<div class="status error">Unknown delete status</div>`;
+                    }
+                }
+
+                // Reload the list
+                setTimeout(loadShops, 1000);
+
+            } catch (error) {
+                console.error('Error:', error);
+                status.innerHTML = `<div class="status error">Error: ${error.message}</div>`;
+                debug.textContent = JSON.stringify(error, null, 2);
+            }
+        }
+
+        // Load shops on page load
+        loadShops();
+    </script>
+</body>
+</html>

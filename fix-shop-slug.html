@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fix Shop Slug</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+            width: 100%;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fix Shop Slug</h1>
+
+    <div id="status" class="info">Shop slug is currently NOT SET</div>
+
+    <button onclick="fixSlug()">Set Slug to "antonys_salon"</button>
+
+    <div id="result"></div>
+
+    <script>
+        async function fixSlug() {
+            const statusDiv = document.getElementById('status');
+            const resultDiv = document.getElementById('result');
+
+            statusDiv.className = 'info';
+            statusDiv.textContent = 'Setting slug...';
+
+            const shopId = localStorage.getItem('supabase_shop_id');
+
+            if (!shopId) {
+                resultDiv.innerHTML = '<div class="error">No shop ID found!</div>';
+                return;
+            }
+
+            try {
+                // Set the slug in database
+                const { data, error } = await supabaseClient
+                    .from('shops')
+                    .update({ slug: 'antonys_salon' })
+                    .eq('id', shopId)
+                    .select()
+                    .single();
+
+                if (error) {
+                    resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                    console.error('Error:', error);
+                } else {
+                    statusDiv.className = 'success';
+                    statusDiv.textContent = '✅ Slug set to "antonys_salon"';
+
+                    // Also update localStorage
+                    const ownerProfile = JSON.parse(localStorage.getItem('ownerProfile') || '{}');
+                    ownerProfile.bookingSlug = 'antonys_salon';
+                    localStorage.setItem('ownerProfile', JSON.stringify(ownerProfile));
+
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <p>✅ Shop slug successfully updated!</p>
+                            <p>Shop Name: ${data.name}</p>
+                            <p>Shop Slug: ${data.slug}</p>
+                            <p>Booking URL: yourdomain.com/book/${data.slug}</p>
+                        </div>
+                        <button onclick="window.location.href='customer-app.html?shop=antonys_salon'">
+                            Test Customer App Now
+                        </button>
+                        <button onclick="window.location.href='owner-app.html'">
+                            Go to Owner App
+                        </button>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Exception: ${error.message}</div>`;
+                console.error('Exception:', error);
+            }
+        }
+    </script>
+</body>
+</html>

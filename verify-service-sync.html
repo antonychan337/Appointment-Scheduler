@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Service Sync</title>
+    <script src="shared-data.js"></script>
+    <style>
+        table { border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; }
+        .enabled { background: #90EE90; }
+        .disabled { background: #FFB6C1; }
+        .button-container { margin: 20px 0; }
+        button { margin: 5px; padding: 10px 20px; font-size: 16px; cursor: pointer; }
+        button.primary { background: #4CAF50; color: white; border: none; }
+    </style>
+</head>
+<body>
+    <h1>Verify Service Sync Between Apps</h1>
+
+    <div class="button-container">
+        <button class="primary" onclick="syncAllServices()">Sync All Services to All Barbers</button>
+        <button onclick="refreshDisplay()">Refresh Display</button>
+    </div>
+
+    <div id="output"></div>
+
+    <script>
+        function displaySync() {
+            const output = document.getElementById('output');
+            const services = SharedData.getServices();
+            const barbers = SharedData.getBarbers();
+
+            // Show services status
+            let html = '<h2>Services Configuration:</h2>';
+            html += '<table>';
+            html += '<tr><th>Service</th><th>Enabled</th><th>Price</th><th>Duration</th></tr>';
+
+            const enabledServiceIds = [];
+            Object.keys(services).forEach(serviceId => {
+                const service = services[serviceId];
+                if (service.enabled) {
+                    enabledServiceIds.push(serviceId);
+                }
+                html += `
+                    <tr>
+                        <td>${service.name} (${serviceId})</td>
+                        <td class="${service.enabled ? 'enabled' : 'disabled'}">${service.enabled}</td>
+                        <td>$${service.price}</td>
+                        <td>${service.duration} min</td>
+                    </tr>
+                `;
+            });
+            html += '</table>';
+
+            // Show barber assignments
+            html += '<h2>Barber Service Assignments:</h2>';
+
+            barbers.forEach(barber => {
+                html += `<h3>${barber.name} (ID: ${barber.id})</h3>`;
+
+                // Process services like customer app
+                let barberServiceIds;
+                if (Array.isArray(barber.services)) {
+                    barberServiceIds = barber.services;
+                } else if (barber.services && typeof barber.services === 'object') {
+                    barberServiceIds = Object.keys(barber.services).filter(key => barber.services[key]);
+                } else {
+                    barberServiceIds = Object.keys(services);
+                }
+
+                // Check what will show in customer app
+                const visibleServices = [];
+                barberServiceIds.forEach(serviceId => {
+                    const service = services[serviceId];
+                    if (service && service.enabled) {
+                        visibleServices.push(`${service.name} (${serviceId})`);
+                    }
+                });
+
+                html += '<p><strong>Services visible in customer app:</strong></p>';
+                if (visibleServices.length > 0) {
+                    html += '<ul>' + visibleServices.map(s => `<li>${s}</li>`).join('') + '</ul>';
+                } else {
+                    html += '<p style="color: red;">No services visible!</p>';
+                }
+
+                // Check for sync issues
+                if (visibleServices.length !== enabledServiceIds.length) {
+                    html += `<p style="color: red; font-weight: bold;">⚠️ SYNC ISSUE: Shows ${visibleServices.length} of ${enabledServiceIds.length} enabled services</p>`;
+                } else {
+                    html += `<p style="color: green; font-weight: bold;">✓ SYNCED: All ${enabledServiceIds.length} enabled services visible</p>`;
+                }
+            });
+
+            output.innerHTML = html;
+        }
+
+        function syncAllServices() {
+            const services = SharedData.getServices();
+            const barbers = SharedData.getBarbers();
+
+            // Get enabled service IDs
+            const enabledServiceIds = Object.keys(services).filter(id => services[id].enabled);
+
+            // Create service assignment object
+            const serviceAssignment = {};
+            enabledServiceIds.forEach(id => {
+                serviceAssignment[id] = true;
+            });
+
+            // Update each barber
+            barbers.forEach(barber => {
+                SharedData.updateBarber(barber.id, { services: serviceAssignment });
+                console.log(`Updated ${barber.name} with services:`, serviceAssignment);
+            });
+
+            alert(`Synced ${enabledServiceIds.length} enabled services to ${barbers.length} barber(s)`);
+            displaySync();
+        }
+
+        function refreshDisplay() {
+            displaySync();
+        }
+
+        // Initial display
+        displaySync();
+    </script>
+</body>
+</html>

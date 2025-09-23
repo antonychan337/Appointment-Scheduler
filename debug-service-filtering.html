@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Service Filtering</title>
+    <script src="shared-data.js"></script>
+</head>
+<body>
+    <h1>Debug Service Filtering</h1>
+    <div id="output"></div>
+
+    <script>
+        const output = document.getElementById('output');
+
+        // Get all services
+        const allServices = SharedData.getServices();
+        output.innerHTML = '<h2>All Services in SharedData:</h2>';
+        output.innerHTML += '<table border="1" style="width: 100%; border-collapse: collapse;">';
+        output.innerHTML += '<tr><th>Service ID</th><th>Name</th><th>Enabled</th><th>Price</th><th>Duration</th></tr>';
+
+        Object.keys(allServices).forEach(serviceId => {
+            const service = allServices[serviceId];
+            output.innerHTML += `
+                <tr>
+                    <td>${serviceId}</td>
+                    <td>${service.name}</td>
+                    <td style="background: ${service.enabled ? '#90EE90' : '#FFB6C1'}">${service.enabled}</td>
+                    <td>$${service.price}</td>
+                    <td>${service.duration} min</td>
+                </tr>
+            `;
+        });
+        output.innerHTML += '</table>';
+
+        // Check each barber's services
+        const barbers = SharedData.getBarbers();
+        output.innerHTML += '<h2>Barber Service Assignments:</h2>';
+
+        barbers.forEach(barber => {
+            output.innerHTML += `<h3>Barber: ${barber.name} (${barber.id})</h3>`;
+
+            // Show raw services data
+            output.innerHTML += '<p><strong>Raw barber.services:</strong></p>';
+            output.innerHTML += `<pre style="background: #f0f0f0; padding: 10px;">${JSON.stringify(barber.services, null, 2)}</pre>`;
+
+            // Process services like customer app does
+            let barberServiceIds;
+            if (Array.isArray(barber.services)) {
+                barberServiceIds = barber.services;
+                output.innerHTML += '<p>Type: Array of IDs</p>';
+            } else if (barber.services && typeof barber.services === 'object') {
+                barberServiceIds = Object.keys(barber.services).filter(key => barber.services[key]);
+                output.innerHTML += '<p>Type: Object (filtering for truthy values)</p>';
+            } else {
+                barberServiceIds = Object.keys(allServices);
+                output.innerHTML += '<p>Type: undefined/null (using all services)</p>';
+            }
+
+            output.innerHTML += `<p><strong>Processed Service IDs:</strong> ${JSON.stringify(barberServiceIds)}</p>`;
+
+            // Show which services would be displayed
+            output.innerHTML += '<p><strong>Services that would be shown (enabled only):</strong></p>';
+            output.innerHTML += '<ul>';
+            let shownCount = 0;
+            barberServiceIds.forEach(serviceId => {
+                const service = allServices[serviceId];
+                if (service && service.enabled) {
+                    output.innerHTML += `<li style="color: green;">✓ ${serviceId}: ${service.name}</li>`;
+                    shownCount++;
+                } else if (service && !service.enabled) {
+                    output.innerHTML += `<li style="color: orange;">✗ ${serviceId}: ${service.name} (disabled)</li>`;
+                } else {
+                    output.innerHTML += `<li style="color: red;">✗ ${serviceId}: NOT FOUND in services</li>`;
+                }
+            });
+            output.innerHTML += '</ul>';
+            output.innerHTML += `<p><strong>Total shown: ${shownCount}</strong></p>`;
+            output.innerHTML += '<hr>';
+        });
+
+        // Check localStorage directly
+        output.innerHTML += '<h2>Raw localStorage Data:</h2>';
+        const servicesData = localStorage.getItem('services');
+        output.innerHTML += '<p><strong>services:</strong></p>';
+        output.innerHTML += `<pre style="background: #f0f0f0; padding: 10px;">${servicesData ? JSON.stringify(JSON.parse(servicesData), null, 2) : 'Not found'}</pre>`;
+
+        const barbersData = localStorage.getItem('barbers');
+        output.innerHTML += '<p><strong>barbers:</strong></p>';
+        output.innerHTML += `<pre style="background: #f0f0f0; padding: 10px;">${barbersData ? JSON.stringify(JSON.parse(barbersData), null, 2) : 'Not found'}</pre>`;
+    </script>
+</body>
+</html>

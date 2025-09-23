@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup Your Appointment System</title>
+    <script src="shared-data.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .wizard-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .wizard-header {
+            background: #4A90E2;
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .wizard-header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .wizard-header p {
+            opacity: 0.9;
+            font-size: 16px;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: white;
+            transition: width 0.3s ease;
+            width: 20%;
+        }
+
+        .wizard-content {
+            padding: 40px 30px;
+        }
+
+        .step {
+            display: none;
+        }
+
+        .step.active {
+            display: block;
+        }
+
+        .step h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #4A90E2;
+        }
+
+        .language-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 40px;
+        }
+
+        .lang-btn {
+            flex: 1;
+            padding: 20px;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        .lang-btn:hover {
+            border-color: #4A90E2;
+            transform: translateY(-2px);
+        }
+
+        .lang-btn.selected {
+            border-color: #4A90E2;
+            background: #f0f7ff;
+        }
+
+        .hours-grid {
+            display: grid;
+            gap: 15px;
+        }
+
+        .day-row {
+            display: grid;
+            grid-template-columns: 100px 1fr 20px 1fr auto;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .day-label {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .time-input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .service-list {
+            margin-bottom: 20px;
+        }
+
+        .service-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #f8f8f8;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .service-item > div:first-child {
+            flex: 1;
+        }
+
+        .toggle-switch {
+            width: 50px;
+            height: 26px;
+            background: #ccc;
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: #4CAF50;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(24px);
+        }
+
+        .service-name-input {
+            width: 100%;
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .active-time-container {
+            background: #f0f8ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 8px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #4A90E2;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #357ABD;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .success-screen {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: #4CAF50;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 30px;
+            font-size: 40px;
+            color: white;
+        }
+
+        .booking-url {
+            background: #f0f7ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 14px;
+            word-break: break-all;
+        }
+
+        .quick-fill-btn {
+            padding: 8px 16px;
+            background: #4A90E2;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .quick-fill-btn:hover {
+            background: #357ABD;
+        }
+
+        .info-checkboxes {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f8f8;
+            border-radius: 8px;
+        }
+
+        .info-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .info-checkbox input {
+            width: 18px;
+            height: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="wizard-container">
+        <div class="wizard-header">
+            <button onclick="toggleLanguage()" style="
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                background: rgba(255,255,255,0.2);
+                border: 1px solid white;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 500;
+            " id="lang-toggle-btn">中文</button>
+            <h1 id="wizard-title">Let's Set Up Your Appointment System</h1>
+            <p id="wizard-subtitle">Easy setup in less than 3 minutes</p>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress"></div>
+            </div>
+        </div>
+
+        <div class="wizard-content">
+            <!-- Step 1: Language Selection -->
+            <div class="step active" id="step-1">
+                <h2>Choose Your Language</h2>
+                <p style="color: #666; margin-bottom: 30px;">Select your preferred language for the system</p>
+                <div class="language-buttons">
+                    <button class="lang-btn" onclick="selectLanguage('en', event)">English</button>
+                    <button class="lang-btn" onclick="selectLanguage('zh', event)">中文</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Business Profile -->
+            <div class="step" id="step-2">
+                <h2 id="profile-title">Business Information</h2>
+                <div class="form-group">
+                    <label id="store-name-label">Business Name *</label>
+                    <input type="text" id="store-name" placeholder="e.g., Premium Cuts Barbershop">
+                </div>
+                <div class="form-group">
+                    <label id="store-address-label">Business Address *</label>
+                    <input type="text" id="store-address" placeholder="e.g., 123 Main St, City">
+                </div>
+                <div class="form-group">
+                    <label id="owner-name-label">Your Name *</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <input type="text" id="owner-first-name" placeholder="First Name">
+                        <input type="text" id="owner-last-name" placeholder="Last Name">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label id="phone-label">Phone Number</label>
+                    <input type="tel" id="phone" placeholder="(555) 123-4567">
+                </div>
+                <div class="form-group">
+                    <label id="email-label">Email</label>
+                    <input type="email" id="email" placeholder="your@email.com">
+                </div>
+                <div class="form-group">
+                    <label id="wechat-label">WeChat ID (Optional)</label>
+                    <input type="text" id="wechat" placeholder="Your WeChat ID">
+                </div>
+
+                <label id="show-on-booking-label" style="font-weight: 500; margin-top: 20px; display: block;">Show on customer booking page:</label>
+                <div class="info-checkboxes">
+                    <div class="info-checkbox">
+                        <input type="checkbox" id="show-phone" checked>
+                        <label for="show-phone" id="show-phone-label">Phone</label>
+                    </div>
+                    <div class="info-checkbox">
+                        <input type="checkbox" id="show-email" checked>
+                        <label for="show-email" id="show-email-label">Email</label>
+                    </div>
+                    <div class="info-checkbox">
+                        <input type="checkbox" id="show-address" checked>
+                        <label for="show-address" id="show-address-label">Address</label>
+                    </div>
+                    <div class="info-checkbox">
+                        <input type="checkbox" id="show-wechat">
+                        <label for="show-wechat" id="show-wechat-label">WeChat</label>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-secondary" onclick="previousStep()">Back</button>
+                    <button class="btn btn-primary" onclick="nextStep()">Continue</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Store Hours -->
+            <div class="step" id="step-3">
+                <h2 id="hours-title">Business Hours</h2>
+                <p id="hours-subtitle" style="color: #666; margin-bottom: 20px;">Set your regular operating hours</p>
+
+                <div class="hours-grid">
+                    <div class="day-row">
+                        <span class="day-label" id="monday-label">Monday</span>
+                        <input type="time" class="time-input" id="monday-open" value="09:00">
+                        <span>–</span>
+                        <input type="time" class="time-input" id="monday-close" value="18:00">
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="monday-closed">
+                            <label for="monday-closed" id="closed-label-1">Closed</label>
+                        </div>
+                    </div>
+                    <div class="day-row">
+                        <span class="day-label" id="tuesday-label">Tuesday</span>
+                        <input type="time" class="time-input" id="tuesday-open" value="09:00">
+                        <span>–</span>
+                        <input type="time" class="time-input" id="tuesday-close" value="18:00">
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="tuesday-closed">
+                            <label for="tuesday-closed" id="closed-label-2">Closed</label>
+                        </div>
+                    </div>
+                    <div class="day-row">
+                        <span class="day-label" id="wednesday-label">Wednesday</span>
+                        <input type="time" class="time-input" id="wednesday-open" value="09:00">
+                        <span>–</span>
+                        <input type="time" class="time-input" id="wednesday-close" value="18:00">
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="wednesday-closed">
+                            <label for="wednesday-closed" id="closed-label-3">Closed</label>
+                        </div>
+                    </div>
+                    <div class="day-row">
+                        <span class="day-label" id="thursday-label">Thursday</span>
+                        <input type="time" class="time-input" id="thursday-open" value="09:00">
+                        <span>–</span>
+                        <input type="time" class="time-input" id="thursday-close" value="18:00">
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="thursday-closed">
+                            <label for="thursday-closed" id="closed-label-4">Closed</label>
+                        </div>
+                    </div>
+                    <div class="day-row">
+                        <span class="day-label" id="friday-label">Friday</span>
+                        <input type="time" class="time-input" id="friday-open" value="09:00">
+                        <span>–</span>
+                        <input type="time" class="time-input" id="friday-close" value="18:00">
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="friday-closed">
+                            <label for="friday-closed" id="closed-label-5">Closed</label>
+                        </div>
+                    </div>
+                    <div class="day-row">
+                        <span class="day-label" id="saturday-label">Saturday</span>
+                        <input type="time" class="time-input" id="saturday-open" value="10:00">
+                        <span>–</span>
+                        <input type="time" class="time-input" id="saturday-close" value="17:00">
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="saturday-closed">
+                            <label for="saturday-closed" id="closed-label-6">Closed</label>
+                        </div>
+                    </div>
+                    <div class="day-row">
+                        <span class="day-label" id="sunday-label">Sunday</span>
+                        <input type="time" class="time-input" id="sunday-open" value="10:00">
+                        <span>–</span>
+                        <input type="time" class="time-input" id="sunday-close" value="17:00">
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="sunday-closed" checked>
+                            <label for="sunday-closed" id="closed-label-7">Closed</label>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="quick-fill-btn" onclick="quickFillHours()" id="quick-fill-btn">Apply Monday's hours to all weekdays</button>
+
+                <div class="button-group">
+                    <button class="btn btn-secondary" onclick="previousStep()">Back</button>
+                    <button class="btn btn-primary" onclick="nextStep()">Continue</button>
+                </div>
+            </div>
+
+            <!-- Step 4: Services -->
+            <div class="step" id="step-4">
+                <h2 id="services-title">Services You Offer</h2>
+                <p id="services-subtitle" style="color: #666; margin-bottom: 20px;">Select the services you provide</p>
+
+                <div class="service-list" id="services-list" style="max-height: 400px; overflow-y: auto;">
+                    <!-- Men's Cut -->
+                    <div class="service-item" data-service="mens-cut">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="width: 20px; height: 20px; background: #2196F3; border-radius: 4px;"></div>
+                                <input type="text" class="service-name-input" id="service-mens-cut" value="Men's Cut" style="flex: 1;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
+                                <input type="number" id="duration-mens-cut" value="30" min="5" max="480" style="width: 50px; padding: 4px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;">
+                                <span style="font-size: 13px; color: #666;">min</span>
+                                <span style="color: #666;">•</span>
+                                <span style="font-size: 13px; color: #666;">$</span>
+                                <input type="number" id="price-mens-cut" value="25" min="0" step="0.01" style="width: 60px; padding: 4px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;">
+                            </div>
+                        </div>
+                        <div style="margin-top: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" id="toggle-active-mens-cut" onchange="toggleActiveTime('mens-cut')" style="cursor: pointer;">
+                                <label for="toggle-active-mens-cut" style="font-size: 12px; color: #666; cursor: pointer;">Has active time periods</label>
+                            </div>
+                            <div id="active-container-mens-cut" style="display: none; margin-left: 24px; margin-top: 8px;">
+                                <div class="active-periods-list" id="periods-mens-cut"></div>
+                                <button onclick="addPeriodToService('mens-cut')" style="margin-top: 5px; padding: 3px 8px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">Add period</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Women's Cut -->
+                    <div class="service-item" data-service="womens-cut">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="width: 20px; height: 20px; background: #E91E63; border-radius: 4px;"></div>
+                                <input type="text" class="service-name-input" id="service-womens-cut" value="Women's Cut" style="flex: 1;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
+                                <input type="number" id="duration-womens-cut" value="45" min="5" max="480" style="width: 50px; padding: 4px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;">
+                                <span style="font-size: 13px; color: #666;">min</span>
+                                <span style="color: #666;">•</span>
+                                <span style="font-size: 13px; color: #666;">$</span>
+                                <input type="number" id="price-womens-cut" value="35" min="0" step="0.01" style="width: 60px; padding: 4px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;">
+                            </div>
+                        </div>
+                        <div style="margin-top: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" id="toggle-active-womens-cut" onchange="toggleActiveTime('womens-cut')" style="cursor: pointer;">
+                                <label for="toggle-active-womens-cut" style="font-size: 12px; color: #666; cursor: pointer;">Has active time periods</label>
+                            </div>
+                            <div id="active-container-womens-cut" style="display: none; margin-left: 24px; margin-top: 8px;">
+                                <div class="active-periods-list" id="periods-womens-cut"></div>
+                                <button onclick="addPeriodToService('womens-cut')" style="margin-top: 5px; padding: 3px 8px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">Add period</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Children's Cut -->
+                    <div class="service-item" data-service="kids-cut">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="width: 20px; height: 20px; background: #4CAF50; border-radius: 4px;"></div>
+                                <input type="text" class="service-name-input" id="service-kids-cut" value="Children's Cut" style="flex: 1;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
+                                <input type="number" id="duration-kids-cut" value="15" min="5" max="480" style="width: 50px; padding: 4px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;">
+                                <span style="font-size: 13px; color: #666;">min</span>
+                                <span style="color: #666;">•</span>
+                                <span style="font-size: 13px; color: #666;">$</span>
+                                <input type="number" id="price-kids-cut" value="15" min="0" step="0.01" style="width: 60px; padding: 4px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;">
+                            </div>
+                        </div>
+                        <div style="margin-top: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" id="toggle-active-kids-cut" onchange="toggleActiveTime('kids-cut')" style="cursor: pointer;">
+                                <label for="toggle-active-kids-cut" style="font-size: 12px; color: #666; cursor: pointer;">Has active time periods</label>
+                            </div>
+                            <div id="active-container-kids-cut" style="display: none; margin-left: 24px; margin-top: 8px;">
+                                <div class="active-periods-list" id="periods-kids-cut"></div>
+                                <button onclick="addPeriodToService('kids-cut')" style="margin-top: 5px; padding: 3px 8px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">Add period</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hair Coloring -->
+                    <div class="service-item" data-service="coloring">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="width: 20px; height: 20px; background: #FF9800; border-radius: 4px;"></div>
+                                <input type="text" class="service-name-input" id="service-coloring" value="Hair Coloring" style="flex: 1;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
+                                <input type="number" id="duration-coloring" value="90" min="5" max="480" style="width: 50px; padding: 4px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;">
+                                <span style="font-size: 13px; color: #666;">min</span>
+                                <span style="color: #666;">•</span>
+                                <span style="font-size: 13px; color: #666;">$</span>
+                                <input type="number" id="price-coloring" value="80" min="0" step="0.01" style="width: 60px; padding: 4px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;">
+                            </div>
+                        </div>
+                        <div style="margin-top: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" id="toggle-active-coloring" checked onchange="toggleActiveTime('coloring')" style="cursor: pointer;">
+                                <label for="toggle-active-coloring" style="font-size: 12px; color: #666; cursor: pointer;">Has active time periods</label>
+                            </div>
+                            <div id="active-container-coloring" style="display: block; margin-left: 24px; margin-top: 8px;">
+                                <div class="active-periods-list" id="periods-coloring">
+                                    <div class="active-period-item" style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                                        <span style="font-size: 12px; color: #4A90E2; min-width: 50px;">Period 1:</span>
+                                        <input type="number" class="period-start" value="0" min="0" max="90" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px;">
+                                        <span style="font-size: 12px; color: #4A90E2;">to</span>
+                                        <input type="number" class="period-end" value="30" min="0" max="90" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px;">
+                                        <span style="font-size: 12px; color: #4A90E2;">min</span>
+                                        <button onclick="removePeriodFromService(this, 'coloring')" style="padding: 2px 6px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">×</button>
+                                    </div>
+                                    <div class="active-period-item" style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                                        <span style="font-size: 12px; color: #4A90E2; min-width: 50px;">Period 2:</span>
+                                        <input type="number" class="period-start" value="60" min="0" max="90" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px;">
+                                        <span style="font-size: 12px; color: #4A90E2;">to</span>
+                                        <input type="number" class="period-end" value="90" min="0" max="90" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px;">
+                                        <span style="font-size: 12px; color: #4A90E2;">min</span>
+                                        <button onclick="removePeriodFromService(this, 'coloring')" style="padding: 2px 6px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">×</button>
+                                    </div>
+                                </div>
+                                <button onclick="addPeriodToService('coloring')" style="margin-top: 5px; padding: 3px 8px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">Add period</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Highlights -->
+                    <div class="service-item" data-service="highlights">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="width: 20px; height: 20px; background: #9C27B0; border-radius: 4px;"></div>
+                                <input type="text" class="service-name-input" id="service-highlights" value="Highlights" style="flex: 1;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
+                                <input type="number" id="duration-highlights" value="120" min="5" max="480" style="width: 50px; padding: 4px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;">
+                                <span style="font-size: 13px; color: #666;">min</span>
+                                <span style="color: #666;">•</span>
+                                <span style="font-size: 13px; color: #666;">$</span>
+                                <input type="number" id="price-highlights" value="120" min="0" step="0.01" style="width: 60px; padding: 4px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;">
+                            </div>
+                        </div>
+                        <div style="margin-top: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" id="toggle-active-highlights" checked onchange="toggleActiveTime('highlights')" style="cursor: pointer;">
+                                <label for="toggle-active-highlights" style="font-size: 12px; color: #666; cursor: pointer;">Has active time periods</label>
+                            </div>
+                            <div id="active-container-highlights" style="display: block; margin-left: 24px; margin-top: 8px;">
+                                <div class="active-periods-list" id="periods-highlights">
+                                    <div class="active-period-item" style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                                        <span style="font-size: 12px; color: #4A90E2; min-width: 50px;">Period 1:</span>
+                                        <input type="number" class="period-start" value="0" min="0" max="120" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px;">
+                                        <span style="font-size: 12px; color: #4A90E2;">to</span>
+                                        <input type="number" class="period-end" value="15" min="0" max="120" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px;">
+                                        <span style="font-size: 12px; color: #4A90E2;">min</span>
+                                        <button onclick="removePeriodFromService(this, 'highlights')" style="padding: 2px 6px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">×</button>
+                                    </div>
+                                    <div class="active-period-item" style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                                        <span style="font-size: 12px; color: #4A90E2; min-width: 50px;">Period 2:</span>
+                                        <input type="number" class="period-start" value="45" min="0" max="120" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px;">
+                                        <span style="font-size: 12px; color: #4A90E2;">to</span>
+                                        <input type="number" class="period-end" value="75" min="0" max="120" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px;">
+                                        <span style="font-size: 12px; color: #4A90E2;">min</span>
+                                        <button onclick="removePeriodFromService(this, 'highlights')" style="padding: 2px 6px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">×</button>
+                                    </div>
+                                    <div class="active-period-item" style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                                        <span style="font-size: 12px; color: #4A90E2; min-width: 50px;">Period 3:</span>
+                                        <input type="number" class="period-start" value="95" min="0" max="120" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px;">
+                                        <span style="font-size: 12px; color: #4A90E2;">to</span>
+                                        <input type="number" class="period-end" value="120" min="0" max="120" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px;">
+                                        <span style="font-size: 12px; color: #4A90E2;">min</span>
+                                        <button onclick="removePeriodFromService(this, 'highlights')" style="padding: 2px 6px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">×</button>
+                                    </div>
+                                </div>
+                                <button onclick="addPeriodToService('highlights')" style="margin-top: 5px; padding: 3px 8px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">Add period</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <p id="services-note" style="color: #666; font-size: 14px; margin-top: 15px;">
+                    You can add more services and customize them later in the Staff tab
+                </p>
+
+                <div class="button-group">
+                    <button class="btn btn-secondary" onclick="previousStep()">Back</button>
+                    <button class="btn btn-primary" onclick="nextStep()">Continue</button>
+                </div>
+            </div>
+
+            <!-- Step 5: Policies -->
+            <div class="step" id="step-5">
+                <h2 id="policies-title">Booking Policies</h2>
+                <p id="policies-subtitle" style="color: #666; margin-bottom: 20px;">Set your booking and cancellation rules</p>
+
+                <div class="form-group">
+                    <label id="min-booking-label">Minimum booking notice (hours)</label>
+                    <input type="number" id="min-booking" value="0" min="0" max="168">
+                    <small style="color: #666;">How far in advance must customers book?</small>
+                </div>
+
+                <div class="form-group">
+                    <label id="min-cancel-label">Minimum cancellation notice (hours)</label>
+                    <input type="number" id="min-cancel" value="24" min="0" max="168">
+                    <small style="color: #666;">How far in advance can customers cancel?</small>
+                </div>
+
+                <div class="form-group">
+                    <label id="max-advance-label">Maximum advance booking (days)</label>
+                    <input type="number" id="max-advance" value="60" min="1" max="365">
+                    <small style="color: #666;">How far into the future can customers book?</small>
+                </div>
+
+                <p id="policies-note" style="color: #666; font-size: 14px; margin-top: 15px;">
+                    You can change these anytime in Settings > Policies
+                </p>
+
+                <div class="button-group">
+                    <button class="btn btn-secondary" onclick="previousStep()">Back</button>
+                    <button class="btn btn-primary" onclick="completeSetup()">Complete Setup</button>
+                </div>
+            </div>
+
+            <!-- Success Screen -->
+            <div class="step" id="step-success">
+                <div class="success-screen">
+                    <div class="success-icon">✓</div>
+                    <h2 id="success-title">Your booking system is ready!</h2>
+                    <p id="success-subtitle" style="color: #666; margin-bottom: 30px;">Share this link with your customers:</p>
+
+                    <div class="booking-url" id="booking-url">
+                        https://yourdomain.com/book/premium-cuts
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn btn-secondary" onclick="copyUrl()" id="copy-btn">Copy Link</button>
+                        <button class="btn btn-primary" onclick="goToDashboard()">Go to Dashboard</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 1;
+        let selectedLang = 'en';
+        let setupServices = {};
+        const totalSteps = 5;
+
+        const translations = {
+            en: {
+                wizardTitle: "Let's Set Up Your Appointment System",
+                wizardSubtitle: "Easy setup in less than 3 minutes",
+                langTitle: "Choose Your Language",
+                langSubtitle: "Select your preferred language for the system",
+                profileTitle: "Business Information",
+                storeNameLabel: "Business Name *",
+                storeAddressLabel: "Business Address *",
+                ownerNameLabel: "Your Name *",
+                phoneLabel: "Phone Number",
+                emailLabel: "Email",
+                wechatLabel: "WeChat ID (Optional)",
+                showOnBookingLabel: "Show on customer booking page:",
+                hoursTitle: "Business Hours",
+                hoursSubtitle: "Set your regular operating hours",
+                days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+                closedLabel: "Closed",
+                quickFillBtn: "Apply Monday's hours to all days",
+                servicesTitle: "Services You Offer",
+                servicesSubtitle: "Select the services you provide",
+                servicesNote: "You can add more services and customize them later in the Staff tab",
+                mensCutName: "Men's Cut",
+                womensCutName: "Women's Cut",
+                kidsCutName: "Children's Cut",
+                coloringName: "Hair Coloring",
+                policiesTitle: "Booking Policies",
+                policiesSubtitle: "Set your booking and cancellation rules",
+                minBookingLabel: "Minimum booking notice (hours)",
+                minCancelLabel: "Minimum cancellation notice (hours)",
+                maxAdvanceLabel: "Maximum advance booking (days)",
+                policiesNote: "You can change these anytime in Settings > Policies",
+                backBtn: "Back",
+                continueBtn: "Continue",
+                completeBtn: "Complete Setup",
+                successTitle: "Your booking system is ready!",
+                successSubtitle: "Share this link with your customers:",
+                copyBtn: "Copy Link",
+                dashboardBtn: "Go to Dashboard"
+            },
+            zh: {
+                wizardTitle: "设置您的预约系统",
+                wizardSubtitle: "3分钟内轻松完成设置",
+                langTitle: "选择语言",
+                langSubtitle: "选择系统的首选语言",
+                profileTitle: "商家信息",
+                storeNameLabel: "商家名称 *",
+                storeAddressLabel: "商家地址 *",
+                ownerNameLabel: "您的姓名 *",
+                phoneLabel: "电话号码",
+                emailLabel: "电子邮箱",
+                wechatLabel: "微信ID（可选）",
+                showOnBookingLabel: "在客户预约页面显示：",
+                hoursTitle: "营业时间",
+                hoursSubtitle: "设置您的常规营业时间",
+                days: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+                closedLabel: "休息",
+                quickFillBtn: "将周一的时间应用到所有天",
+                servicesTitle: "您提供的服务",
+                servicesSubtitle: "选择您提供的服务项目",
+                servicesNote: "您可以稍后在员工标签中添加更多服务并进行自定义",
+                mensCutName: "男士理发",
+                womensCutName: "女士理发",
+                kidsCutName: "儿童理发",
+                coloringName: "染发",
+                policiesTitle: "预约政策",
+                policiesSubtitle: "设置您的预约和取消规则",
+                minBookingLabel: "最短预约通知时间（小时）",
+                minCancelLabel: "最短取消通知时间（小时）",
+                maxAdvanceLabel: "最长提前预约时间（天）",
+                policiesNote: "您可以随时在 设置 > 政策 中更改这些设置",
+                backBtn: "返回",
+                continueBtn: "继续",
+                completeBtn: "完成设置",
+                successTitle: "您的预约系统已准备就绪！",
+                successSubtitle: "与您的客户分享此链接：",
+                copyBtn: "复制链接",
+                dashboardBtn: "进入控制台"
+            }
+        };
+
+        function selectLanguage(lang, event) {
+            selectedLang = lang;
+            SharedData.setPreferredLanguage(lang);
+
+            // Update button styles
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            if (event && event.target) {
+                event.target.classList.add('selected');
+            }
+
+            // Update all text
+            updateLanguage();
+
+            // Advance to next step after a brief delay for visual feedback
+            setTimeout(() => {
+                nextStep();
+            }, 300);
+        }
+
+        function toggleLanguage() {
+            selectedLang = selectedLang === 'en' ? 'zh' : 'en';
+            SharedData.setPreferredLanguage(selectedLang);
+            updateLanguage();
+        }
+
+        function updateLanguage() {
+            const t = translations[selectedLang];
+
+            // Helper function to safely update element text
+            function updateElement(id, text) {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.textContent = text;
+                }
+            }
+
+            // Update language toggle button
+            const langBtn = document.getElementById('lang-toggle-btn');
+            if (langBtn) {
+                langBtn.textContent = selectedLang === 'en' ? '中文' : 'EN';
+            }
+
+            updateElement('wizard-title', t.wizardTitle);
+            updateElement('wizard-subtitle', t.wizardSubtitle);
+            updateElement('profile-title', t.profileTitle);
+            updateElement('store-name-label', t.storeNameLabel);
+            updateElement('store-address-label', t.storeAddressLabel);
+            updateElement('owner-name-label', t.ownerNameLabel);
+            updateElement('phone-label', t.phoneLabel);
+            updateElement('email-label', t.emailLabel);
+            updateElement('wechat-label', t.wechatLabel);
+            updateElement('show-on-booking-label', t.showOnBookingLabel);
+            updateElement('show-phone-label', t.phoneLabel.replace(':', ''));
+            updateElement('show-email-label', t.emailLabel.replace(':', ''));
+            updateElement('show-address-label', t.storeAddressLabel.replace(' *', ''));
+            updateElement('show-wechat-label', t.wechatLabel.replace(' (Optional)', '').replace('（可选）', ''));
+
+            updateElement('hours-title', t.hoursTitle);
+            updateElement('hours-subtitle', t.hoursSubtitle);
+
+            // Update day labels
+            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+            days.forEach((day, i) => {
+                const label = document.getElementById(`${day}-label`);
+                if (label) label.textContent = t.days[i];
+            });
+
+            // Update closed labels
+            for (let i = 1; i <= 7; i++) {
+                const label = document.getElementById(`closed-label-${i}`);
+                if (label) label.textContent = t.closedLabel;
+            }
+
+            updateElement('quick-fill-btn', t.quickFillBtn);
+
+            updateElement('services-title', t.servicesTitle);
+            updateElement('services-subtitle', t.servicesSubtitle);
+            updateElement('services-note', t.servicesNote);
+
+            updateElement('policies-title', t.policiesTitle);
+            updateElement('policies-subtitle', t.policiesSubtitle);
+            updateElement('min-booking-label', t.minBookingLabel);
+            updateElement('min-cancel-label', t.minCancelLabel);
+            updateElement('max-advance-label', t.maxAdvanceLabel);
+            updateElement('policies-note', t.policiesNote);
+
+            updateElement('success-title', t.successTitle);
+            updateElement('success-subtitle', t.successSubtitle);
+            updateElement('copy-btn', t.copyBtn);
+
+            // Update all button texts
+            document.querySelectorAll('.btn-secondary').forEach(btn => {
+                if (btn.textContent.includes('Back') || btn.textContent.includes('返回')) {
+                    btn.textContent = t.backBtn;
+                }
+            });
+
+            document.querySelectorAll('.btn-primary').forEach(btn => {
+                if (btn.textContent.includes('Continue') || btn.textContent.includes('继续')) {
+                    btn.textContent = t.continueBtn;
+                } else if (btn.textContent.includes('Complete') || btn.textContent.includes('完成')) {
+                    btn.textContent = t.completeBtn;
+                } else if (btn.textContent.includes('Dashboard') || btn.textContent.includes('控制台')) {
+                    btn.textContent = t.dashboardBtn;
+                }
+            });
+        }
+
+        function nextStep() {
+            if (currentStep < totalSteps) {
+                // Validate current step
+                if (!validateStep(currentStep)) {
+                    return;
+                }
+
+                document.getElementById(`step-${currentStep}`).classList.remove('active');
+                currentStep++;
+                document.getElementById(`step-${currentStep}`).classList.add('active');
+                updateProgress();
+            }
+        }
+
+        function previousStep() {
+            if (currentStep > 1) {
+                document.getElementById(`step-${currentStep}`).classList.remove('active');
+                currentStep--;
+                document.getElementById(`step-${currentStep}`).classList.add('active');
+                updateProgress();
+            }
+        }
+
+        function updateProgress() {
+            const progress = (currentStep / totalSteps) * 100;
+            document.getElementById('progress').style.width = progress + '%';
+        }
+
+        function validateStep(step) {
+            if (step === 2) {
+                // Validate business profile
+                const storeName = document.getElementById('store-name').value.trim();
+                const storeAddress = document.getElementById('store-address').value.trim();
+                const firstName = document.getElementById('owner-first-name').value.trim();
+                const lastName = document.getElementById('owner-last-name').value.trim();
+
+                if (!storeName || !storeAddress || !firstName || !lastName) {
+                    alert(selectedLang === 'zh' ? '请填写所有必填字段' : 'Please fill in all required fields');
+                    return false;
+                }
+            }
+
+            if (step === 3) {
+                // Validate store hours
+                const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                for (let day of days) {
+                    const closed = document.getElementById(`${day}-closed`).checked;
+                    if (!closed) {
+                        const openTime = document.getElementById(`${day}-open`).value;
+                        const closeTime = document.getElementById(`${day}-close`).value;
+
+                        if (!openTime || !closeTime) {
+                            alert(selectedLang === 'zh' ?
+                                `请为${day}设置营业时间` :
+                                `Please set hours for ${day}`);
+                            return false;
+                        }
+
+                        if (openTime >= closeTime) {
+                            alert(selectedLang === 'zh' ?
+                                `${day}的关闭时间必须晚于开放时间` :
+                                `Closing time must be after opening time for ${day}`);
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+
+        function quickFillHours() {
+            const mondayOpen = document.getElementById('monday-open').value;
+            const mondayClose = document.getElementById('monday-close').value;
+            const mondayClosed = document.getElementById('monday-closed').checked;
+
+            const allDays = ['tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+            allDays.forEach(day => {
+                document.getElementById(`${day}-open`).value = mondayOpen;
+                document.getElementById(`${day}-close`).value = mondayClose;
+                document.getElementById(`${day}-closed`).checked = mondayClosed;
+            });
+        }
+
+        function completeSetup() {
+            // Gather all data
+            const setupData = {
+                language: selectedLang,
+                profile: {
+                    storeName: document.getElementById('store-name').value,
+                    storeAddress: document.getElementById('store-address').value,
+                    firstName: document.getElementById('owner-first-name').value,
+                    lastName: document.getElementById('owner-last-name').value,
+                    phone: document.getElementById('phone').value,
+                    email: document.getElementById('email').value,
+                    wechatId: document.getElementById('wechat').value
+                },
+                displayInfo: {
+                    showPhone: document.getElementById('show-phone').checked,
+                    showEmail: document.getElementById('show-email').checked,
+                    showAddress: document.getElementById('show-address').checked,
+                    showWechat: document.getElementById('show-wechat').checked
+                },
+                storeHours: {},
+                services: {},
+                policies: {
+                    minBookingHours: parseInt(document.getElementById('min-booking').value),
+                    minCancelHours: parseInt(document.getElementById('min-cancel').value),
+                    maxAdvanceDays: parseInt(document.getElementById('max-advance').value)
+                }
+            };
+
+            // Collect store hours
+            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+            days.forEach(day => {
+                setupData.storeHours[day] = {
+                    open: document.getElementById(`${day}-open`).value,
+                    close: document.getElementById(`${day}-close`).value,
+                    closed: document.getElementById(`${day}-closed`).checked
+                };
+            });
+
+            // Collect all services from the service form
+            collectServices();
+            setupData.services = setupServices;
+
+            // Save all data
+            // Include store hours in the owner profile for compatibility
+            setupData.profile.storeHours = setupData.storeHours;
+            localStorage.setItem('ownerProfile', JSON.stringify(setupData.profile));
+            localStorage.setItem('displayInfo', JSON.stringify(setupData.displayInfo));
+
+            // Also save store hours using SharedData to ensure proper format
+            SharedData.saveStoreHours(setupData.storeHours);
+
+            // Save services using SharedData to ensure proper format
+            SharedData.saveServices(setupData.services);
+
+            SharedData.setBookingPolicies(setupData.policies);
+
+            // Create owner as first barber
+            const owner = {
+                id: 'owner',
+                name: `${setupData.profile.firstName} ${setupData.profile.lastName}`,
+                isOwner: true,
+                services: Object.keys(setupData.services).filter(id => setupData.services[id].enabled),
+                hours: setupData.storeHours,
+                usesStoreHours: true
+            };
+            SharedData.saveBarbers([owner]);
+
+            // Generate booking URL
+            const slug = setupData.profile.storeName
+                .toLowerCase()
+                .replace(/'/g, '')  // Remove apostrophes first
+                .replace(/[^a-z0-9]+/g, '_')  // Replace other special chars with underscore
+                .replace(/^_|_$/g, '');  // Remove leading/trailing underscores
+
+            const bookingUrl = `https://yourdomain.com/book/${slug}`;
+            document.getElementById('booking-url').textContent = bookingUrl;
+
+            // Save the booking URL data for the owner app
+            const urlData = {
+                slug: slug,
+                createdAt: new Date().toISOString()
+            };
+            localStorage.setItem('bookingUrl', JSON.stringify(urlData));
+
+            // Mark setup as complete
+            localStorage.setItem('setupComplete', 'true');
+
+            // Show success screen
+            document.getElementById(`step-${currentStep}`).classList.remove('active');
+            document.getElementById('step-success').classList.add('active');
+        }
+
+        function copyUrl() {
+            const url = document.getElementById('booking-url').textContent;
+            navigator.clipboard.writeText(url).then(() => {
+                const btn = document.getElementById('copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = selectedLang === 'zh' ? '已复制!' : 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            });
+        }
+
+        function goToDashboard() {
+            window.location.href = 'owner-app.html';
+        }
+
+        // Check if setup is already complete
+        if (localStorage.getItem('setupComplete') === 'true') {
+            // Redirect to owner app if setup is complete
+            window.location.href = 'owner-app.html';
+        }
+
+        // Service management functions
+        function toggleActiveTime(serviceId) {
+            const checkbox = document.getElementById(`toggle-active-${serviceId}`);
+            const container = document.getElementById(`active-container-${serviceId}`);
+
+            if (checkbox.checked) {
+                container.style.display = 'block';
+                // If no periods exist, add a default one
+                const periodsList = document.getElementById(`periods-${serviceId}`);
+                if (!periodsList || periodsList.children.length === 0) {
+                    const duration = parseInt(document.getElementById(`duration-${serviceId}`).value) || 30;
+                    periodsList.innerHTML = `
+                        <div class="active-period-item" style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                            <span style="font-size: 12px; color: #4A90E2; min-width: 50px;">Period 1:</span>
+                            <input type="number" class="period-start" value="0" min="0" max="${duration}" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px;">
+                            <span style="font-size: 12px; color: #4A90E2;">to</span>
+                            <input type="number" class="period-end" value="${Math.min(duration, 15)}" min="0" max="${duration}" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px;">
+                            <span style="font-size: 12px; color: #4A90E2;">min</span>
+                            <button onclick="removePeriodFromService(this, '${serviceId}')" style="padding: 2px 6px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">×</button>
+                        </div>
+                    `;
+                }
+            } else {
+                container.style.display = 'none';
+            }
+        }
+
+        function addPeriodToService(serviceId) {
+            const periodsList = document.getElementById(`periods-${serviceId}`);
+            const duration = parseInt(document.getElementById(`duration-${serviceId}`).value) || 30;
+            const periodCount = periodsList.children.length + 1;
+
+            const newPeriod = document.createElement('div');
+            newPeriod.className = 'active-period-item';
+            newPeriod.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 5px;';
+            newPeriod.innerHTML = `
+                <span style="font-size: 12px; color: #4A90E2; min-width: 50px;">Period ${periodCount}:</span>
+                <input type="number" class="period-start" value="0" min="0" max="${duration}" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px;">
+                <span style="font-size: 12px; color: #4A90E2;">to</span>
+                <input type="number" class="period-end" value="${Math.min(duration, 15)}" min="0" max="${duration}" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px;">
+                <span style="font-size: 12px; color: #4A90E2;">min</span>
+                <button onclick="removePeriodFromService(this, '${serviceId}')" style="padding: 2px 6px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">×</button>
+            `;
+            periodsList.appendChild(newPeriod);
+        }
+
+        function removePeriodFromService(button, serviceId) {
+            button.parentElement.remove();
+            // Renumber remaining periods
+            const periodsList = document.getElementById(`periods-${serviceId}`);
+            const periods = periodsList.querySelectorAll('.active-period-item');
+            periods.forEach((period, index) => {
+                const label = period.querySelector('span');
+                if (label) {
+                    label.textContent = `Period ${index + 1}:`;
+                }
+            });
+        }
+
+        function collectServices() {
+            const serviceIds = ['mens-cut', 'womens-cut', 'kids-cut', 'coloring', 'highlights'];
+            setupServices = {};
+
+            serviceIds.forEach(serviceId => {
+                const name = document.getElementById(`service-${serviceId}`).value;
+                const duration = parseInt(document.getElementById(`duration-${serviceId}`).value) || 30;
+                const price = parseFloat(document.getElementById(`price-${serviceId}`).value) || 0;
+                const hasActiveTime = document.getElementById(`toggle-active-${serviceId}`).checked;
+
+                const service = {
+                    name: name,
+                    duration: duration,
+                    price: price,
+                    enabled: true,
+                    hasActiveTime: hasActiveTime
+                };
+
+                if (hasActiveTime) {
+                    const periodsList = document.getElementById(`periods-${serviceId}`);
+                    const periods = [];
+                    const periodItems = periodsList.querySelectorAll('.active-period-item');
+
+                    periodItems.forEach(item => {
+                        const start = parseInt(item.querySelector('.period-start').value) || 0;
+                        const end = parseInt(item.querySelector('.period-end').value) || 0;
+                        if (end > start) {
+                            periods.push({ start, end });
+                        }
+                    });
+
+                    if (periods.length > 0) {
+                        service.activePeriods = periods;
+                    }
+                }
+
+                setupServices[serviceId] = service;
+            });
+        }
+    </script>
+</body>
+</html>

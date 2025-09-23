@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Conflicts Test</title>
+    <script src="shared-data.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4A90E2;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #4A90E2;
+            margin-top: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #4A90E2;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .pass {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .fail {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            padding: 10px 20px;
+            background: #4A90E2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #357ABD;
+        }
+        .button-group {
+            margin: 20px 0;
+        }
+        #results {
+            margin-top: 30px;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Appointment System - Booking Conflicts Test Suite</h1>
+
+        <div class="button-group">
+            <button onclick="setupTestData()">1. Setup Test Data</button>
+            <button onclick="testConflictDetection()">2. Test Conflict Detection</button>
+            <button onclick="testActivePeriods()">3. Test Active Periods</button>
+            <button onclick="testMultipleBarbers()">4. Test Multiple Barbers</button>
+            <button onclick="runAllTests()">Run All Tests</button>
+            <button onclick="clearAllData()">Clear All Data</button>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const resultsDiv = document.getElementById('results');
+        let testResults = [];
+
+        function log(message, type = 'info') {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${type}`;
+            resultDiv.innerHTML = message;
+            resultsDiv.appendChild(resultDiv);
+            testResults.push({ message, type });
+        }
+
+        function clearResults() {
+            resultsDiv.innerHTML = '';
+            testResults = [];
+        }
+
+        function setupTestData() {
+            clearResults();
+            log('<h2>Setting Up Test Data</h2>', 'info');
+
+            try {
+                // Clear existing data
+                localStorage.clear();
+
+                // Setup owner profile
+                const ownerProfile = {
+                    storeName: "Test Barbershop",
+                    firstName: "John",
+                    lastName: "Owner",
+                    phone: "555-0001",
+                    email: "owner@test.com",
+                    storeHours: {
+                        monday: { open: "09:00", close: "18:00", closed: false },
+                        tuesday: { open: "09:00", close: "18:00", closed: false },
+                        wednesday: { open: "09:00", close: "18:00", closed: false },
+                        thursday: { open: "09:00", close: "18:00", closed: false },
+                        friday: { open: "09:00", close: "18:00", closed: false },
+                        saturday: { open: "10:00", close: "16:00", closed: false },
+                        sunday: { open: "00:00", close: "00:00", closed: true }
+                    }
+                };
+                localStorage.setItem('ownerProfile', JSON.stringify(ownerProfile));
+                SharedData.saveStoreHours(ownerProfile.storeHours);
+                log('✓ Owner profile and store hours set', 'pass');
+
+                // Setup services with active periods
+                const services = {
+                    'mens-cut': {
+                        name: "Men's Cut",
+                        duration: 30,
+                        price: 25,
+                        enabled: true,
+                        hasActiveTime: false
+                    },
+                    'coloring': {
+                        name: "Hair Coloring",
+                        duration: 90,
+                        price: 80,
+                        enabled: true,
+                        hasActiveTime: true,
+                        activePeriods: [
+                            { start: 0, end: 30 },
+                            { start: 60, end: 90 }
+                        ]
+                    }
+                };
+                SharedData.saveServices(services);
+                log('✓ Services configured (Men\'s Cut: no active periods, Coloring: active periods)', 'pass');
+
+                // Setup multiple barbers
+                const barbers = [
+                    {
+                        id: 'owner',
+                        name: 'John Owner',
+                        isOwner: true,
+                        services: ['mens-cut', 'coloring'],
+                        hours: ownerProfile.storeHours,
+                        usesStoreHours: true
+                    },
+                    {
+                        id: 'barber1',
+                        name: 'Alice Barber',
+                        isOwner: false,
+                        services: ['mens-cut', 'coloring'],
+                        hours: ownerProfile.storeHours,
+                        usesStoreHours: true
+                    },
+                    {
+                        id: 'barber2',
+                        name: 'Bob Stylist',
+                        isOwner: false,
+                        services: ['mens-cut'],
+                        hours: {
+                            monday: { open: "10:00", close: "17:00", closed: false },
+                            tuesday: { open: "10:00", close: "17:00", closed: false },
+                            wednesday: { open: "00:00", close: "00:00", closed: true },
+                            thursday: { open: "10:00", close: "17:00", closed: false },
+                            friday: { open: "10:00", close: "17:00", closed: false },
+                            saturday: { open: "00:00", close: "00:00", closed: true },
+                            sunday: { open: "00:00", close: "00:00", closed: true }
+                        },
+                        usesStoreHours: false
+                    }
+                ];
+                SharedData.saveBarbers(barbers);
+                log('✓ Created 3 barbers (Owner, Alice, Bob with custom hours)', 'pass');
+
+                // Setup booking policies
+                SharedData.setBookingPolicies({
+                    minBookingHours: 2,
+                    minCancelHours: 24,
+                    maxAdvanceDays: 30
+                });
+                log('✓ Booking policies set (2hr min booking, 24hr cancel, 30 days advance)', 'pass');
+
+                localStorage.setItem('setupComplete', 'true');
+                log('<strong>Test data setup complete!</strong>', 'pass');
+
+            } catch (error) {
+                log(`Error setting up test data: ${error.message}`, 'fail');
+            }
+        }
+
+        function testConflictDetection() {
+            clearResults();
+            log('<h2>Testing Basic Conflict Detection</h2>', 'info');
+
+            const testDate = new Date();
+            testDate.setDate(testDate.getDate() + 1); // Tomorrow
+            testDate.setHours(0, 0, 0, 0);
+
+            // Test 1: No conflict for first appointment
+            let isBooked = SharedData.isTimeSlotBooked(testDate, "10:00", 30, 'owner');
+            log(`Test 1 - Empty slot at 10:00: ${!isBooked ? 'PASS ✓' : 'FAIL ✗'}`, !isBooked ? 'pass' : 'fail');
+
+            // Add an appointment
+            const apt1 = {
+                id: 'APT001',
+                date: `${testDate.getFullYear()}-${String(testDate.getMonth() + 1).padStart(2, '0')}-${String(testDate.getDate()).padStart(2, '0')}`,
+                time: '10:00',
+                barberId: 'owner',
+                barberName: 'John Owner',
+                services: ['mens-cut'],
+                serviceNames: ["Men's Cut"],
+                totalDuration: 30,
+                totalPrice: 25,
+                customerName: 'Test Customer 1',
+                customerPhone: '555-1111',
+                activePeriods: []
+            };
+            SharedData.saveAppointment(apt1);
+            log('Added appointment at 10:00-10:30 for owner', 'info');
+
+            // Test 2: Conflict detection for same time
+            isBooked = SharedData.isTimeSlotBooked(testDate, "10:00", 30, 'owner');
+            log(`Test 2 - Conflict at 10:00 (same barber): ${isBooked ? 'PASS ✓' : 'FAIL ✗'}`, isBooked ? 'pass' : 'fail');
+
+            // Test 3: Overlap detection (partial)
+            isBooked = SharedData.isTimeSlotBooked(testDate, "10:15", 30, 'owner');
+            log(`Test 3 - Overlap at 10:15-10:45: ${isBooked ? 'PASS ✓' : 'FAIL ✗'}`, isBooked ? 'pass' : 'fail');
+
+            // Test 4: No conflict after appointment ends
+            isBooked = SharedData.isTimeSlotBooked(testDate, "10:30", 30, 'owner');
+            log(`Test 4 - No conflict at 10:30-11:00: ${!isBooked ? 'PASS ✓' : 'FAIL ✗'}`, !isBooked ? 'pass' : 'fail');
+
+            // Test 5: No conflict for different barber same time
+            isBooked = SharedData.isTimeSlotBooked(testDate, "10:00", 30, 'barber1');
+            log(`Test 5 - No conflict at 10:00 (different barber): ${!isBooked ? 'PASS ✓' : 'FAIL ✗'}`, !isBooked ? 'pass' : 'fail');
+        }
+
+        function testActivePeriods() {
+            clearResults();
+            log('<h2>Testing Active Periods Logic</h2>', 'info');
+
+            const testDate = new Date();
+            testDate.setDate(testDate.getDate() + 2); // Day after tomorrow
+            testDate.setHours(0, 0, 0, 0);
+
+            // Add appointment with active periods (coloring service)
+            const apt2 = {
+                id: 'APT002',
+                date: `${testDate.getFullYear()}-${String(testDate.getMonth() + 1).padStart(2, '0')}-${String(testDate.getDate()).padStart(2, '0')}`,
+                time: '14:00',
+                barberId: 'barber1',
+                barberName: 'Alice Barber',
+                services: ['coloring'],
+                serviceNames: ['Hair Coloring'],
+                totalDuration: 90,
+                totalPrice: 80,
+                customerName: 'Test Customer 2',
+                customerPhone: '555-2222',
+                activePeriods: [
+                    { start: 0, end: 30 },   // 14:00-14:30
+                    { start: 60, end: 90 }   // 15:00-15:30
+                ]
+            };
+            SharedData.saveAppointment(apt2);
+            log('Added coloring appointment at 14:00 with active periods: 14:00-14:30 and 15:00-15:30', 'info');
+
+            // Test 1: Conflict during first active period
+            let isBooked = SharedData.isTimeSlotBooked(testDate, "14:00", 30, 'barber1');
+            log(`Test 1 - Conflict at 14:00-14:30 (first active): ${isBooked ? 'PASS ✓' : 'FAIL ✗'}`, isBooked ? 'pass' : 'fail');
+
+            // Test 2: NO conflict during inactive period
+            isBooked = SharedData.isTimeSlotBooked(testDate, "14:30", 30, 'barber1');
+            log(`Test 2 - No conflict at 14:30-15:00 (inactive): ${!isBooked ? 'PASS ✓' : 'FAIL ✗'}`, !isBooked ? 'pass' : 'fail');
+
+            // Test 3: Conflict during second active period
+            isBooked = SharedData.isTimeSlotBooked(testDate, "15:00", 30, 'barber1');
+            log(`Test 3 - Conflict at 15:00-15:30 (second active): ${isBooked ? 'PASS ✓' : 'FAIL ✗'}`, isBooked ? 'pass' : 'fail');
+
+            // Test 4: No conflict after appointment ends
+            isBooked = SharedData.isTimeSlotBooked(testDate, "15:30", 30, 'barber1');
+            log(`Test 4 - No conflict at 15:30-16:00 (after end): ${!isBooked ? 'PASS ✓' : 'FAIL ✗'}`, !isBooked ? 'pass' : 'fail');
+
+            // Test 5: Multiple bookings during inactive period allowed
+            const apt3 = {
+                id: 'APT003',
+                date: apt2.date,
+                time: '14:35',
+                barberId: 'barber1',
+                barberName: 'Alice Barber',
+                services: ['mens-cut'],
+                serviceNames: ["Men's Cut"],
+                totalDuration: 20,
+                totalPrice: 25,
+                customerName: 'Test Customer 3',
+                customerPhone: '555-3333',
+                activePeriods: []
+            };
+
+            // Should be able to add during inactive period
+            isBooked = SharedData.isTimeSlotBooked(testDate, "14:35", 20, 'barber1');
+            log(`Test 5 - Can book at 14:35-14:55 (inactive period): ${!isBooked ? 'PASS ✓' : 'FAIL ✗'}`, !isBooked ? 'pass' : 'fail');
+        }
+
+        function testMultipleBarbers() {
+            clearResults();
+            log('<h2>Testing Multiple Barbers Scheduling</h2>', 'info');
+
+            const testDate = new Date();
+            testDate.setDate(testDate.getDate() + 3);
+            testDate.setHours(0, 0, 0, 0);
+            const dateStr = `${testDate.getFullYear()}-${String(testDate.getMonth() + 1).padStart(2, '0')}-${String(testDate.getDate()).padStart(2, '0')}`;
+
+            // Clear previous appointments for clean test
+            const appointments = SharedData.getAppointments();
+            const filtered = appointments.filter(apt => apt.date !== dateStr);
+            localStorage.setItem('appointments', JSON.stringify(filtered));
+
+            // Book same time for different barbers
+            const appointments_data = [
+                {
+                    id: 'APT004',
+                    date: dateStr,
+                    time: '11:00',
+                    barberId: 'owner',
+                    barberName: 'John Owner',
+                    services: ['mens-cut'],
+                    serviceNames: ["Men's Cut"],
+                    totalDuration: 30,
+                    totalPrice: 25,
+                    customerName: 'Customer A',
+                    customerPhone: '555-4444'
+                },
+                {
+                    id: 'APT005',
+                    date: dateStr,
+                    time: '11:00',
+                    barberId: 'barber1',
+                    barberName: 'Alice Barber',
+                    services: ['mens-cut'],
+                    serviceNames: ["Men's Cut"],
+                    totalDuration: 30,
+                    totalPrice: 25,
+                    customerName: 'Customer B',
+                    customerPhone: '555-5555'
+                },
+                {
+                    id: 'APT006',
+                    date: dateStr,
+                    time: '11:00',
+                    barberId: 'barber2',
+                    barberName: 'Bob Stylist',
+                    services: ['mens-cut'],
+                    serviceNames: ["Men's Cut"],
+                    totalDuration: 30,
+                    totalPrice: 25,
+                    customerName: 'Customer C',
+                    customerPhone: '555-6666'
+                }
+            ];
+
+            // Add appointments for different barbers
+            appointments_data.forEach(apt => {
+                SharedData.saveAppointment(apt);
+            });
+            log('Added 3 appointments at 11:00 for different barbers', 'info');
+
+            // Test each barber has their slot booked
+            let isBookedOwner = SharedData.isTimeSlotBooked(testDate, "11:00", 30, 'owner');
+            log(`Test 1 - Owner slot at 11:00 is booked: ${isBookedOwner ? 'PASS ✓' : 'FAIL ✗'}`, isBookedOwner ? 'pass' : 'fail');
+
+            let isBookedAlice = SharedData.isTimeSlotBooked(testDate, "11:00", 30, 'barber1');
+            log(`Test 2 - Alice slot at 11:00 is booked: ${isBookedAlice ? 'PASS ✓' : 'FAIL ✗'}`, isBookedAlice ? 'pass' : 'fail');
+
+            let isBookedBob = SharedData.isTimeSlotBooked(testDate, "11:00", 30, 'barber2');
+            log(`Test 3 - Bob slot at 11:00 is booked: ${isBookedBob ? 'PASS ✓' : 'FAIL ✗'}`, isBookedBob ? 'pass' : 'fail');
+
+            // Test different time slots for each barber
+            isBookedOwner = SharedData.isTimeSlotBooked(testDate, "11:30", 30, 'owner');
+            log(`Test 4 - Owner slot at 11:30 is free: ${!isBookedOwner ? 'PASS ✓' : 'FAIL ✗'}`, !isBookedOwner ? 'pass' : 'fail');
+
+            // Test Bob's custom hours (closed on Wednesday)
+            const wednesday = new Date();
+            while (wednesday.getDay() !== 3) { // Find next Wednesday
+                wednesday.setDate(wednesday.getDate() + 1);
+            }
+
+            const barber2Hours = SharedData.getBarberById('barber2').hours;
+            const wednesdayIsClosed = barber2Hours.wednesday.closed;
+            log(`Test 5 - Bob is closed on Wednesday: ${wednesdayIsClosed ? 'PASS ✓' : 'FAIL ✗'}`, wednesdayIsClosed ? 'pass' : 'fail');
+
+            // Count total appointments at 11:00
+            const allAppointments = SharedData.getAppointmentsByDate(testDate);
+            const count11am = allAppointments.filter(apt => apt.time === '11:00').length;
+            log(`Test 6 - Total appointments at 11:00: ${count11am === 3 ? 'PASS ✓' : 'FAIL ✗'} (${count11am}/3)`, count11am === 3 ? 'pass' : 'fail');
+        }
+
+        function runAllTests() {
+            clearResults();
+            log('<h1>Running Complete Test Suite</h1>', 'info');
+
+            setTimeout(() => {
+                setupTestData();
+                setTimeout(() => {
+                    testConflictDetection();
+                    setTimeout(() => {
+                        testActivePeriods();
+                        setTimeout(() => {
+                            testMultipleBarbers();
+                            setTimeout(() => {
+                                // Summary
+                                const passed = testResults.filter(r => r.type === 'pass').length;
+                                const failed = testResults.filter(r => r.type === 'fail').length;
+                                const total = passed + failed;
+
+                                log(`<h2>Test Summary</h2>`, 'info');
+                                log(`<strong>Total Tests: ${total}</strong>`, 'info');
+                                log(`<strong>Passed: ${passed}</strong>`, 'pass');
+                                log(`<strong>Failed: ${failed}</strong>`, failed > 0 ? 'fail' : 'pass');
+
+                                if (failed === 0) {
+                                    log(`<h3>🎉 All tests passed!</h3>`, 'pass');
+                                } else {
+                                    log(`<h3>⚠️ Some tests failed. Please review.</h3>`, 'fail');
+                                }
+                            }, 500);
+                        }, 500);
+                    }, 500);
+                }, 500);
+            }, 100);
+        }
+
+        function clearAllData() {
+            if (confirm('This will clear all appointment data. Continue?')) {
+                localStorage.clear();
+                clearResults();
+                log('All data cleared!', 'pass');
+            }
+        }
+
+        // Auto-run tests on load
+        window.onload = function() {
+            log('<h2>Test Suite Ready</h2>', 'info');
+            log('Click "Run All Tests" to begin comprehensive testing', 'info');
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Debug Owner Services</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            background: #f5f5f5;
+        }
+        pre {
+            background: white;
+            padding: 10px;
+            overflow: auto;
+        }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #4A90E2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Debug Owner Services</h1>
+
+    <button onclick="debugAll()">Debug All</button>
+    <button onclick="enableAllForOwner()">Enable All Services for Owner</button>
+
+    <div class="section">
+        <h2>1. Shop & Owner Info</h2>
+        <div id="shop-info"></div>
+    </div>
+
+    <div class="section">
+        <h2>2. Services in Database</h2>
+        <div id="services-db"></div>
+    </div>
+
+    <div class="section">
+        <h2>3. Owner Barber Data</h2>
+        <div id="owner-data"></div>
+    </div>
+
+    <div class="section">
+        <h2>4. Service ID Matching</h2>
+        <div id="matching"></div>
+    </div>
+
+    <script>
+        async function debugAll() {
+            await SharedData.initialize();
+
+            const shopId = SharedData.getCurrentShopId();
+            const shopInfo = document.getElementById('shop-info');
+
+            if (!shopId) {
+                shopInfo.innerHTML = '<span class="error">No shop ID found!</span>';
+                return;
+            }
+
+            shopInfo.innerHTML = `<p>Shop ID: <strong>${shopId}</strong></p>`;
+
+            // Get services from database
+            const { data: services, error: servicesError } = await supabaseClient
+                .from('services')
+                .select('*')
+                .eq('shop_id', shopId)
+                .order('created_at');
+
+            const servicesDiv = document.getElementById('services-db');
+            if (servicesError) {
+                servicesDiv.innerHTML = `<span class="error">Error: ${servicesError.message}</span>`;
+            } else {
+                servicesDiv.innerHTML = `<h3>Found ${services.length} services:</h3>`;
+                services.forEach(s => {
+                    servicesDiv.innerHTML += `<p><strong>${s.id}</strong>: ${s.name} (enabled: ${s.enabled})</p>`;
+                });
+            }
+
+            // Get owner barber
+            const { data: barbers, error: barbersError } = await supabaseClient
+                .from('barbers')
+                .select('*')
+                .eq('shop_id', shopId)
+                .eq('is_owner', true)
+                .single();
+
+            const ownerDiv = document.getElementById('owner-data');
+            if (barbersError) {
+                ownerDiv.innerHTML = `<span class="error">Error: ${barbersError.message}</span>`;
+            } else if (!barbers) {
+                ownerDiv.innerHTML = '<span class="error">No owner found!</span>';
+            } else {
+                ownerDiv.innerHTML = `
+                    <p>Owner Name: <strong>${barbers.name}</strong></p>
+                    <p>Owner ID: <strong>${barbers.id}</strong></p>
+                    <p>Is Owner: <strong>${barbers.is_owner}</strong></p>
+                    <p>Uses Store Hours: <strong>${barbers.uses_store_hours}</strong></p>
+                    <h4>Service IDs in Database:</h4>
+                    <pre>${JSON.stringify(barbers.service_ids, null, 2)}</pre>
+                `;
+            }
+
+            // Check matching
+            const matchingDiv = document.getElementById('matching');
+            if (services && barbers) {
+                const serviceIds = services.map(s => s.id);
+                const barberServiceIds = barbers.service_ids || [];
+
+                matchingDiv.innerHTML = '<h3>Service ID Comparison:</h3>';
+
+                // Check each service
+                services.forEach(service => {
+                    const inBarber = barberServiceIds.includes(service.id);
+                    const status = inBarber ?
+                        '<span class="success">✓ ENABLED</span>' :
+                        '<span class="error">✗ NOT ENABLED</span>';
+                    matchingDiv.innerHTML += `<p>${service.name}: ${status}</p>`;
+                });
+
+                matchingDiv.innerHTML += `<p><strong>Summary:</strong> ${barberServiceIds.length} of ${serviceIds.length} services enabled for owner</p>`;
+
+                // Also check via SharedData
+                matchingDiv.innerHTML += '<h3>Via SharedData:</h3>';
+                const sdBarbers = await SharedData.getBarbers();
+                if (sdBarbers && sdBarbers.length > 0) {
+                    const owner = sdBarbers.find(b => b.isOwner) || sdBarbers[0];
+                    matchingDiv.innerHTML += '<h4>Owner services object from SharedData:</h4>';
+                    matchingDiv.innerHTML += `<pre>${JSON.stringify(owner.services, null, 2)}</pre>`;
+                }
+            }
+        }
+
+        async function enableAllForOwner() {
+            await SharedData.initialize();
+            const shopId = SharedData.getCurrentShopId();
+
+            if (!shopId) {
+                alert('No shop ID found!');
+                return;
+            }
+
+            // Get all service IDs
+            const { data: services } = await supabaseClient
+                .from('services')
+                .select('id')
+                .eq('shop_id', shopId);
+
+            const serviceIds = services.map(s => s.id);
+
+            // Update owner barber
+            const { data: owner } = await supabaseClient
+                .from('barbers')
+                .select('id')
+                .eq('shop_id', shopId)
+                .eq('is_owner', true)
+                .single();
+
+            if (owner) {
+                const { error } = await supabaseClient
+                    .from('barbers')
+                    .update({
+                        service_ids: serviceIds,
+                        uses_store_hours: true
+                    })
+                    .eq('id', owner.id);
+
+                if (error) {
+                    alert('Error: ' + error.message);
+                } else {
+                    alert(`Success! Enabled ${serviceIds.length} services for owner. Reload the owner app.`);
+                    debugAll(); // Refresh display
+                }
+            } else {
+                alert('No owner barber found!');
+            }
+        }
+
+        // Run debug on load
+        setTimeout(debugAll, 500);
+    </script>
+</body>
+</html>

@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Owner Barber Issue</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Bridge -->
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #2C3E50;
+            margin-bottom: 20px;
+        }
+
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .section h2 {
+            color: #2C3E50;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            background: #2C3E50;
+            color: white;
+        }
+
+        button:hover {
+            background: #1a252f;
+        }
+
+        .btn-success {
+            background: #28a745;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .barber-list {
+            margin: 15px 0;
+        }
+
+        .barber-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+        }
+
+        .barber-item.owner {
+            background: #e7f3ff;
+            border-color: #2196F3;
+        }
+
+        .barber-details {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            font-family: monospace;
+        }
+
+        .highlight {
+            background: #ffeb3b;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Fix Owner Barber Issue</h1>
+        <p>This tool diagnoses and fixes the "Barber owner not found" issue in the owner app.</p>
+
+        <div id="status-area"></div>
+
+        <div class="section">
+            <h2>Step 1: Check Current State</h2>
+            <button onclick="checkCurrentState()">🔍 Check Barbers & Owner</button>
+            <div id="current-state"></div>
+        </div>
+
+        <div class="section">
+            <h2>Step 2: Diagnose Issue</h2>
+            <button onclick="diagnoseIssue()">🏥 Diagnose Problem</button>
+            <div id="diagnosis"></div>
+        </div>
+
+        <div class="section">
+            <h2>Step 3: Fix Owner Barber</h2>
+            <button onclick="fixOwnerBarber()" class="btn-success">✅ Auto-Fix Owner Issue</button>
+            <button onclick="createOwnerBarber()" class="btn-success">➕ Create Owner Barber</button>
+            <button onclick="setFirstAsOwner()">👑 Set First Barber as Owner</button>
+            <div id="fix-result"></div>
+        </div>
+
+        <div class="section">
+            <h2>Console Output</h2>
+            <pre id="console-output"></pre>
+        </div>
+
+        <div class="section">
+            <h2>Navigation</h2>
+            <button onclick="window.location.href='owner-app.html'">👤 Test Owner App</button>
+            <button onclick="window.location.href='check-supabase-schema.html'">📊 Check Schema</button>
+            <button onclick="window.location.href='auth-app.html'">🔐 Login</button>
+        </div>
+    </div>
+
+    <script>
+        const consoleOutput = document.getElementById('console-output');
+
+        function log(message, data = null) {
+            const timestamp = new Date().toTimeString().slice(0, 8);
+            let output = `[${timestamp}] ${message}`;
+            if (data) {
+                output += '\n' + JSON.stringify(data, null, 2);
+            }
+            consoleOutput.textContent += output + '\n';
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            console.log(message, data);
+        }
+
+        function showStatus(message, type = 'info') {
+            const statusArea = document.getElementById('status-area');
+            statusArea.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        async function checkCurrentState() {
+            const stateDiv = document.getElementById('current-state');
+            stateDiv.innerHTML = '<div class="status info">Checking current state...</div>';
+
+            try {
+                // Check authentication
+                const { data: { user } } = await supabaseClient.auth.getUser();
+                if (!user) {
+                    stateDiv.innerHTML = '<div class="status error">Not authenticated. Please login first.</div>';
+                    return;
+                }
+
+                log('Authenticated as:', user.email);
+
+                // Get shop ID
+                const shopId = SharedData.getCurrentShopId();
+                if (!shopId) {
+                    stateDiv.innerHTML = '<div class="status error">No shop ID found. Please complete setup.</div>';
+                    return;
+                }
+
+                log('Shop ID:', shopId);
+
+                // Get all barbers
+                const barbers = await SharedData.getBarbers();
+                log('Barbers found:', barbers.length);
+
+                // Get shop info
+                const { data: shop } = await supabaseClient
+                    .from('shops')
+                    .select('name, owner_first_name, owner_last_name')
+                    .eq('id', shopId)
+                    .single();
+
+                let html = `<div class="status success">Shop: ${shop?.name || 'Unknown'}</div>`;
+                html += `<div class="status info">Owner Name: ${shop?.owner_first_name || ''} ${shop?.owner_last_name || ''}</div>`;
+                html += `<div class="status info">Total Barbers: ${barbers.length}</div>`;
+                html += '<div class="barber-list">';
+
+                barbers.forEach(barber => {
+                    const isOwner = barber.isOwner || barber.is_owner;
+                    html += `
+                        <div class="barber-item ${isOwner ? 'owner' : ''}">
+                            <strong>${barber.name}</strong> ${isOwner ? '<span class="highlight">OWNER</span>' : ''}
+                            <div class="barber-details">
+                                ID: ${barber.id}<br>
+                                Services: ${Object.keys(barber.services || {}).length}<br>
+                                Uses Store Hours: ${barber.usesStoreHours || barber.uses_store_hours ? 'Yes' : 'No'}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += '</div>';
+
+                // Check for owner
+                const ownerBarber = barbers.find(b => b.isOwner || b.is_owner);
+                if (!ownerBarber) {
+                    html += '<div class="status warning">⚠️ No barber marked as owner!</div>';
+                } else {
+                    html += `<div class="status success">✅ Owner barber found: ${ownerBarber.name}</div>`;
+                }
+
+                stateDiv.innerHTML = html;
+                log('State check complete');
+
+            } catch (error) {
+                stateDiv.innerHTML = `<div class="status error">Error: ${error.message}</div>`;
+                log('Error checking state:', error);
+            }
+        }
+
+        async function diagnoseIssue() {
+            const diagDiv = document.getElementById('diagnosis');
+            diagDiv.innerHTML = '<div class="status info">Diagnosing issue...</div>';
+
+            try {
+                const shopId = SharedData.getCurrentShopId();
+                if (!shopId) {
+                    diagDiv.innerHTML = '<div class="status error">No shop ID - cannot diagnose</div>';
+                    return;
+                }
+
+                // Direct query to barbers table
+                const { data: barbersRaw, error } = await supabaseClient
+                    .from('barbers')
+                    .select('*')
+                    .eq('shop_id', shopId);
+
+                if (error) {
+                    diagDiv.innerHTML = `<div class="status error">Database error: ${error.message}</div>`;
+                    log('Database error:', error);
+                    return;
+                }
+
+                log('Raw barbers data:', barbersRaw);
+
+                let issues = [];
+                let suggestions = [];
+
+                // Check if any barbers exist
+                if (!barbersRaw || barbersRaw.length === 0) {
+                    issues.push('❌ No barbers exist in database');
+                    suggestions.push('Create an owner barber');
+                } else {
+                    // Check for owner
+                    const ownerExists = barbersRaw.some(b => b.is_owner === true);
+                    if (!ownerExists) {
+                        issues.push('❌ No barber has is_owner = true');
+                        suggestions.push('Set one barber as owner or create new owner barber');
+                    }
+
+                    // Check for 'owner' ID (legacy)
+                    const hasOwnerId = barbersRaw.some(b => b.id === 'owner');
+                    if (hasOwnerId) {
+                        issues.push('⚠️ Legacy "owner" ID found - may cause issues');
+                        suggestions.push('Update to use proper UUID');
+                    }
+
+                    // Check for inactive owners
+                    const inactiveOwner = barbersRaw.find(b => b.is_owner && !b.is_active);
+                    if (inactiveOwner) {
+                        issues.push('❌ Owner is marked as inactive');
+                        suggestions.push('Activate the owner barber');
+                    }
+                }
+
+                // Build diagnosis HTML
+                let html = '<div class="status info">Diagnosis Results:</div>';
+
+                if (issues.length === 0) {
+                    html += '<div class="status success">✅ No issues found!</div>';
+                } else {
+                    html += '<div class="status error">Issues Found:</div>';
+                    issues.forEach(issue => {
+                        html += `<div class="status warning">${issue}</div>`;
+                    });
+
+                    html += '<div class="status info">Suggested Fixes:</div>';
+                    suggestions.forEach(suggestion => {
+                        html += `<div class="status info">→ ${suggestion}</div>`;
+                    });
+                }
+
+                diagDiv.innerHTML = html;
+                log('Diagnosis complete');
+
+            } catch (error) {
+                diagDiv.innerHTML = `<div class="status error">Diagnosis error: ${error.message}</div>`;
+                log('Diagnosis error:', error);
+            }
+        }
+
+        async function fixOwnerBarber() {
+            const resultDiv = document.getElementById('fix-result');
+            resultDiv.innerHTML = '<div class="status info">Attempting auto-fix...</div>';
+
+            try {
+                const shopId = SharedData.getCurrentShopId();
+                if (!shopId) {
+                    resultDiv.innerHTML = '<div class="status error">No shop ID found</div>';
+                    return;
+                }
+
+                // Get current barbers
+                const { data: barbers } = await supabaseClient
+                    .from('barbers')
+                    .select('*')
+                    .eq('shop_id', shopId);
+
+                log('Current barbers:', barbers);
+
+                if (!barbers || barbers.length === 0) {
+                    // No barbers exist, create owner
+                    await createOwnerBarber();
+                    return;
+                }
+
+                // Check if any is already owner
+                const currentOwner = barbers.find(b => b.is_owner);
+                if (currentOwner) {
+                    // Make sure it's active
+                    if (!currentOwner.is_active) {
+                        await supabaseClient
+                            .from('barbers')
+                            .update({ is_active: true })
+                            .eq('id', currentOwner.id);
+
+                        resultDiv.innerHTML = '<div class="status success">✅ Activated existing owner barber</div>';
+                        log('Activated owner:', currentOwner.id);
+                    } else {
+                        resultDiv.innerHTML = '<div class="status success">✅ Owner already exists and is active</div>';
+                    }
+                } else {
+                    // No owner, set first barber as owner
+                    const firstBarber = barbers[0];
+                    await supabaseClient
+                        .from('barbers')
+                        .update({
+                            is_owner: true,
+                            uses_store_hours: true,
+                            is_active: true
+                        })
+                        .eq('id', firstBarber.id);
+
+                    resultDiv.innerHTML = `<div class="status success">✅ Set ${firstBarber.name} as owner</div>`;
+                    log('Set as owner:', firstBarber);
+                }
+
+                // Refresh barbers cache
+                await SharedData.getBarbers();
+                showStatus('Fix applied! Refresh the owner app to see changes.', 'success');
+
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="status error">Fix failed: ${error.message}</div>`;
+                log('Fix error:', error);
+            }
+        }
+
+        async function createOwnerBarber() {
+            const resultDiv = document.getElementById('fix-result');
+            resultDiv.innerHTML = '<div class="status info">Creating owner barber...</div>';
+
+            try {
+                const shopId = SharedData.getCurrentShopId();
+                const { data: { user } } = await supabaseClient.auth.getUser();
+
+                if (!shopId || !user) {
+                    resultDiv.innerHTML = '<div class="status error">Missing shop ID or user</div>';
+                    return;
+                }
+
+                // Get shop info for owner name
+                const { data: shop } = await supabaseClient
+                    .from('shops')
+                    .select('owner_first_name, owner_last_name')
+                    .eq('id', shopId)
+                    .single();
+
+                const ownerName = shop?.owner_first_name && shop?.owner_last_name
+                    ? `${shop.owner_first_name} ${shop.owner_last_name}`
+                    : 'Owner';
+
+                // Create owner barber
+                const { data: newBarber, error } = await supabaseClient
+                    .from('barbers')
+                    .insert({
+                        shop_id: shopId,
+                        name: ownerName,
+                        is_owner: true,
+                        is_active: true,
+                        uses_store_hours: true,
+                        service_ids: [],
+                        profile_id: user.id,
+                        display_order: 0
+                    })
+                    .select()
+                    .single();
+
+                if (error) throw error;
+
+                resultDiv.innerHTML = `<div class="status success">✅ Created owner barber: ${ownerName}</div>`;
+                log('Created owner barber:', newBarber);
+
+                // Refresh barbers cache
+                await SharedData.getBarbers();
+                showStatus('Owner barber created! Refresh the owner app.', 'success');
+
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="status error">Creation failed: ${error.message}</div>`;
+                log('Creation error:', error);
+            }
+        }
+
+        async function setFirstAsOwner() {
+            const resultDiv = document.getElementById('fix-result');
+            resultDiv.innerHTML = '<div class="status info">Setting first barber as owner...</div>';
+
+            try {
+                const shopId = SharedData.getCurrentShopId();
+                if (!shopId) {
+                    resultDiv.innerHTML = '<div class="status error">No shop ID found</div>';
+                    return;
+                }
+
+                // Get all barbers
+                const { data: barbers } = await supabaseClient
+                    .from('barbers')
+                    .select('*')
+                    .eq('shop_id', shopId)
+                    .order('created_at');
+
+                if (!barbers || barbers.length === 0) {
+                    resultDiv.innerHTML = '<div class="status error">No barbers found to set as owner</div>';
+                    return;
+                }
+
+                // First, unset any existing owners
+                await supabaseClient
+                    .from('barbers')
+                    .update({ is_owner: false })
+                    .eq('shop_id', shopId);
+
+                // Set first barber as owner
+                const firstBarber = barbers[0];
+                await supabaseClient
+                    .from('barbers')
+                    .update({
+                        is_owner: true,
+                        uses_store_hours: true,
+                        is_active: true
+                    })
+                    .eq('id', firstBarber.id);
+
+                resultDiv.innerHTML = `<div class="status success">✅ Set ${firstBarber.name} as owner</div>`;
+                log('Set as owner:', firstBarber);
+
+                // Refresh barbers cache
+                await SharedData.getBarbers();
+                showStatus('Owner set! Refresh the owner app.', 'success');
+
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="status error">Error: ${error.message}</div>`;
+                log('Error setting owner:', error);
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('load', async () => {
+            await SharedData.initialize();
+            const shopId = SharedData.getCurrentShopId();
+            if (shopId) {
+                log('Initialized with shop ID:', shopId);
+                showStatus('Ready to diagnose and fix owner issues', 'info');
+            } else {
+                showStatus('No shop ID found - please login first', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

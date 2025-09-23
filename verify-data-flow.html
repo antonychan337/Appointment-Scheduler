@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Data Flow</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Bridge -->
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #2C3E50;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+
+        .test-section {
+            margin: 30px 0;
+            padding: 25px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .test-section h2 {
+            color: #2C3E50;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-icon {
+            font-size: 24px;
+        }
+
+        .test-item {
+            margin: 15px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .test-name {
+            font-weight: 600;
+            color: #2C3E50;
+        }
+
+        .test-status {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status-pending {
+            background: #e3e8ee;
+            color: #7f8c8d;
+        }
+
+        .status-testing {
+            background: #fff3cd;
+            color: #856404;
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        button {
+            padding: 14px 28px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px 5px;
+        }
+
+        button:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-success {
+            background: #27ae60;
+        }
+
+        .btn-success:hover {
+            background: #219a52;
+        }
+
+        .summary {
+            margin: 30px 0;
+            padding: 25px;
+            border-radius: 12px;
+        }
+
+        .summary.all-pass {
+            background: #d4edda;
+            border: 2px solid #27ae60;
+        }
+
+        .summary.some-fail {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+        }
+
+        .summary.all-fail {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+        }
+
+        .console-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+
+        .detail-row {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #667eea;
+            background: #f8f9fa;
+        }
+
+        .error-detail {
+            color: #dc3545;
+            font-size: 12px;
+            margin-top: 5px;
+            padding: 5px;
+            background: #ffe6e6;
+            border-radius: 4px;
+        }
+
+        .success-detail {
+            color: #27ae60;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e3e8ee;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+
+        .fix-suggestion {
+            background: #e8f4fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .fix-suggestion h3 {
+            color: #2196F3;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Verify Data Flow</h1>
+        <p class="subtitle">Comprehensive test to ensure all data flows correctly from setup wizard to owner app</p>
+
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill" style="width: 0%">0%</div>
+        </div>
+
+        <div class="test-section">
+            <h2><span class="status-icon" id="auth-icon">⏳</span> Authentication</h2>
+            <div class="test-item">
+                <span class="test-name">User Logged In</span>
+                <span class="test-status status-pending" id="auth-user">Pending</span>
+            </div>
+            <div class="test-item">
+                <span class="test-name">Shop ID Available</span>
+                <span class="test-status status-pending" id="auth-shop">Pending</span>
+            </div>
+            <div id="auth-details"></div>
+        </div>
+
+        <div class="test-section">
+            <h2><span class="status-icon" id="db-icon">⏳</span> Database Schema</h2>
+            <div class="test-item">
+                <span class="test-name">Shops Table Columns</span>
+                <span class="test-status status-pending" id="db-shops">Pending</span>
+            </div>
+            <div class="test-item">
+                <span class="test-name">Services Table</span>
+                <span class="test-status status-pending" id="db-services">Pending</span>
+            </div>
+            <div class="test-item">
+                <span class="test-name">Barbers Table</span>
+                <span class="test-status status-pending" id="db-barbers">Pending</span>
+            </div>
+            <div id="db-details"></div>
+        </div>
+
+        <div class="test-section">
+            <h2><span class="status-icon" id="data-icon">⏳</span> Data Retrieval</h2>
+            <div class="test-item">
+                <span class="test-name">Shop Profile</span>
+                <span class="test-status status-pending" id="data-profile">Pending</span>
+            </div>
+            <div class="test-item">
+                <span class="test-name">Store Hours</span>
+                <span class="test-status status-pending" id="data-hours">Pending</span>
+            </div>
+            <div class="test-item">
+                <span class="test-name">Services</span>
+                <span class="test-status status-pending" id="data-services">Pending</span>
+            </div>
+            <div class="test-item">
+                <span class="test-name">Owner Barber</span>
+                <span class="test-status status-pending" id="data-owner">Pending</span>
+            </div>
+            <div id="data-details"></div>
+        </div>
+
+        <div id="summary-section"></div>
+
+        <div class="test-section">
+            <h2>Actions</h2>
+            <button onclick="runAllTests()" id="run-btn">🚀 Run All Tests</button>
+            <button onclick="checkMigrationStatus()" class="btn-success">📊 Check Migration Status</button>
+            <button onclick="window.location.href='apply-supabase-migration.html'">🔧 Apply Migration</button>
+            <button onclick="window.location.href='setup-wizard-app.html'">📝 Re-run Setup Wizard</button>
+        </div>
+
+        <div class="test-section">
+            <h2>Console Output</h2>
+            <div class="console-output" id="console-output"></div>
+        </div>
+    </div>
+
+    <script>
+        let totalTests = 9;
+        let passedTests = 0;
+        let failedTests = 0;
+
+        function log(message, type = 'log') {
+            const console = document.getElementById('console-output');
+            const entry = document.createElement('div');
+            entry.style.color = type === 'error' ? '#f48771' : type === 'success' ? '#4ec9b0' : '#d4d4d4';
+            entry.textContent = `[${new Date().toTimeString().slice(0, 8)}] ${message}`;
+            console.appendChild(entry);
+            console.scrollTop = console.scrollHeight;
+        }
+
+        function updateProgress() {
+            const completed = passedTests + failedTests;
+            const percentage = Math.round((completed / totalTests) * 100);
+            const progressFill = document.getElementById('progress-fill');
+            progressFill.style.width = `${percentage}%`;
+            progressFill.textContent = `${percentage}%`;
+        }
+
+        function setTestStatus(testId, status, message = '') {
+            const element = document.getElementById(testId);
+            element.className = `test-status status-${status}`;
+            element.textContent = status === 'testing' ? 'Testing...' :
+                                 status === 'success' ? '✅ Pass' :
+                                 status === 'error' ? '❌ Fail' : 'Pending';
+
+            if (status === 'success') passedTests++;
+            if (status === 'error') failedTests++;
+            updateProgress();
+
+            if (message) {
+                log(message, status === 'error' ? 'error' : 'success');
+            }
+        }
+
+        function updateIcon(sectionId, status) {
+            const icon = document.getElementById(sectionId);
+            icon.textContent = status === 'success' ? '✅' : status === 'error' ? '❌' : '⏳';
+        }
+
+        async function runAllTests() {
+            const runBtn = document.getElementById('run-btn');
+            runBtn.disabled = true;
+            runBtn.textContent = 'Testing...';
+
+            passedTests = 0;
+            failedTests = 0;
+            updateProgress();
+
+            // Clear previous results
+            document.getElementById('summary-section').innerHTML = '';
+            log('Starting comprehensive data flow verification...', 'log');
+
+            // Test Authentication
+            await testAuthentication();
+
+            // Test Database Schema
+            await testDatabaseSchema();
+
+            // Test Data Retrieval
+            await testDataRetrieval();
+
+            // Show Summary
+            showSummary();
+
+            runBtn.disabled = false;
+            runBtn.textContent = '🚀 Run All Tests';
+        }
+
+        async function testAuthentication() {
+            log('Testing authentication...', 'log');
+
+            try {
+                // Check user
+                setTestStatus('auth-user', 'testing');
+                const { data: { user } } = await supabaseClient.auth.getUser();
+
+                if (user) {
+                    setTestStatus('auth-user', 'success', `User authenticated: ${user.email}`);
+                    document.getElementById('auth-details').innerHTML = `
+                        <div class="detail-row">Email: ${user.email}</div>
+                        <div class="detail-row">ID: ${user.id.substring(0, 8)}...</div>
+                    `;
+                } else {
+                    setTestStatus('auth-user', 'error', 'No user logged in');
+                    document.getElementById('auth-details').innerHTML = `
+                        <div class="error-detail">Please login first</div>
+                    `;
+                    updateIcon('auth-icon', 'error');
+                    return;
+                }
+
+                // Check shop ID
+                setTestStatus('auth-shop', 'testing');
+                await SharedData.initialize();
+                const shopId = SharedData.getCurrentShopId();
+
+                if (shopId) {
+                    setTestStatus('auth-shop', 'success', `Shop ID: ${shopId}`);
+                    document.getElementById('auth-details').innerHTML += `
+                        <div class="detail-row">Shop ID: ${shopId}</div>
+                    `;
+                    updateIcon('auth-icon', 'success');
+                } else {
+                    setTestStatus('auth-shop', 'error', 'No shop ID found');
+                    document.getElementById('auth-details').innerHTML += `
+                        <div class="error-detail">Shop not found. Complete setup wizard first.</div>
+                    `;
+                    updateIcon('auth-icon', 'error');
+                }
+
+            } catch (error) {
+                log(`Authentication error: ${error.message}`, 'error');
+                updateIcon('auth-icon', 'error');
+            }
+        }
+
+        async function testDatabaseSchema() {
+            log('Testing database schema...', 'log');
+            const shopId = SharedData.getCurrentShopId();
+
+            if (!shopId) {
+                log('Skipping database tests - no shop ID', 'error');
+                updateIcon('db-icon', 'error');
+                return;
+            }
+
+            // Test shops table columns
+            setTestStatus('db-shops', 'testing');
+            try {
+                const { data, error } = await supabaseClient
+                    .from('shops')
+                    .select('*')
+                    .eq('id', shopId)
+                    .single();
+
+                if (error) {
+                    setTestStatus('db-shops', 'error', `Shops table error: ${error.message}`);
+                    document.getElementById('db-details').innerHTML = `
+                        <div class="error-detail">Missing columns in shops table. Run migration!</div>
+                    `;
+                } else {
+                    const requiredColumns = ['store_hours', 'min_booking_hours', 'max_booking_days',
+                                            'owner_first_name', 'owner_last_name', 'address', 'phone'];
+                    const missingColumns = requiredColumns.filter(col => !(col in data));
+
+                    if (missingColumns.length === 0) {
+                        setTestStatus('db-shops', 'success', 'All required columns present');
+                    } else {
+                        setTestStatus('db-shops', 'error', `Missing columns: ${missingColumns.join(', ')}`);
+                        document.getElementById('db-details').innerHTML = `
+                            <div class="error-detail">Missing columns: ${missingColumns.join(', ')}</div>
+                            <div class="fix-suggestion">
+                                <h3>Fix Required:</h3>
+                                <p>Run the migration script to add missing columns.</p>
+                            </div>
+                        `;
+                    }
+                }
+            } catch (error) {
+                setTestStatus('db-shops', 'error', `Exception: ${error.message}`);
+            }
+
+            // Test services table
+            setTestStatus('db-services', 'testing');
+            try {
+                const { data, error } = await supabaseClient
+                    .from('services')
+                    .select('*')
+                    .eq('shop_id', shopId)
+                    .limit(1);
+
+                if (error) {
+                    setTestStatus('db-services', 'error', `Services table error: ${error.message}`);
+                } else {
+                    setTestStatus('db-services', 'success', 'Services table accessible');
+                }
+            } catch (error) {
+                setTestStatus('db-services', 'error', `Exception: ${error.message}`);
+            }
+
+            // Test barbers table
+            setTestStatus('db-barbers', 'testing');
+            try {
+                const { data, error } = await supabaseClient
+                    .from('barbers')
+                    .select('*')
+                    .eq('shop_id', shopId)
+                    .limit(1);
+
+                if (error) {
+                    setTestStatus('db-barbers', 'error', `Barbers table error: ${error.message}`);
+                } else {
+                    setTestStatus('db-barbers', 'success', 'Barbers table accessible');
+                }
+            } catch (error) {
+                setTestStatus('db-barbers', 'error', `Exception: ${error.message}`);
+            }
+
+            // Update section icon
+            const dbTests = ['db-shops', 'db-services', 'db-barbers'];
+            const dbPassed = dbTests.every(id =>
+                document.getElementById(id).classList.contains('status-success')
+            );
+            updateIcon('db-icon', dbPassed ? 'success' : 'error');
+        }
+
+        async function testDataRetrieval() {
+            log('Testing data retrieval...', 'log');
+            const shopId = SharedData.getCurrentShopId();
+
+            if (!shopId) {
+                log('Skipping data tests - no shop ID', 'error');
+                updateIcon('data-icon', 'error');
+                return;
+            }
+
+            // Test profile retrieval
+            setTestStatus('data-profile', 'testing');
+            try {
+                const profile = await SharedData.getProfile();
+                if (profile && profile.storeName) {
+                    setTestStatus('data-profile', 'success', `Profile loaded: ${profile.storeName}`);
+                    document.getElementById('data-details').innerHTML = `
+                        <div class="detail-row">Store: ${profile.storeName}</div>
+                        <div class="detail-row">Owner: ${profile.firstName} ${profile.lastName}</div>
+                        <div class="detail-row">Email: ${profile.email}</div>
+                    `;
+                } else {
+                    setTestStatus('data-profile', 'error', 'Profile data missing or incomplete');
+                    document.getElementById('data-details').innerHTML = `
+                        <div class="error-detail">No profile data found. Re-run setup wizard.</div>
+                    `;
+                }
+            } catch (error) {
+                setTestStatus('data-profile', 'error', `Profile error: ${error.message}`);
+            }
+
+            // Test store hours
+            setTestStatus('data-hours', 'testing');
+            try {
+                const hours = await SharedData.getStoreHours();
+                if (hours && hours.monday) {
+                    setTestStatus('data-hours', 'success', 'Store hours loaded');
+                } else {
+                    setTestStatus('data-hours', 'error', 'Store hours missing');
+                }
+            } catch (error) {
+                setTestStatus('data-hours', 'error', `Hours error: ${error.message}`);
+            }
+
+            // Test services
+            setTestStatus('data-services', 'testing');
+            try {
+                const services = await SharedData.getServices();
+                const serviceCount = Object.keys(services).length;
+                if (serviceCount > 0) {
+                    setTestStatus('data-services', 'success', `${serviceCount} services loaded`);
+                } else {
+                    setTestStatus('data-services', 'error', 'No services found');
+                }
+            } catch (error) {
+                setTestStatus('data-services', 'error', `Services error: ${error.message}`);
+            }
+
+            // Test owner barber
+            setTestStatus('data-owner', 'testing');
+            try {
+                const barbers = await SharedData.getBarbers();
+                const owner = barbers.find(b => b.isOwner || b.is_owner);
+                if (owner) {
+                    setTestStatus('data-owner', 'success', `Owner found: ${owner.name}`);
+                } else {
+                    setTestStatus('data-owner', 'error', 'No owner barber found');
+                }
+            } catch (error) {
+                setTestStatus('data-owner', 'error', `Barber error: ${error.message}`);
+            }
+
+            // Update section icon
+            const dataTests = ['data-profile', 'data-hours', 'data-services', 'data-owner'];
+            const dataPassed = dataTests.every(id =>
+                document.getElementById(id).classList.contains('status-success')
+            );
+            updateIcon('data-icon', dataPassed ? 'success' : 'error');
+        }
+
+        function showSummary() {
+            const summarySection = document.getElementById('summary-section');
+            const totalPassed = passedTests;
+            const totalFailed = failedTests;
+
+            let summaryClass = 'all-fail';
+            let summaryText = '❌ Critical Issues Found';
+
+            if (totalFailed === 0) {
+                summaryClass = 'all-pass';
+                summaryText = '✅ All Tests Passed! Data flow is working correctly.';
+            } else if (totalPassed > 0) {
+                summaryClass = 'some-fail';
+                summaryText = `⚠️ ${totalFailed} of ${totalTests} tests failed. Action required.`;
+            }
+
+            summarySection.innerHTML = `
+                <div class="summary ${summaryClass}">
+                    <h2>${summaryText}</h2>
+                    <p>Passed: ${totalPassed} | Failed: ${totalFailed} | Total: ${totalTests}</p>
+                    ${totalFailed > 0 ? `
+                        <div class="fix-suggestion">
+                            <h3>Recommended Actions:</h3>
+                            <ol>
+                                <li>Run the migration script in Supabase to add missing columns</li>
+                                <li>Re-run the setup wizard to save all data</li>
+                                <li>Verify the owner app loads data correctly</li>
+                            </ol>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+
+            log(`Test complete: ${totalPassed} passed, ${totalFailed} failed`,
+                totalFailed === 0 ? 'success' : 'error');
+        }
+
+        async function checkMigrationStatus() {
+            log('Checking if migration has been applied...', 'log');
+
+            const shopId = SharedData.getCurrentShopId();
+            if (!shopId) {
+                alert('Please login first to check migration status');
+                return;
+            }
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('shops')
+                    .select('store_hours, min_booking_hours, max_booking_days, display_info')
+                    .eq('id', shopId)
+                    .single();
+
+                if (error) {
+                    alert('Migration NOT applied. Missing columns detected.\n\nPlease run the migration script in Supabase.');
+                    log('Migration check failed: ' + error.message, 'error');
+                } else {
+                    alert('Migration appears to be applied! ✅\n\nColumns found:\n' +
+                          '- store_hours: ' + (data.store_hours ? 'YES' : 'NO') + '\n' +
+                          '- min_booking_hours: ' + (data.min_booking_hours !== null ? 'YES' : 'NO') + '\n' +
+                          '- max_booking_days: ' + (data.max_booking_days !== null ? 'YES' : 'NO') + '\n' +
+                          '- display_info: ' + (data.display_info ? 'YES' : 'NO'));
+                    log('Migration check passed', 'success');
+                }
+            } catch (error) {
+                alert('Error checking migration: ' + error.message);
+                log('Migration check error: ' + error.message, 'error');
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('load', async () => {
+            await SharedData.initialize();
+            const shopId = SharedData.getCurrentShopId();
+
+            if (!shopId) {
+                document.getElementById('summary-section').innerHTML = `
+                    <div class="summary some-fail">
+                        <h2>⚠️ Setup Required</h2>
+                        <p>Please login and complete the setup wizard first.</p>
+                    </div>
+                `;
+            } else {
+                log('Ready to run tests. Shop ID: ' + shopId, 'success');
+            }
+        });
+    </script>
+</body>
+</html>

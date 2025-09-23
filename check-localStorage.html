@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check LocalStorage Services</title>
+    <script src="shared-data.js"></script>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        pre { background: #f5f5f5; padding: 15px; border-radius: 5px; overflow: auto; }
+        button { padding: 10px 20px; margin: 10px; cursor: pointer; font-size: 16px; }
+        .success { background: #4CAF50; color: white; border: none; }
+    </style>
+</head>
+<body>
+    <h1>Check and Fix Services in LocalStorage</h1>
+
+    <h2>Raw localStorage 'services' data:</h2>
+    <pre id="raw-services"></pre>
+
+    <h2>Services via SharedData.getServices():</h2>
+    <pre id="shared-services"></pre>
+
+    <button class="success" onclick="resetToDefaultServices()">Reset to Default 5 Services (All Enabled)</button>
+    <button onclick="refreshDisplay()">Refresh Display</button>
+
+    <div id="result"></div>
+
+    <script>
+        function displayServices() {
+            // Show raw localStorage
+            const rawServices = localStorage.getItem('services');
+            document.getElementById('raw-services').textContent = rawServices ?
+                JSON.stringify(JSON.parse(rawServices), null, 2) : 'No services in localStorage';
+
+            // Show SharedData services
+            const sharedServices = SharedData.getServices();
+            document.getElementById('shared-services').textContent =
+                JSON.stringify(sharedServices, null, 2);
+
+            // Count services
+            const serviceCount = Object.keys(sharedServices).length;
+            const enabledCount = Object.keys(sharedServices).filter(id => sharedServices[id].enabled).length;
+
+            document.getElementById('result').innerHTML = `
+                <h3>Summary:</h3>
+                <p>Total services: ${serviceCount}</p>
+                <p>Enabled services: ${enabledCount}</p>
+                <p>Service IDs: ${Object.keys(sharedServices).join(', ')}</p>
+            `;
+        }
+
+        function resetToDefaultServices() {
+            const defaultServices = {
+                'mens-cut': {
+                    name: "Men's Cut",
+                    duration: 30,
+                    price: 25,
+                    enabled: true,
+                    hasActiveTime: false
+                },
+                'womens-cut': {
+                    name: "Women's Cut",
+                    duration: 45,
+                    price: 35,
+                    enabled: true,
+                    hasActiveTime: false
+                },
+                'kids-cut': {
+                    name: "Children's Cut",
+                    duration: 15,
+                    price: 15,
+                    enabled: true,
+                    hasActiveTime: false
+                },
+                'coloring': {
+                    name: 'Hair Coloring',
+                    duration: 90,
+                    price: 80,
+                    enabled: true,
+                    hasActiveTime: true,
+                    activePeriods: [
+                        { start: 0, end: 30 },
+                        { start: 60, end: 90 }
+                    ]
+                },
+                'highlights': {
+                    name: 'Highlights',
+                    duration: 120,
+                    price: 120,
+                    enabled: true,
+                    hasActiveTime: true,
+                    activePeriods: [
+                        { start: 0, end: 45 },
+                        { start: 75, end: 120 }
+                    ]
+                }
+            };
+
+            // Save services
+            SharedData.saveServices(defaultServices);
+
+            // Update all barbers to have all services
+            const serviceAssignment = {};
+            Object.keys(defaultServices).forEach(id => {
+                serviceAssignment[id] = true;
+            });
+
+            const barbers = SharedData.getBarbers();
+            barbers.forEach(barber => {
+                SharedData.updateBarber(barber.id, { services: serviceAssignment });
+                console.log(`Updated ${barber.name} with all 5 services`);
+            });
+
+            alert('Reset complete! All 5 services are now enabled and assigned to all barbers.');
+            displayServices();
+        }
+
+        function refreshDisplay() {
+            displayServices();
+        }
+
+        // Initial display
+        displayServices();
+    </script>
+</body>
+</html>

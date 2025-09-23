@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Setup Wizard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        button {
+            flex: 1;
+            padding: 15px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #4A90E2;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #357ABD;
+        }
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #d32f2f;
+        }
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #45a049;
+        }
+        .status {
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .data-display {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Setup Wizard Testing</h1>
+
+        <p>Use this page to test the setup wizard and manage your setup status.</p>
+
+        <h3>Setup Status</h3>
+        <div class="button-group">
+            <button class="btn-primary" onclick="checkStatus()">Check Setup Status</button>
+            <button class="btn-danger" onclick="resetSetup()">Reset Setup</button>
+            <button class="btn-success" onclick="goToSetup()">Go to Setup Wizard</button>
+        </div>
+
+        <h3>Quick Actions</h3>
+        <div class="button-group">
+            <button class="btn-primary" onclick="viewData()">View Saved Data</button>
+            <button class="btn-primary" onclick="goToOwnerApp()">Go to Owner App</button>
+            <button class="btn-primary" onclick="goToCustomerApp()">Go to Customer App</button>
+        </div>
+
+        <div id="status" class="status"></div>
+        <div id="data-display" class="data-display" style="display: none;"></div>
+    </div>
+
+    <script>
+        function checkStatus() {
+            const setupComplete = localStorage.getItem('setupComplete') === 'true';
+            const status = document.getElementById('status');
+
+            if (setupComplete) {
+                const profile = JSON.parse(localStorage.getItem('ownerProfile') || '{}');
+                const businessName = profile.storeName || 'Unknown';
+
+                status.className = 'status success';
+                status.innerHTML = `
+                    <strong>✓ Setup Complete!</strong><br>
+                    Business: ${businessName}<br>
+                    Language: ${localStorage.getItem('preferredLanguage') || 'en'}<br>
+                    You can go to the <a href="owner-app.html">Owner App</a> or <a href="setup-wizard.html">Setup Wizard</a>
+                `;
+            } else {
+                status.className = 'status warning';
+                status.innerHTML = `
+                    <strong>⚠ Setup Not Complete</strong><br>
+                    Please complete the setup wizard first.<br>
+                    <a href="setup-wizard.html">Go to Setup Wizard</a>
+                `;
+            }
+            status.style.display = 'block';
+        }
+
+        function resetSetup() {
+            if (confirm('This will clear all setup data and require you to go through setup again. Continue?')) {
+                // Clear setup-related data
+                localStorage.removeItem('setupComplete');
+                localStorage.removeItem('ownerProfile');
+                localStorage.removeItem('displayInfo');
+                localStorage.removeItem('storeHours');
+                localStorage.removeItem('services');
+                localStorage.removeItem('barbers');
+                localStorage.removeItem('bookingPolicies');
+                localStorage.removeItem('preferredLanguage');
+
+                const status = document.getElementById('status');
+                status.className = 'status info';
+                status.innerHTML = 'Setup has been reset. <a href="setup-wizard.html">Go to Setup Wizard</a>';
+                status.style.display = 'block';
+            }
+        }
+
+        function goToSetup() {
+            window.location.href = 'setup-wizard.html';
+        }
+
+        function goToOwnerApp() {
+            window.location.href = 'owner-app.html';
+        }
+
+        function goToCustomerApp() {
+            window.location.href = 'customer-app.html';
+        }
+
+        function viewData() {
+            const dataDisplay = document.getElementById('data-display');
+            const data = {
+                setupComplete: localStorage.getItem('setupComplete'),
+                preferredLanguage: localStorage.getItem('preferredLanguage'),
+                ownerProfile: JSON.parse(localStorage.getItem('ownerProfile') || '{}'),
+                displayInfo: JSON.parse(localStorage.getItem('displayInfo') || '{}'),
+                storeHours: JSON.parse(localStorage.getItem('storeHours') || '{}'),
+                services: JSON.parse(localStorage.getItem('services') || '{}'),
+                barbers: JSON.parse(localStorage.getItem('barbers') || '[]'),
+                bookingPolicies: JSON.parse(localStorage.getItem('bookingPolicies') || '{}')
+            };
+
+            dataDisplay.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            dataDisplay.style.display = 'block';
+
+            const status = document.getElementById('status');
+            status.className = 'status info';
+            status.innerHTML = 'Scroll down to see all saved data';
+            status.style.display = 'block';
+        }
+
+        // Check status on load
+        window.onload = function() {
+            checkStatus();
+        };
+    </script>
+</body>
+</html>

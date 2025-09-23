@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Services Debug</title>
+</head>
+<body>
+    <h1>Services Debug Test</h1>
+    <button onclick="checkServices()">Check Services</button>
+    <button onclick="checkDOM()">Check DOM</button>
+    <button onclick="clearStorage()">Clear Storage</button>
+    <button onclick="resetToDefaults()">Reset to Defaults</button>
+    <pre id="output"></pre>
+
+    <script src="shared-data.js"></script>
+    <script>
+        function checkServices() {
+            const services = SharedData.getServices();
+            const output = document.getElementById('output');
+            output.textContent = 'Services in SharedData:\n';
+            output.textContent += JSON.stringify(services, null, 2);
+            output.textContent += '\n\nNumber of services: ' + Object.keys(services).length;
+            output.textContent += '\n\nService IDs: ' + Object.keys(services).join(', ');
+        }
+
+        function checkDOM() {
+            // Open the owner-app in a new window and check its DOM
+            window.open('owner-app.html', '_blank');
+            const output = document.getElementById('output');
+            output.textContent = 'Open owner-app.html and check the console logs and DOM inspector.';
+        }
+
+        function clearStorage() {
+            localStorage.removeItem('services');
+            const output = document.getElementById('output');
+            output.textContent = 'Cleared services from localStorage. Refresh owner-app.html to see changes.';
+        }
+
+        function resetToDefaults() {
+            // Reset to default services only
+            const defaultServices = {
+                'mens-cut': {
+                    name: "Men's Cut",
+                    duration: 30,
+                    price: 25,
+                    enabled: true,
+                    hasActiveTime: false
+                },
+                'womens-cut': {
+                    name: "Women's Cut",
+                    duration: 45,
+                    price: 35,
+                    enabled: true,
+                    hasActiveTime: false
+                },
+                'kids-cut': {
+                    name: "Children's Cut",
+                    duration: 15,
+                    price: 15,
+                    enabled: true,
+                    hasActiveTime: false
+                },
+                'coloring': {
+                    name: "Hair Coloring",
+                    duration: 90,
+                    price: 80,
+                    enabled: true,
+                    hasActiveTime: true,
+                    activePeriods: [
+                        { start: 0, end: 30 },
+                        { start: 60, end: 90 }
+                    ]
+                },
+                'highlights': {
+                    name: "Highlights",
+                    duration: 120,
+                    price: 120,
+                    enabled: true,
+                    hasActiveTime: true,
+                    activePeriods: [
+                        { start: 0, end: 15 },
+                        { start: 45, end: 60 },
+                        { start: 90, end: 120 }
+                    ]
+                }
+            };
+            localStorage.setItem('services', JSON.stringify(defaultServices));
+            const output = document.getElementById('output');
+            output.textContent = 'Reset to default services. Refresh owner-app.html to see changes.';
+        }
+    </script>
+</body>
+</html>

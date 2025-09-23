@@ -4,7 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Book Your Haircut</title>
-    <script src="shared-data.js"></script>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Configuration (must load before bridge) -->
+    <script src="supabase-config.js"></script>
+    <!-- Supabase Bridge (replaces shared-data.js) -->
+    <script src="supabase-bridge.js"></script>
     <!-- EmailJS SDK -->
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script type="text/javascript">
@@ -38,7 +43,7 @@
             position: relative;
         }
         .header {
-            background: #4A90E2;
+            background: #2C3E50;
             color: white;
             padding: 15px;
             display: flex;
@@ -84,7 +89,7 @@
         }
         .service-card.selected {
             background: #E3F2FD;
-            border-color: #4A90E2;
+            border-color: #2C3E50;
         }
         .checkbox {
             width: 24px;
@@ -96,12 +101,12 @@
             justify-content: center;
         }
         .checkbox.checked {
-            background: #4A90E2;
-            border-color: #4A90E2;
+            background: #2C3E50;
+            border-color: #2C3E50;
             color: white;
         }
         .next-button {
-            background: #4A90E2;
+            background: #2C3E50;
             color: white;
             padding: 15px;
             border-radius: 10px;
@@ -126,7 +131,7 @@
         }
         .date-card.selected {
             background: #E3F2FD;
-            border-color: #4A90E2;
+            border-color: #2C3E50;
         }
         .time-slots {
             display: grid;
@@ -142,7 +147,7 @@
             cursor: pointer;
         }
         .time-slot.selected {
-            background: #4A90E2;
+            background: #2C3E50;
             color: white;
         }
         .time-slot.unavailable {
@@ -191,10 +196,10 @@
         }
         .back-button {
             background: white;
-            color: #4A90E2;
+            color: #2C3E50;
             padding: 10px;
             border-radius: 5px;
-            border: 1px solid #4A90E2;
+            border: 1px solid #2C3E50;
             cursor: pointer;
             margin-bottom: 20px;
         }
@@ -206,7 +211,7 @@
         }
         .progress-fill {
             height: 100%;
-            background: #4A90E2;
+            background: #2C3E50;
             transition: width 0.3s;
         }
     </style>
@@ -324,7 +329,7 @@
                     </div>
                     <div class="summary-row">
                         <span id="label-price">Total Price:</span>
-                        <span id="total-price" style="font-weight: bold; color: #4A90E2;"></span>
+                        <span id="total-price" style="font-weight: bold; color: #2C3E50;"></span>
                     </div>
                 </div>
 
@@ -369,12 +374,16 @@
     </div>
 
     <script>
-        let isZh = false;
+        // Check for preferred language on load
+        let isZh = SharedData.getPreferredLanguage() === 'zh';
         let selectedBarberId = null;
         let selectedServices = [];
         let selectedDate = null;
         let selectedTime = null;
         let currentScreen = 'barber-screen';
+
+        // Load booking policies
+        const bookingPolicies = SharedData.getBookingPolicies();
 
         const translations = {
             zh: {
@@ -483,6 +492,8 @@
 
         function toggleLang() {
             isZh = !isZh;
+            // Save language preference globally
+            SharedData.setPreferredLanguage(isZh ? 'zh' : 'en');
             updateLanguage();
             loadAvailableServices(); // Reload services with new language
 
@@ -570,7 +581,7 @@
                 }
 
                 // Update active time text
-                const activeTimeDiv = card.querySelector('div[style*="color: #4A90E2"]');
+                const activeTimeDiv = card.querySelector('div[style*="color: #2C3E50"]');
                 if (activeTimeDiv) {
                     const match = activeTimeDiv.textContent.match(/\d+/);
                     if (match) {
@@ -730,7 +741,9 @@
             const datePicker = document.getElementById('appointment-date');
             const today = new Date();
             const maxDate = new Date();
-            maxDate.setMonth(maxDate.getMonth() + 2); // 2 months in advance
+
+            // Apply maximum advance booking policy
+            maxDate.setDate(maxDate.getDate() + bookingPolicies.maxAdvanceDays);
 
             // Set min and max dates on the picker
             datePicker.min = today.toISOString().split('T')[0];
@@ -926,16 +939,32 @@
                 }
             }
 
+            // Apply minimum booking notice policy
+            const now = new Date();
+            const minBookingTime = new Date();
+            minBookingTime.setHours(minBookingTime.getHours() + bookingPolicies.minBookingHours);
+
+            // Filter out slots that don't meet minimum booking notice
+            if (selectedDate.toDateString() === now.toDateString() ||
+                (selectedDate.getTime() - now.getTime()) < (bookingPolicies.minBookingHours * 60 * 60 * 1000)) {
+                availableSlots = availableSlots.filter(slot => {
+                    const [hours, minutes] = slot.split(':').map(Number);
+                    const slotTime = new Date(selectedDate);
+                    slotTime.setHours(hours, minutes, 0, 0);
+                    return slotTime >= minBookingTime;
+                });
+            }
+
             if (availableSlots.length === 0) {
                 timeSlots.innerHTML = '<div style="text-align: center; color: #f44336;">No available slots for this date</div>';
                 return;
             }
 
             // Filter out past times if showing today
-            const now = new Date();
-            const isToday = selectedDate.toDateString() === now.toDateString();
-            const currentHours = now.getHours();
-            const currentMinutes = now.getMinutes();
+            const currentTime = new Date();
+            const isToday = selectedDate.toDateString() === currentTime.toDateString();
+            const currentHours = currentTime.getHours();
+            const currentMinutes = currentTime.getMinutes();
 
             const filteredSlots = availableSlots.filter(time => {
                 if (!isToday) return true; // Show all times for future dates
@@ -996,8 +1025,8 @@
                             return sum + (service ? service.duration : 0);
                         }, 0);
 
-                        // Check if any active periods would conflict
-                        isBooked = SharedData.isTimeSlotBooked(selectedDate, time, totalDuration);
+                        // Check if any active periods would conflict for the selected barber
+                        isBooked = SharedData.isTimeSlotBooked(selectedDate, time, totalDuration, selectedBarber);
                     } catch (e) {
                         // If SharedData not available, skip booking check
                     }
@@ -1544,7 +1573,20 @@
 
         function loadServicesForBarber(barberId) {
             const barber = SharedData.getBarberById(barberId);
-            const services = barber.services || SharedData.getServices();
+            const allServices = SharedData.getServices();
+
+            // Handle both array and object formats for barber.services
+            let barberServiceIds;
+            if (Array.isArray(barber.services)) {
+                barberServiceIds = barber.services;
+            } else if (barber.services && typeof barber.services === 'object') {
+                // If it's an object, get the keys that have truthy values
+                barberServiceIds = Object.keys(barber.services).filter(key => barber.services[key]);
+            } else {
+                // Default to all services
+                barberServiceIds = Object.keys(allServices);
+            }
+
             const container = document.getElementById('services-container');
             container.innerHTML = '';
 
@@ -1557,9 +1599,10 @@
 
             const t = isZh ? translations.zh : translations.en;
 
-            Object.keys(services).forEach(serviceId => {
-                const service = services[serviceId];
-                if (!service.enabled) return;
+            // Only show services that the barber offers
+            barberServiceIds.forEach(serviceId => {
+                const service = allServices[serviceId];
+                if (!service || !service.enabled) return;
 
                 const card = document.createElement('div');
                 card.className = 'service-card';
@@ -1632,31 +1675,107 @@
             }
         }
 
-        // Check for URL parameters (modification or cancellation)
-        const urlParams = new URLSearchParams(window.location.search);
-        const action = urlParams.get('action');
-        const bookingId = urlParams.get('bookingId');
+        // Initialize shop based on URL
+        async function initializeShop() {
+            try {
+                // Check for shop slug in URL path or query param
+                const pathParts = window.location.pathname.split('/');
+                let shopSlug = null;
 
-        if (action && bookingId) {
-            handleBookingAction(action, bookingId);
-        } else {
-            // Normal initialization - check for barbers first
-            const barbers = SharedData.getBarbers();
+                // Check if URL is like /book/shop-slug
+                if (pathParts.includes('book') && pathParts.length > pathParts.indexOf('book') + 1) {
+                    shopSlug = pathParts[pathParts.indexOf('book') + 1];
+                }
 
-            if (barbers.length === 1) {
-                // Single barber - skip barber selection and go straight to services
-                selectedBarberId = barbers[0].id;
-                loadServicesForBarber(selectedBarberId);
-                showScreen('service-screen');
-            } else {
-                // Multiple barbers - show barber selection screen
-                loadBarbers();
-                showScreen('barber-screen');
+                // Fallback to query parameter ?shop=shop-slug
+                const urlParams = new URLSearchParams(window.location.search);
+                if (!shopSlug) {
+                    shopSlug = urlParams.get('shop');
+                }
+
+                // For development/testing, use localStorage shopSlug
+                if (!shopSlug) {
+                    shopSlug = localStorage.getItem('shopSlug');
+                }
+
+                // For testing: Get shop ID from localStorage if set by test launcher
+                const testShopId = localStorage.getItem('customer_shop_id');
+                const testShopSlug = localStorage.getItem('customer_shop_slug');
+
+                if (shopSlug || testShopId) {
+                    // Set the shop context for customer
+                    if (testShopId) {
+                        localStorage.setItem('supabase_shop_id', testShopId);
+                        console.log('Using test shop ID:', testShopId);
+                    }
+                    console.log('Loading shop:', shopSlug || testShopSlug);
+                }
+
+                // Check for booking action (modification or cancellation)
+                const action = urlParams.get('action');
+                const bookingId = urlParams.get('bookingId');
+
+                if (action && bookingId) {
+                    handleBookingAction(action, bookingId);
+                } else {
+                    // Initialize SharedData and wait for data
+                    console.log('Initializing SharedData for customer app...');
+                    await SharedData.initialize();
+
+                    // IMPORTANT: Force set the shop ID after initialization
+                    // This ensures SharedData has the correct shop context
+                    if (testShopId) {
+                        SharedData.setCurrentShopId(testShopId);
+                        console.log('Forced shop ID in SharedData:', testShopId);
+
+                        // Reload barbers after setting shop ID
+                        SharedData.barbersCache = await SharedData.getBarbers();
+                        console.log('Reloaded barbers after setting shop ID');
+                    }
+
+                    // Log current shop context
+                    const currentShopId = SharedData.getCurrentShopId() || localStorage.getItem('supabase_shop_id');
+                    console.log('Current shop ID after init:', currentShopId);
+
+                    // Normal initialization - check for barbers first
+                    const barbers = await SharedData.getBarbers();
+                    console.log('Barbers loaded:', barbers.length, barbers);
+
+                    if (barbers.length === 1) {
+                        // Single barber - skip barber selection and go straight to services
+                        selectedBarberId = barbers[0].id;
+                        console.log('Single barber found, ID:', selectedBarberId);
+                        loadServicesForBarber(selectedBarberId);
+                        showScreen('service-screen');
+                    } else if (barbers.length > 1) {
+                        // Multiple barbers - show barber selection screen
+                        console.log('Multiple barbers found:', barbers.length);
+                        loadBarbers();
+                        showScreen('barber-screen');
+                    } else {
+                        // No barbers found - show error with more detail
+                        console.error('No barbers found for shop:', currentShopId);
+                        showScreen('service-screen');
+                        document.getElementById('services-container').innerHTML =
+                            `<div style="text-align: center; padding: 20px; color: #666;">
+                                Shop not found or not configured yet.<br>
+                                <small>Shop ID: ${currentShopId || 'Not set'}</small><br>
+                                <small>Try refreshing or contact support.</small>
+                            </div>`;
+                    }
+
+                    updateLanguage();
+                    updateProgress();
+                }
+            } catch (error) {
+                console.error('Initialization error:', error);
+                document.getElementById('services-container').innerHTML =
+                    '<div style="text-align: center; padding: 20px; color: #666;">Unable to load shop data. Please try again.</div>';
             }
-
-            updateLanguage();
-            updateProgress();
         }
+
+        // Initialize the app
+        initializeShop();
 
         // Setup input event listeners when DOM is ready
         function setupInputListeners() {
@@ -1709,6 +1828,16 @@
 
         // Listen for changes from owner app
         window.addEventListener('storage', (e) => {
+            // Handle language preference changes
+            if (e.key === 'preferredLanguage') {
+                const newLang = e.newValue;
+                if (newLang) {
+                    isZh = newLang === 'zh';
+                    updateLanguage();
+                    loadAvailableServices(); // Reload services with new language
+                }
+            }
+
             if (e.key === 'services') {
                 loadAvailableServices();
                 // Clear selections if a selected service is no longer available

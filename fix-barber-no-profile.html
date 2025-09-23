@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fix Missing Owner Barber (No Profile ID)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .warning { background: #fff3cd; color: #856404; }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #4A90E2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #357ABD; }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fix Missing Owner Barber</h1>
+    <div id="output"></div>
+    <button onclick="fixBarber()">Create Owner Barber</button>
+    <button onclick="checkDatabase()">Check Database</button>
+    <button onclick="dropForeignKey()">Drop Foreign Key Constraint</button>
+
+    <script>
+        const output = document.getElementById('output');
+
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = message;
+            output.appendChild(div);
+        }
+
+        async function checkDatabase() {
+            output.innerHTML = '';
+            log('Checking database structure...');
+
+            // Check what columns exist in barbers table
+            try {
+                const { data: barbers, error } = await supabaseClient
+                    .from('barbers')
+                    .select('*')
+                    .limit(1);
+
+                if (error) {
+                    log(`Error querying barbers: ${error.message}`, 'error');
+                } else if (barbers && barbers.length > 0) {
+                    log('Barbers table columns:', 'info');
+                    const pre = document.createElement('pre');
+                    pre.textContent = JSON.stringify(Object.keys(barbers[0]), null, 2);
+                    output.appendChild(pre);
+                } else {
+                    log('No barbers found in table', 'warning');
+                }
+            } catch (e) {
+                log(`Exception: ${e.message}`, 'error');
+            }
+        }
+
+        async function dropForeignKey() {
+            output.innerHTML = '';
+            log('To drop the foreign key constraint, run this SQL in Supabase:', 'warning');
+
+            const sql = `
+-- Drop the foreign key constraint
+ALTER TABLE barbers
+DROP CONSTRAINT IF EXISTS barbers_profile_id_fkey;
+
+-- Make profile_id nullable
+ALTER TABLE barbers
+ALTER COLUMN profile_id DROP NOT NULL;
+`;
+
+            const pre = document.createElement('pre');
+            pre.textContent = sql;
+            output.appendChild(pre);
+
+            const btn = document.createElement('button');
+            btn.textContent = 'Copy SQL';
+            btn.onclick = () => {
+                navigator.clipboard.writeText(sql);
+                btn.textContent = 'Copied!';
+            };
+            output.appendChild(btn);
+
+            log('After running this SQL, click "Create Owner Barber" again', 'info');
+        }
+
+        async function fixBarber() {
+            output.innerHTML = '';
+            log('Starting fix process...');
+
+            // Initialize SharedData
+            await SharedData.initialize();
+
+            // Get current user and shop
+            const { data: { user } } = await supabaseClient.auth.getUser();
+            if (!user) {
+                log('Not logged in!', 'error');
+                return;
+            }
+            log(`Logged in as: ${user.email}`, 'success');
+
+            const shopId = SharedData.getCurrentShopId();
+            if (!shopId) {
+                log('No shop ID found!', 'error');
+                return;
+            }
+            log(`Shop ID: ${shopId}`, 'success');
+
+            // Check if barber already exists
+            const barbers = await SharedData.getBarbers();
+            if (barbers.length > 0) {
+                log(`Found ${barbers.length} barber(s). Owner already exists.`, 'info');
+                return;
+            }
+
+            // Get shop data for owner name
+            const profile = await SharedData.getProfile();
+            if (!profile) {
+                log('Could not load profile!', 'error');
+                return;
+            }
+
+            const ownerName = profile.firstName && profile.lastName
+                ? `${profile.firstName} ${profile.lastName}`
+                : profile.storeName + ' Owner';
+
+            log(`Creating owner barber: ${ownerName}`);
+
+            // Create owner barber WITHOUT profile_id
+            try {
+                // First try without profile_id at all
+                const barberData = {
+                    shop_id: shopId,
+                    name: ownerName,
+                    is_owner: true,
+                    uses_store_hours: true,
+                    service_ids: [],
+                    is_active: true,
+                    display_order: 0
+                };
+
+                log('Attempting to create barber without profile_id...');
+
+                const { data: newBarber, error } = await supabaseClient
+                    .from('barbers')
+                    .insert(barberData)
+                    .select()
+                    .single();
+
+                if (error) {
+                    log(`Error: ${error.message}`, 'error');
+
+                    // Try with null profile_id
+                    log('Trying with null profile_id...', 'warning');
+                    barberData.profile_id = null;
+
+                    const { data: newBarber2, error: error2 } = await supabaseClient
+                        .from('barbers')
+                        .insert(barberData)
+                        .select()
+                        .single();
+
+                    if (error2) {
+                        log(`Still failed: ${error2.message}`, 'error');
+                        log('You may need to drop the foreign key constraint first.', 'warning');
+                        return;
+                    } else {
+                        log('Owner barber created successfully (with null profile_id)!', 'success');
+                        await updateBarberServices(newBarber2.id);
+                    }
+                } else {
+                    log('Owner barber created successfully!', 'success');
+                    await updateBarberServices(newBarber.id);
+                }
+
+            } catch (e) {
+                log(`Exception: ${e.message}`, 'error');
+            }
+        }
+
+        async function updateBarberServices(barberId) {
+            // Enable all services for the owner
+            const services = await SharedData.getServices();
+            const serviceIds = Object.keys(services);
+
+            if (serviceIds.length > 0) {
+                const { error: updateError } = await supabaseClient
+                    .from('barbers')
+                    .update({ service_ids: serviceIds })
+                    .eq('id', barberId);
+
+                if (updateError) {
+                    log(`Error updating services: ${updateError.message}`, 'error');
+                } else {
+                    log(`Enabled ${serviceIds.length} services for owner`, 'success');
+                }
+            }
+
+            log('Fix complete! Reload the owner app to see the barber.', 'success');
+        }
+
+        // Check database structure on load
+        checkDatabase();
+    </script>
+</body>
+</html>

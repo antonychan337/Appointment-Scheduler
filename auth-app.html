@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop Login</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Configuration (must load before bridge) -->
+    <script src="supabase-config.js"></script>
+    <!-- Supabase Bridge -->
+    <script src="supabase-bridge.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+
+        .phone-container {
+            max-width: 375px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 30px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            height: 812px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #2C3E50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .content {
+            flex: 1;
+            padding: 30px 20px;
+            overflow-y: auto;
+        }
+
+        .auth-tabs {
+            display: flex;
+            background: #f0f0f0;
+            border-radius: 10px;
+            padding: 4px;
+            margin-bottom: 30px;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 12px;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .auth-tab.active {
+            background: white;
+            color: #2C3E50;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .form-section {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .form-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            border-color: #2C3E50;
+            outline: none;
+        }
+
+        .form-group.half {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #2C3E50;
+            color: white;
+            margin-bottom: 15px;
+        }
+
+        .btn-primary:hover {
+            background: #1a252f;
+        }
+
+        .btn-primary:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .forgot-password {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .forgot-password a {
+            color: #2C3E50;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .forgot-password a:hover {
+            text-decoration: underline;
+        }
+
+        .error-message {
+            background: #fee;
+            border: 1px solid #fcc;
+            color: #c33;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .success-message {
+            background: #efe;
+            border: 1px solid #cfc;
+            color: #363;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .terms-note {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            margin-top: 20px;
+            line-height: 1.4;
+        }
+
+        .terms-note a {
+            color: #2C3E50;
+            text-decoration: none;
+        }
+
+        .demo-note {
+            background: #f0f7ff;
+            border: 1px solid #d0e4ff;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #2C3E50;
+        }
+
+        .demo-note strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-container">
+        <div class="header">
+            <h1>Appointment Scheduler</h1>
+            <p>Professional Booking Management</p>
+        </div>
+
+        <div class="content">
+            <!-- Tab Navigation -->
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="switchTab('login')">Log In</button>
+                <button class="auth-tab" onclick="switchTab('signup')">Sign Up</button>
+            </div>
+
+            <!-- Error/Success Messages -->
+            <div class="error-message" id="error-message"></div>
+            <div class="success-message" id="success-message"></div>
+
+            <!-- Login Form -->
+            <div class="form-section active" id="login-form">
+                <form onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" id="login-email" required placeholder="shop@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="login-password" required placeholder="Enter your password">
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="login-btn">
+                        Log In
+                    </button>
+                </form>
+
+                <div class="forgot-password">
+                    <a href="#" onclick="handleForgotPassword()">Forgot Password?</a>
+                </div>
+
+                <div class="demo-note">
+                    <strong>Demo Account:</strong>
+                    Email: demo@example.com<br>
+                    Password: demo123
+                </div>
+            </div>
+
+            <!-- Signup Form -->
+            <div class="form-section" id="signup-form">
+                <form onsubmit="handleSignup(event)">
+                    <div class="form-group">
+                        <label>Shop Name</label>
+                        <input type="text" id="signup-shop" required placeholder="Premium Cuts Barbershop">
+                    </div>
+                    <div class="form-group half">
+                        <div>
+                            <label>First Name</label>
+                            <input type="text" id="signup-firstname" required placeholder="John">
+                        </div>
+                        <div>
+                            <label>Last Name</label>
+                            <input type="text" id="signup-lastname" required placeholder="Smith">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" id="signup-email" required placeholder="shop@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="signup-password" required placeholder="At least 6 characters">
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm Password</label>
+                        <input type="password" id="signup-confirm" required placeholder="Confirm your password">
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="signup-btn">
+                        Create Account
+                    </button>
+                </form>
+
+                <div class="terms-note">
+                    By signing up, you agree to our <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check if already logged in
+        async function checkAuth() {
+            try {
+                const { data: { user } } = await supabaseClient.auth.getUser();
+                console.log('Auth check - user:', user ? 'logged in' : 'not logged in');
+                if (user) {
+                    // User is logged in, check if setup is complete
+                    const setupComplete = localStorage.getItem('setupComplete') === 'true';
+                    console.log('User already authenticated, setupComplete:', setupComplete);
+
+                    // Check if we have shop data
+                    const shopId = localStorage.getItem('supabase_shop_id');
+                    console.log('Shop ID:', shopId);
+
+                    if (setupComplete) {
+                        console.log('Redirecting to owner-app.html');
+                        window.location.href = 'owner-app.html';
+                    } else {
+                        console.log('Redirecting to setup-wizard-app.html');
+                        window.location.href = 'setup-wizard-app.html';
+                    }
+                }
+            } catch (error) {
+                console.log('Not authenticated:', error);
+            }
+        }
+
+        // Switch between login and signup tabs
+        function switchTab(tab) {
+            // Update tabs
+            document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Update forms
+            document.querySelectorAll('.form-section').forEach(f => f.classList.remove('active'));
+            document.getElementById(`${tab}-form`).classList.add('active');
+
+            // Clear messages
+            hideMessages();
+        }
+
+        // Handle login
+        async function handleLogin(event) {
+            event.preventDefault();
+            hideMessages();
+
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const button = document.getElementById('login-btn');
+
+            // Show loading
+            button.disabled = true;
+            button.innerHTML = 'Logging in<span class="loading"></span>';
+
+            try {
+                const result = await SharedData.signIn(email, password);
+
+                if (result.success) {
+                    showSuccess('Login successful! Redirecting...');
+
+                    // Check if setup is complete
+                    const setupComplete = localStorage.getItem('setupComplete') === 'true';
+                    console.log('Login successful, setupComplete:', setupComplete);
+                    console.log('LocalStorage keys:', Object.keys(localStorage));
+
+                    // Force redirect after timeout
+                    setTimeout(() => {
+                        if (setupComplete) {
+                            console.log('Redirecting to owner-app.html');
+                            window.location.href = 'owner-app.html';
+                        } else {
+                            console.log('Redirecting to setup-wizard-app.html');
+                            window.location.href = 'setup-wizard-app.html';
+                        }
+                    }, 1500);
+                } else {
+                    // Check if it's an email confirmation error
+                    if (result.error?.message && result.error.message.includes('Email not confirmed')) {
+                        showError(`Email not confirmed. <br><br>
+                            <strong>For Testing:</strong> Open <a href="confirm-email-bypass.html" style="color: #2C3E50; text-decoration: underline;">Email Confirmation Helper</a> to bypass this requirement.
+                            <br><br>
+                            <strong>For Production:</strong> Check your email for the confirmation link.`);
+                    } else {
+                        showError(result.error?.message || 'Login failed. Please check your credentials.');
+                    }
+                    button.disabled = false;
+                    button.innerHTML = 'Log In';
+                }
+            } catch (error) {
+                showError('An error occurred. Please try again.');
+                button.disabled = false;
+                button.innerHTML = 'Log In';
+            }
+        }
+
+        // Handle signup
+        async function handleSignup(event) {
+            event.preventDefault();
+            hideMessages();
+
+            const shopName = document.getElementById('signup-shop').value;
+            const firstName = document.getElementById('signup-firstname').value;
+            const lastName = document.getElementById('signup-lastname').value;
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            const confirm = document.getElementById('signup-confirm').value;
+            const button = document.getElementById('signup-btn');
+
+            // Validate passwords match
+            if (password !== confirm) {
+                showError('Passwords do not match');
+                return;
+            }
+
+            // Validate password length
+            if (password.length < 6) {
+                showError('Password must be at least 6 characters');
+                return;
+            }
+
+            // Show loading
+            button.disabled = true;
+            button.innerHTML = 'Creating Account<span class="loading"></span>';
+
+            try {
+                const ownerName = `${firstName} ${lastName}`;
+                console.log('Attempting signup for:', email, shopName, ownerName);
+
+                // Pass additional data for complete profile
+                const result = await SharedData.signUp(email, password, shopName, ownerName, {
+                    firstName: firstName,
+                    lastName: lastName
+                });
+
+                console.log('Signup result:', result);
+
+                if (result.success) {
+                    // Check if email confirmation is required
+                    if (result.user && !result.user.confirmed_at) {
+                        showSuccess(`Account created! <br><br>
+                            <strong>For Testing:</strong> Open <a href="confirm-email-bypass.html" style="color: #363; text-decoration: underline;">Email Confirmation Helper</a> to bypass email verification.
+                            <br><br>
+                            <strong>For Production:</strong> Check your email to confirm your account.`);
+                        button.disabled = false;
+                        button.innerHTML = 'Create Account';
+
+                        // Switch to login tab after 5 seconds
+                        setTimeout(() => {
+                            switchTab('login');
+                            document.getElementById('login-email').value = email;
+                        }, 5000);
+                    } else {
+                        showSuccess('Account created successfully! Redirecting to setup...');
+
+                        // No need to save to localStorage - data is in Supabase now
+
+                        setTimeout(() => {
+                            window.location.href = 'setup-wizard-app.html';
+                        }, 2000);
+                    }
+                } else {
+                    // Handle specific error messages
+                    let errorMessage = 'Signup failed. Please try again.';
+                    if (result.error?.message) {
+                        if (result.error.message.includes('not authorized')) {
+                            errorMessage = 'Email confirmation is required. Please check your email.';
+                        } else if (result.error.message.includes('already registered')) {
+                            errorMessage = 'This email is already registered. Please login instead.';
+                        } else {
+                            errorMessage = result.error.message;
+                        }
+                    }
+                    showError(errorMessage);
+                    button.disabled = false;
+                    button.innerHTML = 'Create Account';
+                }
+            } catch (error) {
+                console.error('Signup error:', error);
+                showError(`An error occurred: ${error.message || 'Please try again.'}`);
+                button.disabled = false;
+                button.innerHTML = 'Create Account';
+            }
+        }
+
+        // Handle forgot password
+        function handleForgotPassword() {
+            const email = document.getElementById('login-email').value;
+            if (!email) {
+                showError('Please enter your email address first');
+                return;
+            }
+
+            // TODO: Implement password reset with Supabase
+            showSuccess('Password reset instructions sent to ' + email);
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.innerHTML = message;  // Changed to innerHTML to support HTML content
+            errorDiv.style.display = 'block';
+        }
+
+        // Show success message
+        function showSuccess(message) {
+            const successDiv = document.getElementById('success-message');
+            successDiv.innerHTML = message;  // Changed to innerHTML to support HTML content
+            successDiv.style.display = 'block';
+        }
+
+        // Hide all messages
+        function hideMessages() {
+            document.getElementById('error-message').style.display = 'none';
+            document.getElementById('success-message').style.display = 'none';
+        }
+
+        // Initialize
+        checkAuth();
+    </script>
+</body>
+</html>

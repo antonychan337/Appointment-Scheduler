@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Debug Services</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            background: #f5f5f5;
+        }
+        pre {
+            background: white;
+            padding: 10px;
+            overflow: auto;
+        }
+        .match { color: green; font-weight: bold; }
+        .nomatch { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Debug Services Mismatch</h1>
+
+    <div class="section">
+        <h2>1. Services in Database</h2>
+        <div id="services-list"></div>
+    </div>
+
+    <div class="section">
+        <h2>2. Barber Service IDs</h2>
+        <div id="barber-services"></div>
+    </div>
+
+    <div class="section">
+        <h2>3. Service ID Comparison</h2>
+        <div id="comparison"></div>
+    </div>
+
+    <script>
+        async function debugServices() {
+            await SharedData.initialize();
+
+            const shopId = SharedData.getCurrentShopId();
+            if (!shopId) {
+                document.getElementById('services-list').innerHTML = 'No shop ID found';
+                return;
+            }
+
+            // 1. Get all services
+            const services = await SharedData.getServices();
+            const servicesDiv = document.getElementById('services-list');
+            servicesDiv.innerHTML = '<h3>All Services:</h3>';
+
+            const serviceIds = Object.keys(services);
+            const servicesList = document.createElement('ul');
+            serviceIds.forEach(id => {
+                const li = document.createElement('li');
+                li.innerHTML = `<strong>${id}</strong>: ${services[id].name} ($${services[id].price}, ${services[id].duration}min)`;
+                servicesList.appendChild(li);
+            });
+            servicesDiv.appendChild(servicesList);
+
+            // 2. Get barber services
+            const barbers = await SharedData.getBarbers();
+            const barberDiv = document.getElementById('barber-services');
+
+            if (barbers.length > 0) {
+                const owner = barbers[0];
+                barberDiv.innerHTML = `<h3>Owner: ${owner.name}</h3>`;
+
+                // Get raw data from database
+                const { data: rawBarber } = await supabaseClient
+                    .from('barbers')
+                    .select('service_ids')
+                    .eq('id', owner.id)
+                    .single();
+
+                if (rawBarber) {
+                    barberDiv.innerHTML += '<h4>Raw service_ids from database:</h4>';
+                    const pre = document.createElement('pre');
+                    pre.textContent = JSON.stringify(rawBarber.service_ids, null, 2);
+                    barberDiv.appendChild(pre);
+                }
+
+                barberDiv.innerHTML += '<h4>Transformed services object:</h4>';
+                const pre2 = document.createElement('pre');
+                pre2.textContent = JSON.stringify(owner.services, null, 2);
+                barberDiv.appendChild(pre2);
+            } else {
+                barberDiv.innerHTML = 'No barbers found';
+            }
+
+            // 3. Compare
+            const compDiv = document.getElementById('comparison');
+            compDiv.innerHTML = '<h3>Service ID Matching:</h3>';
+
+            if (barbers.length > 0) {
+                const owner = barbers[0];
+                const barberServiceIds = owner.services ? Object.keys(owner.services) : [];
+
+                const table = document.createElement('table');
+                table.innerHTML = `
+                    <tr>
+                        <th>Service ID</th>
+                        <th>In Services Table</th>
+                        <th>In Barber Services</th>
+                        <th>Match?</th>
+                    </tr>
+                `;
+
+                // Check all service IDs
+                const allIds = new Set([...serviceIds, ...barberServiceIds]);
+                allIds.forEach(id => {
+                    const inServices = serviceIds.includes(id);
+                    const inBarber = barberServiceIds.includes(id);
+                    const match = inServices && inBarber;
+
+                    const row = table.insertRow();
+                    row.innerHTML = `
+                        <td>${id}</td>
+                        <td>${inServices ? '✓' : '✗'}</td>
+                        <td>${inBarber ? '✓' : '✗'}</td>
+                        <td class="${match ? 'match' : 'nomatch'}">${match ? 'MATCH' : 'NO MATCH'}</td>
+                    `;
+                });
+
+                compDiv.appendChild(table);
+
+                // Summary
+                const matchCount = barberServiceIds.filter(id => serviceIds.includes(id)).length;
+                compDiv.innerHTML += `<p><strong>Summary:</strong> ${matchCount} out of ${barberServiceIds.length} barber services match existing services</p>`;
+            }
+        }
+
+        debugServices();
+    </script>
+</body>
+</html>

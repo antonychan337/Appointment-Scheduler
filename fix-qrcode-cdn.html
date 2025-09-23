@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fix QRCode CDN in All Files</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .instruction {
+            background: #f0f8ff;
+            border: 2px solid #4A90E2;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .file-fix {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .old-url {
+            background: #ffe0e0;
+            padding: 5px;
+            border-radius: 3px;
+            font-family: monospace;
+            margin: 5px 0;
+            display: block;
+        }
+        .new-url {
+            background: #e0ffe0;
+            padding: 5px;
+            border-radius: 3px;
+            font-family: monospace;
+            margin: 5px 0;
+            display: block;
+        }
+        h2 {
+            color: #333;
+        }
+        button {
+            padding: 10px 20px;
+            background: #4A90E2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        button:hover {
+            background: #357ABD;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fix QRCode CDN References</h1>
+
+    <div class="instruction">
+        <h2>The Problem</h2>
+        <p>The QRCode library CDN URL is incorrect in the HTML files. The files are using:</p>
+        <code class="old-url">https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js</code>
+        <p>But it should be:</p>
+        <code class="new-url">https://unpkg.com/qrcode@1.5.3/build/qrcode.js</code>
+    </div>
+
+    <div class="file-fix">
+        <h3>1. owner-app.html</h3>
+        <p>Open <strong>owner-app.html</strong> in your text editor</p>
+        <p>Find line 8:</p>
+        <code class="old-url">&lt;script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"&gt;&lt;/script&gt;</code>
+        <p>Replace with:</p>
+        <code class="new-url">&lt;script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.js"&gt;&lt;/script&gt;</code>
+    </div>
+
+    <div class="file-fix">
+        <h3>2. setup-wizard-app.html</h3>
+        <p>Open <strong>setup-wizard-app.html</strong> in your text editor</p>
+        <p>Find line 14:</p>
+        <code class="old-url">&lt;script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"&gt;&lt;/script&gt;</code>
+        <p>Replace with:</p>
+        <code class="new-url">&lt;script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.js"&gt;&lt;/script&gt;</code>
+    </div>
+
+    <div class="instruction" style="background: #fff3cd; border-color: #ffc107;">
+        <h2>After Making Changes</h2>
+        <p>1. Save both files</p>
+        <p>2. Refresh your browser (Ctrl+F5 or Cmd+Shift+R)</p>
+        <p>3. The QR code generation should now work properly</p>
+    </div>
+
+    <div style="text-align: center; margin-top: 30px;">
+        <button onclick="testQRCode()">Test QR Code Generation</button>
+        <canvas id="test-canvas" style="display: none; margin: 20px auto;"></canvas>
+        <div id="status"></div>
+    </div>
+
+    <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.js"></script>
+    <script>
+        function testQRCode() {
+            const canvas = document.getElementById('test-canvas');
+            const status = document.getElementById('status');
+
+            if (typeof QRCode === 'undefined') {
+                status.innerHTML = '<p style="color: red;">❌ QRCode library not loaded</p>';
+                return;
+            }
+
+            canvas.style.display = 'block';
+
+            QRCode.toCanvas(canvas, 'https://yourdomain.com/book/test', {
+                width: 200,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#ffffff'
+                }
+            }, function(error) {
+                if (error) {
+                    status.innerHTML = '<p style="color: red;">❌ Error: ' + error + '</p>';
+                } else {
+                    status.innerHTML = '<p style="color: green;">✅ QR Code library is working!</p>';
+                }
+            });
+        }
+
+        // Test on load
+        window.addEventListener('load', () => {
+            console.log('QRCode library loaded:', typeof QRCode !== 'undefined');
+        });
+    </script>
+</body>
+</html>

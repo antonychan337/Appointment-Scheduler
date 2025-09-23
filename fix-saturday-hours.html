@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fix Saturday Hours</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+            width: 100%;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fix Saturday Store Hours</h1>
+
+    <div id="current-hours">
+        <h3>Current Store Hours:</h3>
+        <pre id="hours-display">Loading...</pre>
+    </div>
+
+    <button onclick="fixSaturdayHours()">Set Saturday to 10:00 AM - 4:00 PM</button>
+
+    <div id="status"></div>
+
+    <script>
+        async function loadCurrentHours() {
+            await SharedData.initialize();
+            const hours = await SharedData.loadStoreHours();
+
+            document.getElementById('hours-display').textContent = JSON.stringify(hours, null, 2);
+
+            if (hours.saturday) {
+                const saturdayInfo = `Saturday: ${hours.saturday.open} - ${hours.saturday.close}`;
+                if (hours.saturday.close === '16:00') {
+                    document.getElementById('status').innerHTML =
+                        `<div class="success">✅ Saturday hours are already correct: ${saturdayInfo}</div>`;
+                } else {
+                    document.getElementById('status').innerHTML =
+                        `<div class="error">Saturday currently closes at ${hours.saturday.close}, not 4:00 PM</div>`;
+                }
+            }
+        }
+
+        async function fixSaturdayHours() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = '<div>Updating Saturday hours...</div>';
+
+            try {
+                // Get current store hours
+                const currentHours = await SharedData.loadStoreHours();
+
+                // Update Saturday to close at 4pm (16:00)
+                currentHours.saturday = {
+                    open: '10:00',
+                    close: '16:00',
+                    closed: false
+                };
+
+                // Save updated hours
+                await SharedData.saveStoreHours(currentHours);
+
+                statusDiv.innerHTML = '<div class="success">✅ Saturday hours updated to 10:00 AM - 4:00 PM!</div>';
+
+                // Reload to show updated hours
+                setTimeout(loadCurrentHours, 1000);
+
+                // Also update the owner barber if they use store hours
+                const shopId = localStorage.getItem('supabase_shop_id');
+                if (shopId) {
+                    const { data: barbers } = await supabaseClient
+                        .from('barbers')
+                        .select('*')
+                        .eq('shop_id', shopId)
+                        .eq('is_owner', true);
+
+                    if (barbers && barbers.length > 0) {
+                        const ownerBarber = barbers[0];
+                        if (ownerBarber.uses_store_hours) {
+                            await supabaseClient
+                                .from('barbers')
+                                .update({ working_hours: currentHours })
+                                .eq('id', ownerBarber.id);
+
+                            statusDiv.innerHTML += '<br>Owner barber hours also updated.';
+                        }
+                    }
+                }
+
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                console.error('Error updating hours:', error);
+            }
+        }
+
+        // Load current hours on page load
+        setTimeout(loadCurrentHours, 500);
+    </script>
+</body>
+</html>

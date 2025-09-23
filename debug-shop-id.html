@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Shop ID Issues</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Bridge -->
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 40px;
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #2C3E50;
+            margin-bottom: 20px;
+        }
+
+        .status-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .status-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .status-value {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .status-value.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-value.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            background: #2C3E50;
+            color: white;
+        }
+
+        button:hover {
+            background: #1a252f;
+        }
+
+        .btn-success {
+            background: #28a745;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+            margin: 10px 0;
+        }
+
+        .console-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin: 20px 0;
+        }
+
+        .console-log { color: #d4d4d4; }
+        .console-warn { color: #ce9178; }
+        .console-error { color: #f48771; }
+        .console-success { color: #4ec9b0; }
+
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 0 5px;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug Shop ID Issues</h1>
+
+        <div class="status-section">
+            <h2>Current Status</h2>
+            <div id="status-items">
+                <div class="status-item">
+                    <span class="status-label">Loading...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-section">
+            <h2>Actions</h2>
+            <button onclick="checkEverything()">🔍 Run Full Diagnosis</button>
+            <button onclick="testShopQuery()">📊 Test Shop Query</button>
+            <button onclick="findAllShops()">🏪 Find All Shops</button>
+            <button onclick="testInitialize()">🔄 Test Initialize</button>
+            <button class="btn-danger" onclick="clearShopId()">🗑️ Clear Shop ID</button>
+
+            <div style="margin-top: 20px;">
+                <input type="text" id="manual-shop-id" placeholder="Enter shop ID manually">
+                <button class="btn-success" onclick="setManualShopId()">Set Shop ID</button>
+            </div>
+        </div>
+
+        <div class="status-section">
+            <h2>Console Output</h2>
+            <div id="console" class="console-output"></div>
+        </div>
+
+        <div class="status-section">
+            <h2>Quick Links</h2>
+            <button onclick="window.location.href='auth-app.html'">🔐 Login</button>
+            <button onclick="window.location.href='setup-wizard-app.html'">🚀 Setup Wizard</button>
+            <button onclick="window.location.href='owner-app.html'">👤 Owner App</button>
+            <button onclick="window.location.href='reset-all-data.html'">🔄 Reset Data</button>
+        </div>
+    </div>
+
+    <script>
+        // Capture console output
+        const consoleDiv = document.getElementById('console');
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+
+        function addToConsole(message, type = 'log') {
+            const entry = document.createElement('div');
+            entry.className = `console-${type}`;
+            entry.textContent = `[${type.toUpperCase()}] ${typeof message === 'object' ? JSON.stringify(message, null, 2) : message}`;
+            consoleDiv.appendChild(entry);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            args.forEach(arg => addToConsole(arg, 'log'));
+        };
+
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            args.forEach(arg => addToConsole(arg, 'warn'));
+        };
+
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            args.forEach(arg => addToConsole(arg, 'error'));
+        };
+
+        async function checkEverything() {
+            consoleDiv.innerHTML = '';
+            const statusDiv = document.getElementById('status-items');
+            let html = '';
+
+            addToConsole('Starting full diagnosis...', 'log');
+
+            // Check authentication
+            try {
+                const { data: { user }, error } = await supabaseClient.auth.getUser();
+
+                if (user) {
+                    html += createStatusItem('Authentication', 'Logged In', 'success');
+                    html += createStatusItem('User Email', user.email);
+                    html += createStatusItem('User ID', user.id.substring(0, 12) + '...');
+                    addToConsole(`User authenticated: ${user.email}`, 'success');
+                } else {
+                    html += createStatusItem('Authentication', 'Not Logged In', 'error');
+                    addToConsole('No user authenticated', 'warn');
+                }
+            } catch (error) {
+                html += createStatusItem('Authentication', 'Error: ' + error.message, 'error');
+                addToConsole('Auth error: ' + error.message, 'error');
+            }
+
+            // Check localStorage
+            const savedShopId = localStorage.getItem('supabase_shop_id');
+            if (savedShopId) {
+                html += createStatusItem('LocalStorage Shop ID', savedShopId, 'success');
+                addToConsole(`LocalStorage shop ID: ${savedShopId}`, 'log');
+            } else {
+                html += createStatusItem('LocalStorage Shop ID', 'Not Set', 'error');
+                addToConsole('No shop ID in localStorage', 'warn');
+            }
+
+            // Check current shop ID from SharedData
+            const currentShopId = SharedData.getCurrentShopId();
+            if (currentShopId) {
+                html += createStatusItem('Current Shop ID', currentShopId, 'success');
+                addToConsole(`Current shop ID: ${currentShopId}`, 'success');
+            } else {
+                html += createStatusItem('Current Shop ID', 'Not Set', 'error');
+                addToConsole('No current shop ID in SharedData', 'error');
+            }
+
+            // Check setupComplete flag
+            const setupComplete = localStorage.getItem('setupComplete');
+            html += createStatusItem('Setup Complete', setupComplete || 'Not Set', setupComplete === 'true' ? 'success' : 'error');
+
+            statusDiv.innerHTML = html;
+        }
+
+        async function testShopQuery() {
+            consoleDiv.innerHTML = '';
+            addToConsole('Testing shop query...', 'log');
+
+            try {
+                const { data: { user } } = await supabaseClient.auth.getUser();
+                if (!user) {
+                    addToConsole('No user authenticated', 'error');
+                    return;
+                }
+
+                addToConsole(`Querying shops table for email: ${user.email}`, 'log');
+
+                const { data: shops, error } = await supabaseClient
+                    .from('shops')
+                    .select('*')
+                    .eq('email', user.email);
+
+                if (error) {
+                    addToConsole(`Shop query error: ${JSON.stringify(error)}`, 'error');
+                } else {
+                    addToConsole(`Found ${shops?.length || 0} shops:`, 'success');
+                    shops?.forEach(shop => {
+                        addToConsole(`Shop: ${shop.name} (ID: ${shop.id})`, 'log');
+                    });
+                }
+            } catch (error) {
+                addToConsole(`Exception: ${error.message}`, 'error');
+            }
+        }
+
+        async function findAllShops() {
+            consoleDiv.innerHTML = '';
+            addToConsole('Finding all shops...', 'log');
+
+            try {
+                const { data: shops, error } = await supabaseClient
+                    .from('shops')
+                    .select('id, name, email, created_at');
+
+                if (error) {
+                    addToConsole(`Error: ${JSON.stringify(error)}`, 'error');
+                } else {
+                    addToConsole(`Total shops: ${shops?.length || 0}`, 'success');
+                    shops?.forEach(shop => {
+                        addToConsole(`${shop.name} - ${shop.email} (${shop.id})`, 'log');
+                    });
+                }
+            } catch (error) {
+                addToConsole(`Exception: ${error.message}`, 'error');
+            }
+        }
+
+        async function testInitialize() {
+            consoleDiv.innerHTML = '';
+            addToConsole('Testing SharedData.initialize()...', 'log');
+
+            await SharedData.initialize();
+
+            const shopId = SharedData.getCurrentShopId();
+            if (shopId) {
+                addToConsole(`Initialize successful! Shop ID: ${shopId}`, 'success');
+            } else {
+                addToConsole('Initialize completed but no shop ID set', 'error');
+            }
+        }
+
+        function clearShopId() {
+            localStorage.removeItem('supabase_shop_id');
+            SharedData.setCurrentShopId(null);
+            addToConsole('Shop ID cleared from localStorage and SharedData', 'warn');
+            checkEverything();
+        }
+
+        function setManualShopId() {
+            const shopId = document.getElementById('manual-shop-id').value.trim();
+            if (!shopId) {
+                alert('Please enter a shop ID');
+                return;
+            }
+
+            SharedData.setCurrentShopId(shopId);
+            addToConsole(`Manually set shop ID to: ${shopId}`, 'success');
+            checkEverything();
+        }
+
+        function createStatusItem(label, value, type = '') {
+            const className = type ? ` class="${type}"` : '';
+            return `
+                <div class="status-item">
+                    <span class="status-label">${label}:</span>
+                    <span class="status-value${className}">${value}</span>
+                </div>
+            `;
+        }
+
+        // Check everything on load
+        window.addEventListener('load', () => {
+            checkEverything();
+        });
+    </script>
+</body>
+</html>

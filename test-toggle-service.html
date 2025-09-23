@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Toggle Service</title>
+    <script src="shared-data.js"></script>
+    <style>
+        .service-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            margin: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .toggle-switch {
+            width: 50px;
+            height: 25px;
+            background: #ccc;
+            border-radius: 25px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .toggle-switch.active {
+            background: #4CAF50;
+        }
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 21px;
+            height: 21px;
+            border-radius: 50%;
+            background: white;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+        }
+        .toggle-switch.active::after {
+            transform: translateX(25px);
+        }
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .status {
+            margin: 20px;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 5px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 10px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Service Toggle Sync</h1>
+
+    <div id="services-list"></div>
+
+    <button onclick="saveAllServices()">Manual Save (Should Sync to Barbers)</button>
+    <button onclick="refreshStatus()">Refresh Status</button>
+
+    <div class="status" id="status"></div>
+
+    <script>
+        // Simulate owner app's toggleService function
+        function toggleService(element) {
+            element.classList.toggle('active');
+            saveServices();
+        }
+
+        // Simulate owner app's saveServices function
+        function saveServices() {
+            const services = SharedData.getServices();
+
+            // Update enabled state based on toggles
+            document.querySelectorAll('[data-service-id]').forEach(toggle => {
+                const serviceId = toggle.dataset.serviceId;
+                if (services[serviceId]) {
+                    services[serviceId].enabled = toggle.classList.contains('active');
+                }
+            });
+
+            // Save services
+            SharedData.saveServices(services);
+
+            // THIS IS THE KEY PART - Update all barbers with enabled services
+            const enabledServiceIds = Object.keys(services).filter(id => services[id].enabled);
+            const serviceAssignment = {};
+            enabledServiceIds.forEach(id => {
+                serviceAssignment[id] = true;
+            });
+
+            // Update all barbers
+            const barbers = SharedData.getBarbers();
+            barbers.forEach(barber => {
+                SharedData.updateBarber(barber.id, { services: serviceAssignment });
+            });
+
+            console.log('Services saved and barbers updated');
+            console.log('Enabled services:', enabledServiceIds);
+            console.log('Service assignment:', serviceAssignment);
+
+            refreshStatus();
+        }
+
+        function saveAllServices() {
+            saveServices();
+            alert('Services saved and barbers updated!');
+        }
+
+        function loadServiceToggles() {
+            const services = SharedData.getServices();
+            const container = document.getElementById('services-list');
+            container.innerHTML = '<h2>Toggle Services:</h2>';
+
+            Object.keys(services).forEach(serviceId => {
+                const service = services[serviceId];
+                const div = document.createElement('div');
+                div.className = 'service-toggle';
+                div.innerHTML = `
+                    <span>${service.name} (${serviceId})</span>
+                    <div class="toggle-switch ${service.enabled ? 'active' : ''}"
+                         data-service-id="${serviceId}"
+                         onclick="toggleService(this)"></div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function refreshStatus() {
+            const services = SharedData.getServices();
+            const barbers = SharedData.getBarbers();
+            const status = document.getElementById('status');
+
+            let html = '<h2>Current Status:</h2>';
+
+            // Show services
+            html += '<h3>Services:</h3>';
+            html += '<table>';
+            html += '<tr><th>Service</th><th>Enabled</th></tr>';
+
+            const enabledCount = Object.keys(services).filter(id => services[id].enabled).length;
+            Object.keys(services).forEach(serviceId => {
+                const service = services[serviceId];
+                html += `
+                    <tr>
+                        <td>${service.name} (${serviceId})</td>
+                        <td style="background: ${service.enabled ? '#90EE90' : '#FFB6C1'}">${service.enabled}</td>
+                    </tr>
+                `;
+            });
+            html += '</table>';
+            html += `<p><strong>Total enabled: ${enabledCount}</strong></p>`;
+
+            // Show barber assignments
+            html += '<h3>Barber Service Assignments:</h3>';
+            barbers.forEach(barber => {
+                html += `<h4>${barber.name} (${barber.id})</h4>`;
+
+                // Process like customer app
+                let barberServiceIds;
+                if (Array.isArray(barber.services)) {
+                    barberServiceIds = barber.services;
+                } else if (barber.services && typeof barber.services === 'object') {
+                    barberServiceIds = Object.keys(barber.services).filter(key => barber.services[key]);
+                } else {
+                    barberServiceIds = Object.keys(services);
+                }
+
+                const visibleServices = barberServiceIds.filter(id => services[id] && services[id].enabled);
+
+                html += `<p>Raw services data: ${JSON.stringify(barber.services)}</p>`;
+                html += `<p>Services visible in customer app: ${visibleServices.length}</p>`;
+                html += '<ul>';
+                visibleServices.forEach(id => {
+                    html += `<li>${services[id].name}</li>`;
+                });
+                html += '</ul>';
+
+                if (visibleServices.length !== enabledCount) {
+                    html += `<p style="color: red; font-weight: bold;">⚠️ MISMATCH: Shows ${visibleServices.length} of ${enabledCount} enabled services!</p>`;
+                }
+            });
+
+            status.innerHTML = html;
+        }
+
+        // Initialize
+        loadServiceToggles();
+        refreshStatus();
+    </script>
+</body>
+</html>

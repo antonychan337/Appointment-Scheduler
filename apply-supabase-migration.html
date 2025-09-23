@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apply Supabase Migration</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            max-width: 800px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #2C3E50;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+
+        .step {
+            margin: 25px 0;
+            padding: 25px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+            position: relative;
+        }
+
+        .step-number {
+            position: absolute;
+            top: -12px;
+            left: 20px;
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .step h3 {
+            color: #2C3E50;
+            margin-bottom: 15px;
+            margin-top: 10px;
+        }
+
+        .step p {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            margin: 15px 0;
+            position: relative;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s;
+        }
+
+        .copy-btn:hover {
+            background: #764ba2;
+        }
+
+        .copy-btn.copied {
+            background: #27ae60;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn-success {
+            background: #27ae60;
+        }
+
+        .btn-success:hover {
+            background: #219a52;
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .links {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        ul {
+            margin-left: 20px;
+            color: #555;
+        }
+
+        li {
+            margin: 8px 0;
+        }
+
+        .highlight {
+            background: #fff3cd;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Apply Supabase Migration</h1>
+        <p class="subtitle">Fix all missing columns and table issues in your Supabase database</p>
+
+        <div class="warning">
+            <strong>⚠️ Important:</strong> This migration will add missing columns to your Supabase tables. It won't delete any existing data, but always backup your database before running migrations.
+        </div>
+
+        <div class="step">
+            <div class="step-number">1</div>
+            <h3>Open Supabase Dashboard</h3>
+            <p>Go to your Supabase project dashboard:</p>
+            <div class="code-block">
+                https://supabase.com/dashboard/project/zpgebfbzdmahlbhjbvvk
+                <button class="copy-btn" onclick="copyText('https://supabase.com/dashboard/project/zpgebfbzdmahlbhjbvvk', this)">Copy</button>
+            </div>
+            <button onclick="window.open('https://supabase.com/dashboard/project/zpgebfbzdmahlbhjbvvk', '_blank')">
+                Open Supabase Dashboard
+            </button>
+        </div>
+
+        <div class="step">
+            <div class="step-number">2</div>
+            <h3>Navigate to SQL Editor</h3>
+            <p>In your Supabase dashboard:</p>
+            <ul>
+                <li>Click on <span class="highlight">SQL Editor</span> in the left sidebar</li>
+                <li>Click <span class="highlight">New query</span> button</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <div class="step-number">3</div>
+            <h3>Copy Migration Script</h3>
+            <p>Click the button below to copy the complete migration script:</p>
+            <button class="btn-success" onclick="loadAndCopyMigration()">
+                📋 Copy Migration Script
+            </button>
+            <div id="copy-status"></div>
+        </div>
+
+        <div class="step">
+            <div class="step-number">4</div>
+            <h3>Run Migration</h3>
+            <p>In the Supabase SQL Editor:</p>
+            <ul>
+                <li>Paste the migration script (Ctrl+V or Cmd+V)</li>
+                <li>Review the script to understand what it will do</li>
+                <li>Click the <span class="highlight">Run</span> button</li>
+                <li>Wait for the success message</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <div class="step-number">5</div>
+            <h3>Verify Migration</h3>
+            <p>After running the migration, run this verification query in SQL Editor:</p>
+            <div class="code-block">
+                SELECT table_name, column_name, data_type
+                FROM information_schema.columns
+                WHERE table_name IN ('shops', 'barbers', 'services', 'appointments', 'blocked_times')
+                ORDER BY table_name, ordinal_position;
+                <button class="copy-btn" onclick="copyText(`SELECT table_name, column_name, data_type
+FROM information_schema.columns
+WHERE table_name IN ('shops', 'barbers', 'services', 'appointments', 'blocked_times')
+ORDER BY table_name, ordinal_position;`, this)">Copy</button>
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-number">6</div>
+            <h3>Test Your Application</h3>
+            <p>Once migration is complete, test your application:</p>
+            <div class="links">
+                <button onclick="window.location.href='check-supabase-schema.html'">
+                    🔍 Check Schema
+                </button>
+                <button onclick="window.location.href='auth-app.html'">
+                    🔐 Test Login
+                </button>
+                <button onclick="window.location.href='owner-app.html'">
+                    👤 Test Owner App
+                </button>
+                <button class="btn-secondary" onclick="window.location.href='clear-all-data.html'">
+                    🗑️ Clear Test Data
+                </button>
+            </div>
+        </div>
+
+        <div class="success" id="success-message" style="display: none;">
+            <strong>✅ Migration Applied!</strong><br>
+            Your Supabase database schema has been updated. All missing columns have been added. You can now test your application without errors.
+        </div>
+    </div>
+
+    <script>
+        async function loadAndCopyMigration() {
+            try {
+                // Load the migration script
+                const response = await fetch('supabase-migration.sql');
+                const migrationScript = await response.text();
+
+                // Copy to clipboard
+                await navigator.clipboard.writeText(migrationScript);
+
+                // Show success
+                const statusDiv = document.getElementById('copy-status');
+                statusDiv.innerHTML = '<div class="success">✅ Migration script copied to clipboard! Now paste it in Supabase SQL Editor.</div>';
+
+                // Show next steps
+                setTimeout(() => {
+                    statusDiv.innerHTML += '<p style="margin-top: 10px;">👉 Go to your Supabase SQL Editor and paste the script.</p>';
+                }, 1000);
+
+            } catch (error) {
+                const statusDiv = document.getElementById('copy-status');
+                statusDiv.innerHTML = '<div class="warning">Could not copy automatically. Please open supabase-migration.sql file manually and copy its contents.</div>';
+            }
+        }
+
+        function copyText(text, button) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                button.classList.add('copied');
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>

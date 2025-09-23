@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Service Sync Now</title>
+    <script src="shared-data.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button {
+            font-size: 18px;
+            padding: 15px 30px;
+            margin: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            border: none;
+        }
+        .fix-btn { background: #4CAF50; color: white; }
+        .fix-btn:hover { background: #45a049; }
+        .status {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 5px;
+        }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Fix Service Sync Between Owner and Customer Apps</h1>
+
+    <div class="status">
+        <p><strong>Problem:</strong> Customer app only shows 2 services even though 5 are enabled.</p>
+        <p><strong>Solution:</strong> Click the button below to sync all enabled services to all barbers.</p>
+    </div>
+
+    <button class="fix-btn" onclick="fixServiceSync()">Fix Service Sync Now</button>
+
+    <div id="result"></div>
+
+    <script>
+        function fixServiceSync() {
+            const result = document.getElementById('result');
+
+            try {
+                // Get all services
+                const services = SharedData.getServices();
+
+                // Count enabled services
+                const enabledServiceIds = [];
+                Object.keys(services).forEach(serviceId => {
+                    if (services[serviceId].enabled) {
+                        enabledServiceIds.push(serviceId);
+                    }
+                });
+
+                // Create service assignment object
+                const serviceAssignment = {};
+                enabledServiceIds.forEach(serviceId => {
+                    serviceAssignment[serviceId] = true;
+                });
+
+                // Update all barbers
+                const barbers = SharedData.getBarbers();
+                barbers.forEach(barber => {
+                    SharedData.updateBarber(barber.id, { services: serviceAssignment });
+                    console.log(`Updated ${barber.name} with ${enabledServiceIds.length} services`);
+                });
+
+                // Display success message
+                result.innerHTML = `
+                    <div class="status">
+                        <p class="success">✓ Successfully synced ${enabledServiceIds.length} enabled services to ${barbers.length} barber(s)!</p>
+                        <h3>Enabled Services:</h3>
+                        <ul>
+                            ${enabledServiceIds.map(id => `<li>${services[id].name} (${id})</li>`).join('')}
+                        </ul>
+                        <h3>Updated Barbers:</h3>
+                        <ul>
+                            ${barbers.map(b => `<li>${b.name} (${b.id})</li>`).join('')}
+                        </ul>
+                        <p><strong>Next Steps:</strong></p>
+                        <ol>
+                            <li>Open the Customer App</li>
+                            <li>You should now see all ${enabledServiceIds.length} services</li>
+                        </ol>
+                    </div>
+                `;
+
+                // Automatically open customer app after 2 seconds
+                setTimeout(() => {
+                    window.open('customer-app.html', '_blank');
+                }, 2000);
+
+            } catch (error) {
+                result.innerHTML = `
+                    <div class="status">
+                        <p class="error">✗ Error: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Check initial state
+        window.onload = () => {
+            const services = SharedData.getServices();
+            const barbers = SharedData.getBarbers();
+
+            const enabledCount = Object.keys(services).filter(id => services[id].enabled).length;
+
+            console.log(`Found ${enabledCount} enabled services`);
+            console.log(`Found ${barbers.length} barber(s)`);
+
+            // Show initial status
+            const result = document.getElementById('result');
+            result.innerHTML = `
+                <div class="status">
+                    <p>Current Status:</p>
+                    <ul>
+                        <li>Enabled services: ${enabledCount}</li>
+                        <li>Number of barbers: ${barbers.length}</li>
+                    </ul>
+                </div>
+            `;
+        };
+    </script>
+</body>
+</html>
