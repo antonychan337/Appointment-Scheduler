@@ -398,6 +398,23 @@ const SharedData = {
         }));
     },
 
+    async deleteService(serviceId) {
+        try {
+            // If Supabase is available, delete from database
+            if (window.SupabaseBridge) {
+                await window.SupabaseBridge.deleteService(serviceId);
+            } else {
+                // Fallback to local storage
+                const services = this.getServices();
+                delete services[serviceId];
+                this.saveServices(services);
+            }
+        } catch (error) {
+            console.error('Error deleting service:', error);
+            throw error;
+        }
+    },
+
     // Get week start (Sunday) for a given date
     getWeekStart(date) {
         const d = new Date(date);
@@ -410,18 +427,56 @@ const SharedData = {
 
     // Get service color
     getServiceColor(serviceId) {
-        // Check if it's a default service
+        // Check if it's a default service by ID
         if (this.serviceColors[serviceId]) {
             return this.serviceColors[serviceId];
         }
 
         const services = this.getServices();
+        const service = services[serviceId];
+
+        // Map of service names to their default colors
+        const nameToColorMap = {
+            "Men's Cut": '#2196F3',
+            "男士理发": '#2196F3',
+            "Women's Cut": '#E91E63',
+            "女士理发": '#E91E63',
+            "Children's Cut": '#4CAF50',
+            "儿童理发": '#4CAF50',
+            "Hair Coloring": '#FF9800',
+            "染发": '#FF9800',
+            "Highlights": '#9C27B0',
+            "挑染": '#9C27B0'
+        };
+
+        // Check if the service name matches a known service
+        if (service && service.name) {
+            // Check primary name
+            if (nameToColorMap[service.name]) {
+                return nameToColorMap[service.name];
+            }
+            // Check translated names
+            if (service.name_en && nameToColorMap[service.name_en]) {
+                return nameToColorMap[service.name_en];
+            }
+            if (service.name_zh && nameToColorMap[service.name_zh]) {
+                return nameToColorMap[service.name_zh];
+            }
+        }
 
         // If it's a custom service, use color from palette
-        // Assign a color from the palette for custom services
-        const customServices = Object.keys(services).filter(id =>
-            !this.defaultServices[id]
-        );
+        // Get all service IDs that don't have predefined colors
+        const customServices = Object.keys(services).filter(id => {
+            const svc = services[id];
+            // Check if this is a known default service by name
+            const isDefault = svc && (
+                nameToColorMap[svc.name] ||
+                nameToColorMap[svc.name_en] ||
+                nameToColorMap[svc.name_zh]
+            );
+            return !isDefault;
+        });
+
         const customIndex = customServices.indexOf(serviceId);
 
         if (customIndex >= 0) {

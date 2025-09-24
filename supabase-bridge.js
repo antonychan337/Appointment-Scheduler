@@ -136,13 +136,28 @@ const SharedData = {
             // Load initial data into cache
             if (currentShopId) {
                 console.log('Loading initial data for shop:', currentShopId);
+
+                // Load critical caches first
+                this.storeHoursCache = await this.loadStoreHours();
+                this.bookingPoliciesCache = await this.loadBookingPolicies();
+                console.log('Critical caches loaded:', {
+                    storeHours: !!this.storeHoursCache,
+                    bookingPolicies: !!this.bookingPoliciesCache
+                });
+
+                // Then load other data
                 this.barbersCache = await this.getBarbers();
                 this.appointmentsCache = await this.getAppointments();
-                await this.loadServices(); // Load services into cache
-                this.storeHoursCache = await this.loadStoreHours(); // Load store hours into cache
-                this.bookingPoliciesCache = await this.loadBookingPolicies(); // Load booking policies into cache
+                await this.loadServices();
             } else {
-                console.warn('No shop ID available, skipping data load');
+                console.warn('No shop ID available, loading default caches');
+                // Load defaults even without shop ID
+                this.storeHoursCache = this.defaultStoreHours;
+                this.bookingPoliciesCache = {
+                    minBookingHours: 2,
+                    maxBookingDays: 30,
+                    cancellationHours: 24
+                };
             }
         } catch (error) {
             console.error('Initialization error:', error);
@@ -398,7 +413,31 @@ const SharedData = {
     },
 
     async updateBarber(barberId, updates) {
+        console.log('updateBarber called with ID:', barberId, 'type:', typeof barberId);
         if (!currentShopId) return false;
+
+        // Check if barberId is a valid UUID or special ID
+        const isValidId = barberId && (
+            barberId === 'owner' ||
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(barberId)
+        );
+
+        if (!isValidId) {
+            console.error('Invalid barber ID:', barberId, 'Type:', typeof barberId);
+            // Try to find barber by index if it's a number
+            if (!isNaN(barberId)) {
+                const index = parseInt(barberId);
+                if (this.barbersCache && this.barbersCache[index]) {
+                    barberId = this.barbersCache[index].id;
+                    console.log('Converted index', index, 'to barber ID:', barberId);
+                } else {
+                    console.error('Cannot find barber at index:', index, 'Cache:', this.barbersCache);
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
 
         try {
             const updateData = {};
@@ -408,18 +447,39 @@ const SharedData = {
             if (updates.title !== undefined) updateData.title = updates.title;
             if (updates.services !== undefined) {
                 // Convert services object to array of IDs
-                updateData.service_ids = Object.keys(updates.services).filter(id => updates.services[id]);
+                // Filter to only include valid UUID format IDs (not legacy string IDs)
+                const serviceIds = Object.keys(updates.services)
+                    .filter(id => updates.services[id])
+                    .filter(id => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
+
+                // Only set service_ids if we have valid UUIDs
+                if (serviceIds.length > 0) {
+                    updateData.service_ids = serviceIds;
+                } else {
+                    // If no valid UUIDs, set empty array
+                    updateData.service_ids = [];
+                }
             }
             if (updates.hours !== undefined) updateData.working_hours = updates.hours;
             if (updates.isOwner !== undefined) updateData.is_owner = updates.isOwner;
             if (updates.usesStoreHours !== undefined) updateData.uses_store_hours = updates.usesStoreHours;
+
+            console.log('Attempting to update barber with data:', updateData, 'for ID:', barberId);
 
             const { error } = await supabaseClient
                 .from('barbers')
                 .update(updateData)
                 .eq('id', barberId);
 
-            if (error) throw error;
+            if (error) {
+                console.error('Supabase update error details:', {
+                    error,
+                    barberId,
+                    updateData,
+                    currentShopId
+                });
+                throw error;
+            }
 
             // Refresh cache
             const refreshedBarbers = await this.getBarbers();
@@ -439,6 +499,29 @@ const SharedData = {
 
     async deleteBarber(barberId) {
         if (!currentShopId) return false;
+
+        // Check if barberId is a valid UUID or special ID
+        const isValidId = barberId && (
+            barberId === 'owner' ||
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(barberId)
+        );
+
+        if (!isValidId) {
+            console.error('Invalid barber ID for delete:', barberId);
+            // Try to find barber by index if it's a number
+            if (!isNaN(barberId)) {
+                const index = parseInt(barberId);
+                if (this.barbersCache && this.barbersCache[index]) {
+                    barberId = this.barbersCache[index].id;
+                    console.log('Converted index', index, 'to barber ID for delete:', barberId);
+                } else {
+                    console.error('Cannot find barber at index for delete:', index);
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
 
         try {
             const { error } = await supabaseClient
@@ -541,7 +624,44 @@ const SharedData = {
 
             // Transform to match existing format (object instead of array)
             const services = {};
+
+            // Define color palette for automatic assignment
+            const colorPalette = [
+                '#2196F3', // Blue
+                '#E91E63', // Pink
+                '#4CAF50', // Green
+                '#FF9800', // Orange
+                '#9C27B0', // Purple
+                '#00BCD4', // Cyan
+                '#FFC107', // Amber
+                '#795548', // Brown
+                '#607D8B', // Blue Grey
+                '#F44336'  // Red
+            ];
+
+            let colorIndex = 0;
             (data || []).forEach(service => {
+                // Get default color based on service name or assign from palette
+                let defaultColor = '#2196F3';
+
+                // Check for specific service names (case insensitive)
+                const nameLower = service.name.toLowerCase();
+                if (nameLower.includes("men") && nameLower.includes("cut")) {
+                    defaultColor = '#2196F3'; // Blue
+                } else if (nameLower.includes("women") && nameLower.includes("cut")) {
+                    defaultColor = '#E91E63'; // Pink
+                } else if (nameLower.includes("child") || nameLower.includes("kid")) {
+                    defaultColor = '#4CAF50'; // Green
+                } else if (nameLower.includes("color")) {
+                    defaultColor = '#FF9800'; // Orange
+                } else if (nameLower.includes("highlight")) {
+                    defaultColor = '#9C27B0'; // Purple
+                } else {
+                    // Assign from palette based on order
+                    defaultColor = colorPalette[colorIndex % colorPalette.length];
+                    colorIndex++;
+                }
+
                 services[service.id] = {
                     name: service.name,
                     name_zh: service.name_zh,
@@ -550,8 +670,9 @@ const SharedData = {
                     enabled: service.enabled,
                     hasActiveTime: service.has_active_time,
                     activePeriods: service.active_periods,
-                    color: service.color
+                    color: service.color || defaultColor
                 };
+                console.log(`Loaded service "${service.name}" with color ${services[service.id].color} (${service.color ? 'from DB' : 'default assigned'})`);
             });
 
             // Cache services for synchronous access
@@ -560,6 +681,34 @@ const SharedData = {
         } catch (error) {
             console.error('Error fetching services:', error);
             return {};
+        }
+    },
+
+    async deleteService(serviceId) {
+        if (!currentShopId) return;
+
+        try {
+            // Delete from Supabase
+            const { error } = await supabaseClient
+                .from('services')
+                .delete()
+                .eq('shop_id', currentShopId)
+                .eq('id', serviceId);
+
+            if (error) throw error;
+
+            // Remove from cache
+            if (this.servicesCache && this.servicesCache[serviceId]) {
+                delete this.servicesCache[serviceId];
+            }
+
+            // Reload services to ensure consistency
+            await this.loadServices();
+
+            console.log(`Service ${serviceId} deleted successfully`);
+        } catch (error) {
+            console.error('Error deleting service:', error);
+            throw error;
         }
     },
 
@@ -595,7 +744,55 @@ const SharedData = {
 
             const finalServiceIds = [];
 
-            for (const [serviceId, service] of Object.entries(services)) {
+            // Define color palette for services
+            const colorPalette = [
+                '#2196F3', // Blue
+                '#E91E63', // Pink
+                '#4CAF50', // Green
+                '#FF9800', // Orange
+                '#9C27B0', // Purple
+                '#00BCD4', // Cyan
+                '#FFC107', // Amber
+                '#795548', // Brown
+                '#607D8B', // Blue Grey
+                '#F44336'  // Red
+            ];
+
+            let colorIndex = 0;
+            const serviceList = Object.entries(services);
+
+            for (const [serviceId, service] of serviceList) {
+                // If service already has a color, use it
+                let assignedColor = service.color;
+
+                // Only assign a default color if one isn't already provided
+                if (!assignedColor) {
+                    // Check for specific service names (case insensitive)
+                    const nameLower = service.name.toLowerCase();
+                    if (nameLower.includes("men") && nameLower.includes("cut")) {
+                        assignedColor = '#2196F3'; // Blue
+                    } else if (nameLower.includes("women") && nameLower.includes("cut")) {
+                        assignedColor = '#E91E63'; // Pink
+                    } else if (nameLower.includes("child") || nameLower.includes("kid")) {
+                        assignedColor = '#4CAF50'; // Green
+                    } else if (nameLower.includes("color")) {
+                        assignedColor = '#FF9800'; // Orange
+                    } else if (nameLower.includes("highlight")) {
+                        assignedColor = '#9C27B0'; // Purple
+                    } else {
+                        // Use color from existing service if available, otherwise assign from palette
+                        const existingService = existingByName[service.name];
+                        if (existingService && this.servicesCache && this.servicesCache[existingService]) {
+                            assignedColor = this.servicesCache[existingService].color;
+                        }
+                        if (!assignedColor) {
+                            // Assign sequential colors from palette to make them distinct
+                            const index = serviceList.findIndex(([id]) => id === serviceId);
+                            assignedColor = colorPalette[index % colorPalette.length];
+                        }
+                    }
+                }
+
                 const serviceData = {
                     name: service.name,
                     name_zh: service.name_zh,
@@ -604,8 +801,10 @@ const SharedData = {
                     enabled: service.enabled,
                     has_active_time: service.hasActiveTime,
                     active_periods: service.activePeriods,
-                    color: service.color
+                    color: assignedColor
                 };
+
+                console.log(`Saving service "${service.name}" with color: ${assignedColor}`);
 
                 // Check if a service with this name already exists
                 if (existingByName[service.name]) {
@@ -806,9 +1005,19 @@ const SharedData = {
     // STORE HOURS
     // Synchronous version - returns cached store hours
     getStoreHours() {
-        // Return cached hours if available
-        if (this.storeHoursCache) {
-            return this.storeHoursCache;
+        // Return cached hours if available and valid
+        if (this.storeHoursCache && this.storeHoursCache.thursday !== undefined) {
+            // Validate that all days exist
+            const requiredDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+            const hasAllDays = requiredDays.every(day => this.storeHoursCache[day] !== undefined);
+
+            if (hasAllDays) {
+                return this.storeHoursCache;
+            } else {
+                console.warn('Store hours cache incomplete, merging with defaults');
+                // Merge with defaults to ensure all days exist
+                return { ...this.defaultStoreHours, ...this.storeHoursCache };
+            }
         }
 
         // Return defaults if no cache
@@ -908,18 +1117,17 @@ const SharedData = {
     // BOOKING POLICIES
     // Synchronous version - returns cached policies
     getBookingPolicies() {
-        // Return cached policies if available
+        // Always return valid policies
         if (this.bookingPoliciesCache) {
             return this.bookingPoliciesCache;
         }
 
-        // Return defaults if no cache
+        // Return defaults if no cache (without warning - this is normal during init)
         const defaultPolicies = {
             minBookingHours: 2,
             maxBookingDays: 30,
             cancellationHours: 24
         };
-        console.warn('Booking policies cache not loaded, returning defaults');
         return defaultPolicies;
     },
 
@@ -1003,7 +1211,20 @@ const SharedData = {
 
     // AVAILABILITY CHECKING
     getAvailableSlots(date, serviceDuration = 30, barberId = null) {
+        // Force refresh store hours if cache is potentially stale
+        if (!this.storeHoursCache || !this.storeHoursCache.thursday ||
+            (this.storeHoursCache.thursday && this.storeHoursCache.thursday.closed === undefined)) {
+            console.log('[Bridge] Store hours cache seems incomplete, using defaults');
+            this.storeHoursCache = this.defaultStoreHours;
+        }
+        console.log('[Bridge] getAvailableSlots called with:', {
+            date: date,
+            dateString: date ? date.toString() : 'null',
+            serviceDuration: serviceDuration,
+            barberId: barberId
+        });
         const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+        console.log('[Bridge] Day name extracted:', dayName);
 
         // Get hours for the specific barber or store
         let hours;
@@ -1015,8 +1236,10 @@ const SharedData = {
         }
 
         const dayHours = hours[dayName];
+        console.log('[Bridge] Hours for', dayName + ':', dayHours);
 
         if (!dayHours || dayHours.closed) {
+            console.log('[Bridge] Returning empty - store closed or no hours for', dayName);
             return [];
         }
 
@@ -1037,6 +1260,7 @@ const SharedData = {
             }
         }
 
+        console.log('[Bridge] Generated slots:', slots.length, 'slots for', dayName, '- first few:', slots.slice(0, 5));
         return slots;
     },
 
@@ -1377,3 +1601,20 @@ const SharedData = {
 
 // Initialize on load
 SharedData.initialize();
+
+// Initialize caches after SharedData is defined
+(async function initializeCaches() {
+    // Wait a bit for SharedData to be ready
+    setTimeout(async () => {
+        try {
+            // Load booking policies into cache
+            await SharedData.loadBookingPolicies();
+            console.log('Booking policies cache loaded');
+            // Load store hours into cache
+            await SharedData.loadStoreHours();
+            console.log('Store hours cache loaded');
+        } catch (error) {
+            console.warn('Cache initialization error:', error);
+        }
+    }, 100);
+})();

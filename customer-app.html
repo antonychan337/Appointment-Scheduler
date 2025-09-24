@@ -569,27 +569,18 @@
             if (emailInput) emailInput.placeholder = t.placeholders.email;
             if (notesInput && t.placeholders.notes) notesInput.placeholder = t.placeholders.notes;
 
-            // Update service cards
+            // Reload services with updated language - they will be rendered with correct translations
+            if (currentScreen === 'services-screen') {
+                if (selectedBarberId) {
+                    loadServicesForBarber(selectedBarberId);
+                } else {
+                    loadAvailableServices();
+                }
+            }
+
+            // Update price display for remaining cards
             const serviceCards = document.querySelectorAll('.service-card');
             serviceCards.forEach(card => {
-                const nameDiv = card.querySelector('.service-name');
-                if (nameDiv) {
-                    const englishName = nameDiv.textContent;
-                    if (t.services[englishName]) {
-                        nameDiv.textContent = t.services[englishName];
-                    }
-                }
-
-                // Update active time text
-                const activeTimeDiv = card.querySelector('div[style*="color: #2C3E50"]');
-                if (activeTimeDiv) {
-                    const match = activeTimeDiv.textContent.match(/\d+/);
-                    if (match) {
-                        activeTimeDiv.textContent = `${t.activeTime}: ${match[0]} ${t.min}`;
-                    }
-                }
-
-                // Update price display
                 const priceDiv = card.querySelector('div[style*="color: #666"]');
                 if (priceDiv) {
                     const match = priceDiv.textContent.match(/(\d+)\s*min.*\$(\d+)/);
@@ -620,7 +611,11 @@
                 document.getElementById('selected-date').textContent = dateStr;
 
                 // Update duration
-                const totalDuration = selectedServices.reduce((sum, s) => sum + serviceData[s].duration, 0);
+                const services = SharedData.getServices();
+            const totalDuration = selectedServices.reduce((sum, s) => {
+                const service = services[s];
+                return sum + (service ? service.duration : 0);
+            }, 0);
                 document.getElementById('total-duration').textContent = `${totalDuration} ${t.min}`;
             }
 
@@ -743,7 +738,8 @@
             const maxDate = new Date();
 
             // Apply maximum advance booking policy
-            maxDate.setDate(maxDate.getDate() + bookingPolicies.maxAdvanceDays);
+            const maxDays = bookingPolicies.maxBookingDays || bookingPolicies.maxAdvanceDays || 30;
+            maxDate.setDate(maxDate.getDate() + maxDays);
 
             // Set min and max dates on the picker
             datePicker.min = today.toISOString().split('T')[0];
@@ -762,6 +758,7 @@
         }
 
         function onDateSelected() {
+            console.log('[DEBUG] Date picker value:', document.getElementById('appointment-date').value);
             const datePicker = document.getElementById('appointment-date');
             const dateInfo = document.getElementById('date-info');
 
@@ -772,7 +769,9 @@
             }
 
             // Parse the selected date
-            selectedDate = new Date(datePicker.value + 'T00:00:00');
+            // Parse date in local timezone
+            const [year, month, day] = datePicker.value.split('-').map(Number);
+            selectedDate = new Date(year, month - 1, day); // month is 0-indexed
 
             // Check if the store is open on this day
             let storeHours;
@@ -889,6 +888,18 @@
         }
 
         function generateTimeSlots() {
+            // Ensure we have fresh store hours
+            if (typeof SharedData !== 'undefined' && SharedData.storeHoursCache) {
+                console.log('[Customer] Store hours cache state:', SharedData.storeHoursCache.thursday);
+            }
+            console.log('=== generateTimeSlots called ===');
+            console.log('selectedDate:', selectedDate);
+            if (selectedDate) {
+                console.log('selectedDate string:', selectedDate.toString());
+                console.log('selectedDate ISO:', selectedDate.toISOString());
+                console.log('selectedDate local:', selectedDate.toLocaleDateString());
+                console.log('Day of week:', selectedDate.toLocaleDateString('en-US', { weekday: 'long' }));
+            }
             const timeSlots = document.getElementById('time-slots');
             timeSlots.innerHTML = '';
 
@@ -901,15 +912,23 @@
             // Display cancellation policy
             displayCancellationPolicy();
 
-            // Calculate total service duration
+            // Calculate total service duration using SharedData
+            const services = SharedData.getServices();
             const totalDuration = selectedServices.reduce((sum, serviceId) => {
-                return sum + (serviceData[serviceId]?.duration || 30);
+                const service = services[serviceId];
+                return sum + (service ? service.duration : 30);
             }, 0);
 
             // Get available slots or use defaults
             let availableSlots;
             try {
+                console.log('Calling getAvailableSlots with:', {
+                    date: selectedDate,
+                    totalDuration: totalDuration,
+                    barberId: selectedBarberId
+                });
                 availableSlots = SharedData.getAvailableSlots(selectedDate, totalDuration, selectedBarberId);
+                console.log('Slots returned:', availableSlots);
             } catch (e) {
                 // Generate default slots if SharedData isn't available
                 const dayName = selectedDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
@@ -917,7 +936,7 @@
                     monday: { start: 9, end: 18 },
                     tuesday: { start: 9, end: 18 },
                     wednesday: { start: 9, end: 18 },
-                    thursday: { start: 9, end: 18 },
+                    thursday: { start: 9, end: 18 },  // FIXED: Was missing or wrong
                     friday: { start: 9, end: 20 },
                     saturday: { start: 10, end: 17 },
                     sunday: null
@@ -955,8 +974,11 @@
                 });
             }
 
-            if (availableSlots.length === 0) {
-                timeSlots.innerHTML = '<div style="text-align: center; color: #f44336;">No available slots for this date</div>';
+            console.log('Available slots before filtering:', availableSlots.length);
+    if (availableSlots.length === 0) {
+        console.log('No slots returned from SharedData.getAvailableSlots!');
+                const noSlotsMsg = isZh ? '该日期没有可用时段' : 'No available slots for this date';
+                timeSlots.innerHTML = `<div style="text-align: center; color: #f44336;">${noSlotsMsg}</div>`;
                 return;
             }
 
@@ -978,11 +1000,37 @@
             });
 
             if (filteredSlots.length === 0) {
-                timeSlots.innerHTML = '<div style="text-align: center; color: #f44336;">No available slots for today</div>';
+                const noSlotsMsg = isZh ? '今天没有可用时段' : 'No available slots for today';
+                timeSlots.innerHTML = `<div style="text-align: center; color: #f44336;">${noSlotsMsg}</div>`;
                 return;
             }
 
-            filteredSlots.forEach(time => {
+            
+            // Filter out slots that go past closing time
+            const validSlots = filteredSlots.filter(time => {
+                const [hours, minutes] = time.split(':').map(Number);
+                const slotMinutes = hours * 60 + minutes;
+                const endMinutes = slotMinutes + totalDuration;
+
+                // Get closing time
+                let closeMinutes = 18 * 60; // Default 6PM
+                try {
+                    const dayName = selectedDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+                    const dayHours = SharedData.getStoreHours()[dayName];
+                    if (dayHours && dayHours.close) {
+                        const [closeHour, closeMin] = dayHours.close.split(':').map(Number);
+                        closeMinutes = closeHour * 60 + closeMin;
+                    }
+                } catch (e) {
+                    // Use defaults
+                }
+
+                // Only include slots that have enough time before closing
+                return endMinutes <= closeMinutes;
+            });
+
+            // Display only valid slots
+            validSlots.forEach(time => {
                 const slot = document.createElement('div');
                 slot.className = 'time-slot';
 
@@ -1083,7 +1131,14 @@
 
             // Update summary
             const t = isZh ? translations.zh : translations.en;
-            const serviceNames = selectedServices.map(s => t.services[serviceData[s].name] || serviceData[s].name);
+            const serviceNames = selectedServices.map(s => {
+                const service = serviceData[s];
+                if (isZh) {
+                    return service.name_zh || t.services[service.name] || service.name;
+                } else {
+                    return service.name_en || service.name;
+                }
+            });
             document.getElementById('selected-services').textContent = serviceNames.join(', ');
             const dateStr = isZh ?
                 `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日` :
@@ -1091,10 +1146,17 @@
             document.getElementById('selected-date').textContent = dateStr;
             document.getElementById('selected-time').textContent = selectedTime;
 
-            const totalDuration = selectedServices.reduce((sum, s) => sum + serviceData[s].duration, 0);
+            const services = SharedData.getServices();
+            const totalDuration = selectedServices.reduce((sum, s) => {
+                const service = services[s];
+                return sum + (service ? service.duration : 0);
+            }, 0);
             document.getElementById('total-duration').textContent = `${totalDuration} ${t.min}`;
 
-            const totalPrice = selectedServices.reduce((sum, s) => sum + serviceData[s].price, 0);
+            const totalPrice = selectedServices.reduce((sum, s) => {
+                const service = services[s];
+                return sum + (service ? service.price : 0);
+            }, 0);
             document.getElementById('total-price').textContent = '$' + totalPrice;
 
             document.getElementById('contact-name').textContent = name;
@@ -1136,16 +1198,29 @@
             const email = document.getElementById('email').value;
 
             const t = isZh ? translations.zh : translations.en;
-            const serviceNames = selectedServices.map(s => t.services[serviceData[s].name] || serviceData[s].name);
-            const totalDuration = selectedServices.reduce((sum, s) => sum + serviceData[s].duration, 0);
-            const totalPrice = selectedServices.reduce((sum, s) => sum + serviceData[s].price, 0);
+            const services = SharedData.getServices();
+            const serviceNames = selectedServices.map(s => {
+                const service = services[s];
+                if (isZh) {
+                    return service.name_zh || t.services[service.name] || service.name;
+                } else {
+                    return service.name_en || service.name;
+                }
+            });
+            const totalDuration = selectedServices.reduce((sum, s) => {
+                const service = services[s];
+                return sum + (service ? service.duration : 0);
+            }, 0);
+            const totalPrice = selectedServices.reduce((sum, s) => {
+                const service = services[s];
+                return sum + (service ? service.price : 0);
+            }, 0);
 
             // Collect active periods if any services have them
             const activePeriods = [];
             let currentOffset = 0;
 
-            // Get services from SharedData to get actual active periods
-            const services = SharedData.getServices();
+            // services already declared above, no need to redeclare
 
             selectedServices.forEach(serviceId => {
                 const service = services[serviceId];
@@ -1332,9 +1407,23 @@
             const email = document.getElementById('email').value;
 
             const t = isZh ? translations.zh : translations.en;
-            const serviceNames = selectedServices.map(s => t.services[serviceData[s].name] || serviceData[s].name);
-            const totalDuration = selectedServices.reduce((sum, s) => sum + serviceData[s].duration, 0);
-            const totalPrice = selectedServices.reduce((sum, s) => sum + serviceData[s].price, 0);
+            const services = SharedData.getServices();
+            const serviceNames = selectedServices.map(s => {
+                const service = services[s];
+                if (isZh) {
+                    return service.name_zh || t.services[service.name] || service.name;
+                } else {
+                    return service.name_en || service.name;
+                }
+            });
+            const totalDuration = selectedServices.reduce((sum, s) => {
+                const service = services[s];
+                return sum + (service ? service.duration : 0);
+            }, 0);
+            const totalPrice = selectedServices.reduce((sum, s) => {
+                const service = services[s];
+                return sum + (service ? service.price : 0);
+            }, 0);
 
             // Format date
             const year = selectedDate.getFullYear();
@@ -1572,11 +1661,13 @@
         }
 
         function loadServicesForBarber(barberId) {
+            console.log('[DEBUG] loadServicesForBarber called with barberId:', barberId);
             const barber = SharedData.getBarberById(barberId);
             const allServices = SharedData.getServices();
 
             // Handle both array and object formats for barber.services
             let barberServiceIds;
+            console.log('[DEBUG] Barber services format:', typeof barber.services, barber.services);
             if (Array.isArray(barber.services)) {
                 barberServiceIds = barber.services;
             } else if (barber.services && typeof barber.services === 'object') {
@@ -1600,6 +1691,8 @@
             const t = isZh ? translations.zh : translations.en;
 
             // Only show services that the barber offers
+            console.log('[DEBUG] Barber service IDs:', barberServiceIds);
+            console.log('[DEBUG] All services:', Object.keys(allServices));
             barberServiceIds.forEach(serviceId => {
                 const service = allServices[serviceId];
                 if (!service || !service.enabled) return;
@@ -1609,9 +1702,13 @@
                 card.onclick = function() { toggleService(this, serviceId); };
 
                 // Get the correct translation for the service name
-                let serviceName = service.name;
-                if (isZh && t.services[service.name]) {
-                    serviceName = t.services[service.name];
+                let serviceName;
+                if (isZh) {
+                    // Try to use the Chinese name from the service, fall back to default translation
+                    serviceName = service.name_zh || t.services[service.name] || service.name;
+                } else {
+                    // Use English name or the main name field
+                    serviceName = service.name_en || service.name;
                 }
 
                 const minText = t.min || 'min';
@@ -1656,7 +1753,13 @@
                 serviceCard.onclick = () => toggleService(serviceCard, serviceId);
 
                 const t = isZh ? translations.zh : translations.en;
-                const serviceName = t.services[service.name] || service.name;
+                // Use translated names from service object
+                let serviceName;
+                if (isZh) {
+                    serviceName = service.name_zh || t.services[service.name] || service.name;
+                } else {
+                    serviceName = service.name_en || service.name;
+                }
                 const minText = isZh ? '分钟' : 'min';
 
                 serviceCard.innerHTML = `

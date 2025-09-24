@@ -11,7 +11,7 @@
     <!-- Supabase Bridge -->
     <script src="supabase-bridge.js"></script>
     <!-- QR Code Library -->
-    <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@latest/build/qrcode.js"></script>
     <style>
         * {
             margin: 0;
@@ -1053,8 +1053,9 @@
                 toLabel: "to",
                 addPeriodBtn: "Add period",
                 addNewServiceBtn: "Add New Service",
-                translationPlaceholder: "Chinese name (optional)",
-                translationHint: "Provide translation for multi-language support",
+                translationPlaceholder: "Enter Chinese name",
+                translationHint: "If provided, Chinese name will be displayed when customers use the app in Chinese mode",
+                optionalLabel: "Chinese Name (Optional)",
                 periodValidationError: "Please fix validation errors in active time periods before proceeding",
                 policiesTitle: "Booking Policies",
                 policiesSubtitle: "Set your booking and cancellation rules",
@@ -1105,8 +1106,9 @@
                 toLabel: "到",
                 addPeriodBtn: "添加时段",
                 addNewServiceBtn: "添加新服务",
-                translationPlaceholder: "英文名称（可选）",
-                translationHint: "提供翻译以支持多语言",
+                translationPlaceholder: "输入英文名称",
+                translationHint: "如果提供英文名称，当客户使用英文模式时将显示此名称",
+                optionalLabel: "英文名称（可选）",
                 periodValidationError: "请在继续之前修正活动时间段的验证错误",
                 policiesTitle: "预约政策",
                 policiesSubtitle: "设置您的预约和取消规则",
@@ -1669,6 +1671,7 @@
                            data-name-zh="${selectedLang === 'zh' ? '新服务' : ''}">
                     <button class="delete-service-btn" onclick="deleteService('${newServiceId}')">${t.deleteBtn}</button>
                 </div>
+                <label style="display: block; margin-top: 8px; margin-bottom: 4px; font-size: 13px; color: #666;">${t.optionalLabel}</label>
                 <input type="text" class="service-translation-input"
                        id="translation-${newServiceId}"
                        placeholder="${t.translationPlaceholder}"
@@ -1960,23 +1963,80 @@
             console.log('Canvas element:', canvas);
             console.log('QRCode library available:', typeof QRCode !== 'undefined');
 
+            if (!canvas) {
+                console.error('Canvas element not found!');
+                return;
+            }
+
+            // Check if QRCode library is available
+            if (typeof QRCode === 'undefined') {
+                console.log('QRCode not loaded yet, waiting...');
+
+                // Wait for library to load
+                let attempts = 0;
+                const checkInterval = setInterval(() => {
+                    attempts++;
+                    if (typeof QRCode !== 'undefined') {
+                        clearInterval(checkInterval);
+                        console.log('QRCode library now available!');
+                        generateQRCode(url); // Retry
+                    } else if (attempts > 20) {
+                        clearInterval(checkInterval);
+                        console.error('QRCode library failed to load after 10 seconds');
+
+                        // Last resort - try alternative library
+                        console.log('Attempting to load alternative QR library...');
+                        const script = document.createElement('script');
+                        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+                        script.onload = function() {
+                            console.log('Alternative library loaded, generating with QRCodeJS...');
+                            // Use alternative library syntax
+                            const qrContainer = document.createElement('div');
+                            qrContainer.id = 'qr-alternative';
+                            qrContainer.style.background = 'white';
+                            qrContainer.style.padding = '10px';
+                            qrContainer.style.display = 'inline-block';
+                            canvas.parentElement.appendChild(qrContainer);
+                            new QRCode(qrContainer, {
+                                text: url,
+                                width: 200,
+                                height: 200
+                            });
+                            canvas.style.display = 'none'; // Hide original canvas
+                        };
+                        script.onerror = function() {
+                            console.error('Failed to load alternative library');
+                            alert('Unable to generate QR code. Please refresh the page and try again.');
+                        };
+                        document.head.appendChild(script);
+                    }
+                }, 500);
+                return;
+            }
+
+            // Generate QR code
             if (canvas && typeof QRCode !== 'undefined') {
-                QRCode.toCanvas(canvas, url, {
-                    width: 200,
-                    margin: 2,
-                    color: {
-                        dark: '#000000',
-                        light: '#ffffff'
-                    }
-                }, function (error) {
-                    if (error) {
-                        console.error('QR Code generation error:', error);
-                        alert('Failed to generate QR code. Please refresh and try again.');
-                    } else {
-                        console.log('QR Code generated successfully');
-                        canvas.style.display = 'block'; // Ensure canvas is visible
-                    }
-                });
+                try {
+                    console.log('Generating QR code with QRCode library...');
+                    QRCode.toCanvas(canvas, url, {
+                        width: 200,
+                        margin: 2,
+                        color: {
+                            dark: '#000000',
+                            light: '#ffffff'
+                        }
+                    }, function (error) {
+                        if (error) {
+                            console.error('QR Code generation error:', error);
+                            alert('Failed to generate QR code. Please refresh and try again.');
+                        } else {
+                            console.log('QR Code generated successfully');
+                            canvas.style.display = 'block'; // Ensure canvas is visible
+                        }
+                    });
+                } catch (e) {
+                    console.error('Exception generating QR code:', e);
+                }
             } else {
                 console.error('QR Code generation failed - canvas or library missing');
                 if (!canvas) console.error('Canvas element not found');

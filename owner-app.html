@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shop Owner Dashboard</title>
     <!-- QR Code Library -->
-    <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@latest/build/qrcode.js"></script>
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- Supabase Config -->
@@ -384,7 +384,9 @@
             background: white;
             border-radius: 10px;
             padding: 15px;
+            padding-left: 40px;
             margin-bottom: 15px;
+            position: relative;
         }
         .service-item {
             display: flex;
@@ -396,7 +398,7 @@
         }
         .service-item > div:first-child {
             flex: 1;
-            padding-right: 60px;
+            padding-right: 70px;
         }
         .service-name-input {
             font-weight: bold;
@@ -416,9 +418,52 @@
             background: white;
             border: 1px solid #4A90E2;
         }
+        .service-translation-input {
+            width: 100%;
+            padding: 4px 6px;
+            border: 1px solid #e8e8e8;
+            border-radius: 3px;
+            font-size: 13px;
+            font-style: italic;
+            margin-top: 6px;
+            background-color: #fafafa;
+        }
+        .service-translation-input:focus {
+            outline: none;
+            background: white;
+            border: 1px solid #4A90E2;
+        }
+        .translation-hint {
+            font-size: 11px;
+            color: #888;
+            margin-top: 3px;
+            margin-left: 2px;
+        }
         .service-item:last-child {
             border-bottom: none;
         }
+        .delete-service-btn {
+            width: 20px !important;
+            height: 20px !important;
+            padding: 0 !important;
+            background: transparent !important;
+            color: #f44336 !important;
+            border: none !important;
+            cursor: pointer !important;
+            font-size: 20px !important;
+            font-weight: bold !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex-shrink: 0 !important;
+            transition: color 0.2s ease !important;
+            line-height: 1 !important;
+        }
+
+        .delete-service-btn:hover {
+            color: #d32f2f !important;
+        }
+
         .toggle-switch {
             position: absolute;
             right: 0;
@@ -643,8 +688,14 @@
             </div>
 
             <div class="form-group" style="margin-bottom: 15px;">
-                <label style="display: block; margin-bottom: 5px; font-size: 14px; color: #333;">Service Name</label>
-                <input type="text" id="new-service-name" placeholder="Enter service name" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 14px;">
+                <label id="service-name-label" style="display: block; margin-bottom: 5px; font-size: 14px; color: #333;">Service Name</label>
+                <input type="text" id="new-service-name" placeholder="Enter service name" style="width: 100%; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 14px;" data-name-en="" data-name-zh="">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label id="english-name-label" style="display: block; margin-bottom: 5px; font-size: 14px; color: #666;">English Name (Optional)</label>
+                <input type="text" id="new-service-translation" placeholder="Enter English name" style="width: 100%; padding: 6px; border: 1px solid #e8e8e8; border-radius: 4px; font-size: 13px; background-color: #fafafa;" data-lang="en">
+                <div id="english-name-helper" style="font-size: 11px; color: #888; margin-top: 3px;">English name will be displayed when customers use the app in English mode</div>
             </div>
 
             <div style="display: flex; gap: 15px; margin-bottom: 15px;">
@@ -681,7 +732,7 @@
                         <span style="font-size: 13px; color: #666;">to</span>
                         <input type="number" class="period-end" value="15" min="0" style="width: 60px; padding: 5px; border: 1px solid #e0e0e0; border-radius: 3px; font-size: 13px;">
                         <span style="font-size: 13px; color: #666;">min</span>
-                        <button onclick="removeActivePeriod(this)" style="padding: 3px 8px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">Remove</button>
+                        <button onclick="removeActivePeriod(this)" style="width: 18px; height: 18px; padding: 0; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: bold; display: flex; align-items: center; justify-content: center;">×</button>
                     </div>
                 </div>
                 <button onclick="addActivePeriod()" style="padding: 5px 10px; background: #4A90E2; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 13px;">Add Another Period</button>
@@ -2004,6 +2055,8 @@
                 navCalendar: '日历',
                 navServices: '员工',
                 navSettings: '设置',
+                staffMembers: '员工管理',
+                addStaff: '添加员工',
                 addService: '添加新服务',
                 saveSettings: '保存设置',
                 backToStaffList: '返回员工列表',
@@ -2166,6 +2219,8 @@
                 navCalendar: 'Calendar',
                 navServices: 'Staff',
                 navSettings: 'Settings',
+                staffMembers: 'Staff Members',
+                addStaff: 'Add Staff',
                 addService: 'Add New Service',
                 saveSettings: 'Save Settings',
                 backToStaffList: 'Back to Staff List',
@@ -2287,7 +2342,34 @@
             }
         };
 
+        function saveCurrentServiceTranslations() {
+            // Save current input values to data attributes based on current language
+            document.querySelectorAll('.service-item').forEach(item => {
+                const nameInput = item.querySelector('.service-name-input');
+                const translationInput = item.querySelector('.service-translation-input');
+
+                if (!nameInput || !translationInput) return;
+
+                const currentName = nameInput.value;
+                const currentTranslation = translationInput.value;
+
+                // Save based on current language state (before toggle)
+                if (isZh) {
+                    // Currently in Chinese, so main field is Chinese, translation is English
+                    nameInput.setAttribute('data-name-zh', currentName || '');
+                    nameInput.setAttribute('data-name-en', currentTranslation || '');
+                } else {
+                    // Currently in English, so main field is English, translation is Chinese
+                    nameInput.setAttribute('data-name-en', currentName || '');
+                    nameInput.setAttribute('data-name-zh', currentTranslation || '');
+                }
+            });
+        }
+
         function toggleLang() {
+            // Save current service values BEFORE changing language
+            saveCurrentServiceTranslations();
+
             isZh = !isZh;
             // Save language preference globally
             SharedData.setPreferredLanguage(isZh ? 'zh' : 'en');
@@ -2388,6 +2470,11 @@
 
             // Settings
             updateElement('settings-title', t.settingsTitle);
+
+            // Staff section
+            updateElement('staff-title', t.staffMembers);
+            const addStaffBtn = document.querySelector('[onclick="addNewStaff()"]');
+            if (addStaffBtn) addStaffBtn.textContent = t.addStaff;
 
             // Staff Hours (in Staff > Services tab)
             const staffHoursEl = document.getElementById('staff-hours-title');
@@ -2580,6 +2667,196 @@
 
             // Update Store tab translations
             updateStoreTabTranslations();
+
+            // Update service language display
+            updateServiceLanguageDisplay();
+        }
+
+        function updateServiceLanguageDisplay() {
+            // Update all service items when language changes
+            document.querySelectorAll('.service-item').forEach(item => {
+                const serviceId = item.dataset.actualServiceId || item.dataset.service;
+                const nameInput = item.querySelector('.service-name-input');
+                const translationInput = item.querySelector('.service-translation-input');
+
+                if (!nameInput || !translationInput) return;
+
+                // Get stored translations from data attributes (already saved by saveCurrentServiceTranslations)
+                const enName = nameInput.getAttribute('data-name-en') || '';
+                const zhName = nameInput.getAttribute('data-name-zh') || '';
+
+                // Extended API translations for common services
+                const apiTranslations = {
+                    en_to_zh: {
+                        "Men's Cut": "男士理发",
+                        "Women's Cut": "女士理发",
+                        "Children's Cut": "儿童理发",
+                        "Hair Coloring": "染发",
+                        "Highlights": "挑染",
+                        "Beard Trim": "修胡须",
+                        "Hair Wash": "洗发",
+                        "Perm": "烫发",
+                        "Hair Treatment": "护发",
+                        "Styling": "造型",
+                        "Haircut": "理发",
+                        "Shampoo": "洗头",
+                        "Blowdry": "吹干",
+                        "Hair Spa": "头发护理",
+                        "Hair Mask": "发膜",
+                        "Scalp Treatment": "头皮护理",
+                        "Hair Extensions": "接发",
+                        "Braiding": "编发",
+                        "Updo": "盘发",
+                        // Common test names
+                        "Testing": "测试",
+                        "Test": "测试",
+                        "Custom": "自定义",
+                        "Service": "服务",
+                        "New Service": "新服务",
+                        // Additional common services
+                        "Trim": "修剪",
+                        "Bang Trim": "修刘海",
+                        "Deep Conditioning": "深层护理",
+                        "Color Touch-up": "补染",
+                        "Root Touch-up": "补根",
+                        "Balayage": "渐变染",
+                        "Ombre": "渐变色",
+                        "Straightening": "拉直",
+                        "Relaxer": "软化",
+                        "Keratin Treatment": "角蛋白护理"
+                    },
+                    zh_to_en: {
+                        "男士理发": "Men's Cut",
+                        "女士理发": "Women's Cut",
+                        "儿童理发": "Children's Cut",
+                        "染发": "Hair Coloring",
+                        "挑染": "Highlights",
+                        "修胡须": "Beard Trim",
+                        "洗发": "Hair Wash",
+                        "烫发": "Perm",
+                        "护发": "Hair Treatment",
+                        "造型": "Styling",
+                        "理发": "Haircut",
+                        "洗头": "Shampoo",
+                        "吹干": "Blowdry",
+                        "头发护理": "Hair Spa",
+                        "发膜": "Hair Mask",
+                        "头皮护理": "Scalp Treatment",
+                        "接发": "Hair Extensions",
+                        "编发": "Braiding",
+                        "盘发": "Updo",
+                        // Common test names
+                        "测试": "Testing",
+                        "自定义": "Custom",
+                        "服务": "Service",
+                        "新服务": "New Service",
+                        // Additional common services
+                        "修剪": "Trim",
+                        "修刘海": "Bang Trim",
+                        "深层护理": "Deep Conditioning",
+                        "补染": "Color Touch-up",
+                        "补根": "Root Touch-up",
+                        "渐变染": "Balayage",
+                        "渐变色": "Ombre",
+                        "拉直": "Straightening",
+                        "软化": "Relaxer",
+                        "角蛋白护理": "Keratin Treatment"
+                    }
+                };
+
+                if (isZh) {
+                    // Now in Chinese mode
+                    let mainName = zhName;
+                    let placeholderValue = enName;
+
+                    // If no Chinese name, try API translation
+                    if (!mainName && enName) {
+                        // Try exact match first
+                        mainName = apiTranslations.en_to_zh[enName];
+
+                        // If no exact match, try case-insensitive match
+                        if (!mainName) {
+                            const lowerEnName = enName.toLowerCase();
+                            for (const [key, value] of Object.entries(apiTranslations.en_to_zh)) {
+                                if (key.toLowerCase() === lowerEnName) {
+                                    mainName = value;
+                                    break;
+                                }
+                            }
+                        }
+
+                        // If still no match, keep original
+                        mainName = mainName || enName;
+
+                        // If we found a translation, update the data attribute
+                        if (mainName !== enName) {
+                            nameInput.setAttribute('data-name-zh', mainName);
+                        }
+                    }
+
+                    nameInput.value = mainName || enName || '';
+                    translationInput.value = placeholderValue || '';
+                    translationInput.placeholder = '英文名称（可选）';
+                    translationInput.setAttribute('data-lang', 'en');
+
+                    // Update hint text
+                    const hint = item.querySelector('.translation-hint');
+                    if (hint) hint.textContent = '提供翻译以支持多语言';
+                } else {
+                    // Now in English mode
+                    let mainName = enName;
+                    let placeholderValue = zhName;
+
+                    // If no English name, try API translation
+                    if (!mainName && zhName) {
+                        // Try exact match first
+                        mainName = apiTranslations.zh_to_en[zhName];
+
+                        // If no exact match, try partial match (for compound words)
+                        if (!mainName) {
+                            for (const [key, value] of Object.entries(apiTranslations.zh_to_en)) {
+                                if (zhName.includes(key)) {
+                                    mainName = value;
+                                    break;
+                                }
+                            }
+                        }
+
+                        // If still no match, keep original
+                        mainName = mainName || zhName;
+
+                        // If we found a translation, update the data attribute
+                        if (mainName !== zhName) {
+                            nameInput.setAttribute('data-name-en', mainName);
+                        }
+                    }
+
+                    nameInput.value = mainName || zhName || '';
+                    translationInput.value = placeholderValue || '';
+                    translationInput.placeholder = 'Chinese name (optional)';
+                    translationInput.setAttribute('data-lang', 'zh');
+
+                    // Update hint text
+                    const hint = item.querySelector('.translation-hint');
+                    if (hint) hint.textContent = 'Provide translation for multi-language support';
+                }
+            });
+
+            // Also update the Add Service modal placeholders
+            const newServiceTranslation = document.getElementById('new-service-translation');
+            if (newServiceTranslation) {
+                if (isZh) {
+                    newServiceTranslation.placeholder = '英文名称（可选）';
+                    newServiceTranslation.setAttribute('data-lang', 'en');
+                    const modalHint = newServiceTranslation.nextElementSibling;
+                    if (modalHint) modalHint.textContent = '提供翻译以支持多语言';
+                } else {
+                    newServiceTranslation.placeholder = 'Chinese name (optional)';
+                    newServiceTranslation.setAttribute('data-lang', 'zh');
+                    const modalHint = newServiceTranslation.nextElementSibling;
+                    if (modalHint) modalHint.textContent = 'Provide translation for multi-language support';
+                }
+            }
         }
 
         function updateStoreTabTranslations() {
@@ -2797,7 +3074,7 @@
                 <span class="to-label" style="font-size: 12px; color: #4A90E2;">${toLabel}</span>
                 <input type="number" class="period-end" value="${defaultEnd}" min="0" max="${duration}" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px; background: #F5FBFF;" onchange="saveServices()">
                 <span style="font-size: 12px; color: #4A90E2;">${minLabel}</span>
-                <button onclick="removePeriodFromService(this, '${serviceId}')" style="padding: 2px 6px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">×</button>
+                <button onclick="removePeriodFromService(this, '${serviceId}')" style="width: 18px; height: 18px; padding: 0; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: bold; display: flex; align-items: center; justify-content: center;">×</button>
             `;
 
             periodsList.appendChild(newPeriod);
@@ -3676,8 +3953,56 @@
         }
 
         function generateBookingQRCode(url) {
+            console.log('generateBookingQRCode called with URL:', url);
             const canvas = document.getElementById('booking-qr-canvas');
-            if (canvas && typeof QRCode !== 'undefined') {
+
+            if (!canvas) {
+                console.error('Canvas element not found!');
+                return;
+            }
+
+            // Check if QRCode library is available
+            if (typeof QRCode === 'undefined') {
+                console.log('QRCode not loaded yet, waiting...');
+
+                // Wait for library to load
+                let attempts = 0;
+                const checkInterval = setInterval(() => {
+                    attempts++;
+                    if (typeof QRCode !== 'undefined') {
+                        clearInterval(checkInterval);
+                        console.log('QRCode library now available!');
+                        generateBookingQRCode(url); // Retry
+                    } else if (attempts > 20) {
+                        clearInterval(checkInterval);
+                        console.error('QRCode library failed to load after 10 seconds');
+
+                        // Last resort - try alternative library
+                        console.log('Attempting to load alternative QR library...');
+                        const script = document.createElement('script');
+                        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+                        script.onload = function() {
+                            console.log('Alternative library loaded, generating with QRCodeJS...');
+                            // Use alternative library syntax
+                            const qrContainer = document.createElement('div');
+                            qrContainer.id = 'qr-alternative';
+                            canvas.parentElement.appendChild(qrContainer);
+                            new QRCode(qrContainer, {
+                                text: url,
+                                width: 200,
+                                height: 200
+                            });
+                            canvas.style.display = 'none'; // Hide original canvas
+                        };
+                        document.head.appendChild(script);
+                    }
+                }, 500);
+                return;
+            }
+
+            // Generate QR code
+            try {
+                console.log('Generating QR code with QRCode library...');
                 QRCode.toCanvas(canvas, url, {
                     width: 200,
                     margin: 2,
@@ -3686,9 +4011,15 @@
                         light: '#ffffff'
                     }
                 }, function (error) {
-                    if (error) console.error('QR Code generation error:', error);
-                    else console.log('QR Code generated successfully for:', url);
+                    if (error) {
+                        console.error('QR Code generation error:', error);
+                    } else {
+                        console.log('QR Code generated successfully!');
+                        canvas.style.display = 'block';
+                    }
                 });
+            } catch (e) {
+                console.error('Exception generating QR code:', e);
             }
         }
 
@@ -3929,6 +4260,36 @@
             return { valid: true, periods: sortedPeriods };
         }
 
+        async function deleteService(serviceId) {
+            // Confirm deletion
+            const confirmMessage = isZh ? '确定要删除这个服务吗？此操作无法撤销。' : 'Are you sure you want to delete this service? This action cannot be undone.';
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+
+            try {
+                // Delete from database
+                await SharedData.deleteService(serviceId);
+
+                // Remove from UI
+                const serviceItem = document.querySelector(`.service-item[data-service="${serviceId}"]`);
+                if (serviceItem) {
+                    serviceItem.remove();
+                }
+
+                // Show success message
+                const message = isZh ? '服务已删除' : 'Service deleted successfully';
+                showServiceSaveMessage(message);
+
+                // Reload services to ensure consistency
+                loadServices();
+            } catch (error) {
+                console.error('Error deleting service:', error);
+                const errorMessage = isZh ? '删除服务失败，请重试' : 'Failed to delete service, please try again';
+                alert(errorMessage);
+            }
+        }
+
         async function saveServices() {
             console.log('saveServices called');
             // Always work with the full services object from SharedData
@@ -3950,10 +4311,33 @@
                     return;
                 }
 
-                // Get service name
+                // Get service name and translations
                 const nameInput = item.querySelector('.service-name-input');
-                if (nameInput && nameInput.value.trim()) {
-                    services[actualServiceId].name = nameInput.value.trim();
+                const translationInput = item.querySelector('.service-translation-input');
+
+                if (nameInput) {
+                    // Update the correct language attribute based on current language
+                    const currentValue = nameInput.value.trim();
+                    if (isZh) {
+                        services[actualServiceId].name_zh = currentValue;
+                        nameInput.setAttribute('data-name-zh', currentValue);
+                    } else {
+                        services[actualServiceId].name_en = currentValue;
+                        services[actualServiceId].name = currentValue; // Keep backward compatibility
+                        nameInput.setAttribute('data-name-en', currentValue);
+                    }
+                }
+
+                if (translationInput) {
+                    const translationValue = translationInput.value.trim();
+                    const targetLang = translationInput.getAttribute('data-lang');
+                    if (targetLang === 'zh') {
+                        services[actualServiceId].name_zh = translationValue;
+                        nameInput.setAttribute('data-name-zh', translationValue);
+                    } else {
+                        services[actualServiceId].name_en = translationValue;
+                        nameInput.setAttribute('data-name-en', translationValue);
+                    }
                 }
 
                 // Get enabled state
@@ -4058,7 +4442,7 @@
             }
         }
 
-        function showServiceSaveMessage() {
+        function showServiceSaveMessage(customMessage) {
             // Create or get message div
             let messageDiv = document.getElementById('service-save-message');
             if (!messageDiv) {
@@ -4079,8 +4463,9 @@
                 document.body.appendChild(messageDiv);
             }
 
-            // Just show the success message - services are already saved in saveServices()
-            messageDiv.textContent = isZh ? '服务已保存' : 'Services saved';
+            // Use custom message or default
+            const defaultMessage = isZh ? '服务已保存' : 'Services saved';
+            messageDiv.textContent = customMessage || defaultMessage;
             messageDiv.style.display = 'block';
 
             setTimeout(() => {
@@ -4108,32 +4493,155 @@
                             <span class="to-label" style="font-size: 12px; color: #4A90E2;">${toLabel}</span>
                             <input type="number" class="period-end" value="${period.end}" min="0" max="${service.duration}" style="width: 45px; padding: 3px; border: 1px solid #E3F2FD; border-radius: 3px; font-size: 12px; background: #F5FBFF;" onchange="saveServices()">
                             <span style="font-size: 12px; color: #4A90E2;">${minLabel}</span>
+                            <button onclick="removePeriodFromService(this, '${serviceId}')" style="width: 18px; height: 18px; padding: 0; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: bold; display: flex; align-items: center; justify-content: center;">×</button>
                         </div>
                     `;
                 });
             }
 
-            const color = SharedData.getServiceColor ? SharedData.getServiceColor(serviceId) : '#999';
+            // Get service color
+            let color = '#2196F3'; // Default blue
+            if (SharedData.getServiceColor) {
+                color = SharedData.getServiceColor(serviceId);
+                console.log(`Service ${serviceId} color: ${color}`);
+            } else {
+                console.warn('SharedData.getServiceColor not found, using default');
+            }
 
-            // Translate known service names
-            let displayName = service.name;
-            if (isZh) {
-                const serviceTranslations = {
+            // Get translations from service object or use defaults
+            let enName = service.name_en || '';
+            let zhName = service.name_zh || '';
+
+            // Extended API translations mapping for common services
+            const apiTranslations = {
+                en_to_zh: {
                     "Men's Cut": '男士理发',
                     "Women's Cut": '女士理发',
                     "Children's Cut": '儿童理发',
                     "Hair Coloring": '染发',
-                    "Highlights": '挑染'
-                };
-                displayName = serviceTranslations[service.name] || service.name;
+                    "Highlights": '挑染',
+                    "Beard Trim": "修胡须",
+                    "Hair Wash": "洗发",
+                    "Perm": "烫发",
+                    "Hair Treatment": "护发",
+                    "Styling": "造型",
+                    "Haircut": "理发",
+                    "Shampoo": "洗头",
+                    "Blowdry": "吹干",
+                    "Hair Spa": "头发护理",
+                    "Hair Mask": "发膜",
+                    "Scalp Treatment": "头皮护理",
+                    "Hair Extensions": "接发",
+                    "Braiding": "编发",
+                    "Updo": "盘发",
+                    // Common test names
+                    "Testing": "测试",
+                    "Test": "测试",
+                    "Custom": "自定义",
+                    "Service": "服务",
+                    "New Service": "新服务",
+                    // Additional common services
+                    "Trim": "修剪",
+                    "Bang Trim": "修刘海",
+                    "Deep Conditioning": "深层护理",
+                    "Color Touch-up": "补染",
+                    "Root Touch-up": "补根",
+                    "Balayage": "渐变染",
+                    "Ombre": "渐变色",
+                    "Straightening": "拉直",
+                    "Relaxer": "软化",
+                    "Keratin Treatment": "角蛋白护理"
+                },
+                zh_to_en: {
+                    '男士理发': "Men's Cut",
+                    '女士理发': "Women's Cut",
+                    '儿童理发': "Children's Cut",
+                    '染发': "Hair Coloring",
+                    '挑染': "Highlights",
+                    "修胡须": "Beard Trim",
+                    "洗发": "Hair Wash",
+                    "烫发": "Perm",
+                    "护发": "Hair Treatment",
+                    "造型": "Styling",
+                    "理发": "Haircut",
+                    "洗头": "Shampoo",
+                    "吹干": "Blowdry",
+                    "头发护理": "Hair Spa",
+                    "发膜": "Hair Mask",
+                    "头皮护理": "Scalp Treatment",
+                    "接发": "Hair Extensions",
+                    "编发": "Braiding",
+                    "盘发": "Updo",
+                    // Common test names
+                    "测试": "Testing",
+                    "自定义": "Custom",
+                    "服务": "Service",
+                    "新服务": "New Service",
+                    // Additional common services
+                    "修剪": "Trim",
+                    "修刘海": "Bang Trim",
+                    "深层护理": "Deep Conditioning",
+                    "补染": "Color Touch-up",
+                    "补根": "Root Touch-up",
+                    "渐变染": "Balayage",
+                    "渐变色": "Ombre",
+                    "拉直": "Straightening",
+                    "软化": "Relaxer",
+                    "角蛋白护理": "Keratin Treatment"
+                }
+            };
+
+            // If we don't have both translations, try to fill them in
+            if (!enName && !zhName) {
+                // If we only have service.name, determine what it is
+                if (service.name) {
+                    // Check if it's Chinese or English
+                    if (apiTranslations.zh_to_en[service.name]) {
+                        // It's a Chinese name
+                        zhName = service.name;
+                        enName = apiTranslations.zh_to_en[service.name];
+                    } else if (apiTranslations.en_to_zh[service.name]) {
+                        // It's an English name
+                        enName = service.name;
+                        zhName = apiTranslations.en_to_zh[service.name];
+                    } else {
+                        // Unknown service, use as-is for both
+                        enName = service.name;
+                        zhName = service.name;
+                    }
+                }
+            } else if (!enName && zhName) {
+                // We have Chinese but not English - try to translate
+                enName = apiTranslations.zh_to_en[zhName] || zhName;
+            } else if (enName && !zhName) {
+                // We have English but not Chinese - try to translate
+                zhName = apiTranslations.en_to_zh[enName] || enName;
             }
 
+            const displayName = isZh ? (zhName || enName) : (enName || zhName);
+            const translationValue = isZh ? enName : zhName;
+            const translationPlaceholder = isZh ? '英文名称（可选）' : 'Chinese name (optional)';
+            const translationLang = isZh ? 'en' : 'zh';
+            const translationHint = isZh ? '提供翻译以支持多语言' : 'Provide translation for multi-language support';
+
             div.innerHTML = `
+                <button class="delete-service-btn" onclick="deleteService('${serviceId}')" title="${isZh ? '删除服务' : 'Delete service'}" style="position: absolute; left: -25px; top: 12px;">✕</button>
                 <div style="flex: 1;">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <div class="service-color-indicator" style="width: 20px; height: 20px; background: ${color}; border-radius: 4px;"></div>
-                        <input type="text" class="service-name-input" id="service-${serviceId}" value="${displayName}" onchange="saveServices()" style="flex: 1;">
+                        <input type="text" class="service-name-input" id="service-${serviceId}"
+                               value="${displayName}"
+                               data-name-en="${enName}"
+                               data-name-zh="${zhName}"
+                               onchange="saveServices()" style="flex: 1;">
                     </div>
+                    <input type="text" class="service-translation-input"
+                           id="translation-${serviceId}"
+                           placeholder="${translationPlaceholder}"
+                           value="${translationValue}"
+                           data-lang="${translationLang}"
+                           onchange="saveServices()">
+                    <div class="translation-hint">${translationHint}</div>
                     <div style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
                         <input type="number" class="service-duration" id="duration-${serviceId}" value="${service.duration}" min="5" max="480" style="width: 50px; padding: 4px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;" onchange="saveServices()">
                         <span class="min-label" style="font-size: 13px; color: #666;">${isZh ? '分钟' : 'min'}</span>
@@ -4166,6 +4674,8 @@
 
             // Always get the full service objects from SharedData
             const allServices = SharedData.getServices();
+            console.log('All services loaded:', allServices);
+            console.log('SharedData.getServiceColor exists?', typeof SharedData.getServiceColor);
 
             // Get current barber to check which services they offer
             const barber = SharedData.getBarberById(window.currentBarberId);
@@ -4626,15 +5136,183 @@
             alert(isZh ? '关于页面' : 'About page');
         }
 
+        // Auto-translate service name when typing using Google Translate API
+        async function autoTranslateService() {
+            console.log('autoTranslateService called');
+            const nameInput = document.getElementById('new-service-name');
+            const translationInput = document.getElementById('new-service-translation');
+
+            if (!nameInput || !translationInput) {
+                console.log('Input elements not found');
+                return;
+            }
+
+            const name = nameInput.value.trim();
+            console.log('Service name entered:', name, 'Language mode:', isZh ? 'Chinese' : 'English');
+            console.log('Translation input userModified flag:', translationInput.dataset.userModified);
+
+            // Don't override if user has manually entered a translation
+            if (translationInput.dataset.userModified === 'true') {
+                console.log('User has manually modified translation, not auto-translating');
+                return;
+            }
+
+            // Clear translation if input is empty
+            if (!name) {
+                translationInput.value = '';
+                translationInput.dataset.userModified = 'false';
+                return;
+            }
+
+            // Determine source and target languages
+            const sourceLang = isZh ? 'zh' : 'en';
+            const targetLang = isZh ? 'en' : 'zh';
+
+            try {
+                // Use Google Translate API (free tier through a proxy)
+                const translation = await translateText(name, sourceLang, targetLang);
+
+                if (translation) {
+                    translationInput.value = translation;
+                    translationInput.dataset.userModified = 'false';
+                    console.log('Translation successful:', name, '->', translation);
+                }
+            } catch (error) {
+                console.error('Translation API error:', error);
+                // Fall back to dictionary translation
+                fallbackDictionaryTranslation(name, isZh, translationInput);
+            }
+        }
+
+        // Translation API function
+        async function translateText(text, sourceLang, targetLang) {
+            // Using MyMemory Translation API (free, no key required for basic use)
+            const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.responseStatus === 200 && data.responseData) {
+                    return data.responseData.translatedText;
+                }
+            } catch (error) {
+                console.error('Translation API request failed:', error);
+            }
+
+            return null;
+        }
+
+        // Fallback dictionary translation (keeping existing logic)
+        function fallbackDictionaryTranslation(name, isZh, translationInput) {
+            console.log('Using fallback dictionary translation');
+
+            // Extended dictionary for common terms (as fallback)
+            const apiTranslations = {
+                en_to_zh: {
+                    "Men's Cut": "男士理发",
+                    "Women's Cut": "女士理发",
+                    "Hair Coloring": "染发",
+                    "Cut": "理发",
+                    "Haircut": "理发"
+                },
+                zh_to_en: {
+                    "男士理发": "Men's Cut",
+                    "女士理发": "Women's Cut",
+                    "染发": "Hair Coloring",
+                    "理发": "Haircut"
+                }
+            };
+
+            let translation = '';
+            if (isZh) {
+                translation = apiTranslations.zh_to_en[name] || '';
+            } else {
+                translation = apiTranslations.en_to_zh[name] || '';
+                // Try case-insensitive
+                if (!translation) {
+                    const lowerName = name.toLowerCase();
+                    for (const [key, value] of Object.entries(apiTranslations.en_to_zh)) {
+                        if (key.toLowerCase() === lowerName) {
+                            translation = value;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (translation) {
+                translationInput.value = translation;
+                translationInput.dataset.userModified = 'false';
+                console.log('Fallback translation found:', translation);
+            }
+        }
+
+        // Handle manual translation input
+        function handleTranslationInput() {
+            this.dataset.userModified = 'true';
+        }
+
+        // Track when user manually modifies translation
+        document.addEventListener('DOMContentLoaded', function() {
+            const translationInput = document.getElementById('new-service-translation');
+            if (translationInput) {
+                translationInput.addEventListener('input', handleTranslationInput);
+            }
+        });
+
         // Add Service Modal Functions
         function openAddServiceModal() {
             document.getElementById('add-service-modal').classList.add('active');
+
+            // Reset form fields
+            document.getElementById('new-service-name').value = '';
+            document.getElementById('new-service-translation').value = '';
+            document.getElementById('new-service-duration').value = '30';
+            document.getElementById('new-service-price').value = '25';
+            document.getElementById('new-service-enabled').checked = true;
+            document.getElementById('new-service-has-active').checked = false;
+            document.getElementById('new-service-active-periods').style.display = 'none';
+
+            // Update labels and placeholders based on current language
+            const serviceNameLabel = document.getElementById('service-name-label');
+            const serviceNameInput = document.getElementById('new-service-name');
+            const englishNameLabel = document.getElementById('english-name-label');
+            const translationInput = document.getElementById('new-service-translation');
+            const englishNameHelper = document.getElementById('english-name-helper');
+
+            if (isZh) {
+                // Chinese mode - service name is in Chinese, English is optional
+                if (serviceNameLabel) serviceNameLabel.textContent = '服务名称';
+                if (serviceNameInput) serviceNameInput.placeholder = '输入服务名称';
+                if (englishNameLabel) englishNameLabel.textContent = '英文名称（可选）';
+                if (translationInput) {
+                    translationInput.placeholder = '输入英文名称';
+                    translationInput.dataset.lang = 'en';
+                }
+                if (englishNameHelper) {
+                    englishNameHelper.textContent = '如果提供英文名称，当客户使用英文模式时将显示此名称';
+                }
+            } else {
+                // English mode - service name is in English, Chinese is optional
+                if (serviceNameLabel) serviceNameLabel.textContent = 'Service Name';
+                if (serviceNameInput) serviceNameInput.placeholder = 'Enter service name';
+                if (englishNameLabel) englishNameLabel.textContent = 'Chinese Name (Optional)';
+                if (translationInput) {
+                    translationInput.placeholder = 'Enter Chinese name';
+                    translationInput.dataset.lang = 'zh';
+                }
+                if (englishNameHelper) {
+                    englishNameHelper.textContent = 'If provided, Chinese name will be displayed when customers use the app in Chinese mode';
+                }
+            }
         }
 
         function closeAddServiceModal() {
             document.getElementById('add-service-modal').classList.remove('active');
             // Reset form
             document.getElementById('new-service-name').value = '';
+            document.getElementById('new-service-translation').value = '';
             document.getElementById('new-service-duration').value = '30';
             document.getElementById('new-service-price').value = '25';
             document.getElementById('new-service-enabled').checked = true;
@@ -4648,7 +5326,7 @@
                     <span style="font-size: 13px; color: #666;">to</span>
                     <input type="number" class="period-end" value="15" min="0" style="width: 60px; padding: 5px; border: 1px solid #e0e0e0; border-radius: 3px; font-size: 13px;">
                     <span style="font-size: 13px; color: #666;">min</span>
-                    <button onclick="removeActivePeriod(this)" style="padding: 3px 8px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">Remove</button>
+                    <button onclick="removeActivePeriod(this)" style="width: 18px; height: 18px; padding: 0; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: bold; display: flex; align-items: center; justify-content: center;">×</button>
                 </div>
             `;
         }
@@ -4704,7 +5382,7 @@
                 <span style="font-size: 13px; color: #666;">to</span>
                 <input type="number" class="period-end" value="${defaultEnd}" min="0" style="width: 60px; padding: 5px; border: 1px solid #e0e0e0; border-radius: 3px; font-size: 13px;" onchange="validatePeriodsOnChange()">
                 <span style="font-size: 13px; color: #666;">min</span>
-                <button onclick="removeActivePeriod(this)" style="padding: 3px 8px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">Remove</button>
+                <button onclick="removeActivePeriod(this)" style="width: 18px; height: 18px; padding: 0; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: bold; display: flex; align-items: center; justify-content: center;">×</button>
             `;
             periodsList.appendChild(newPeriod);
 
@@ -4811,7 +5489,10 @@
         }
 
         function saveNewService() {
-            const name = document.getElementById('new-service-name').value.trim();
+            const nameInput = document.getElementById('new-service-name');
+            const translationInput = document.getElementById('new-service-translation');
+            const name = nameInput.value.trim();
+            const translation = translationInput.value.trim();
             const duration = parseInt(document.getElementById('new-service-duration').value);
             const price = parseFloat(document.getElementById('new-service-price').value);
             const enabled = document.getElementById('new-service-enabled').checked;
@@ -4860,14 +5541,96 @@
                 serviceId = `custom-${counter}`;
             }
 
-            // Create service object
+            // API translations for auto-population
+            const apiTranslations = {
+                en_to_zh: {
+                    "Testing": "测试",
+                    "Test": "测试",
+                    "Custom": "自定义",
+                    "Service": "服务",
+                    "New Service": "新服务",
+                    "Trim": "修剪",
+                    "Haircut": "理发",
+                    "Styling": "造型",
+                    "Treatment": "护理"
+                },
+                zh_to_en: {
+                    "测试": "Testing",
+                    "自定义": "Custom",
+                    "服务": "Service",
+                    "新服务": "New Service",
+                    "修剪": "Trim",
+                    "理发": "Haircut",
+                    "造型": "Styling",
+                    "护理": "Treatment"
+                }
+            };
+
+            // Get a unique color for the new service
+            const colorPalette = [
+                '#2196F3', // Blue
+                '#E91E63', // Pink
+                '#4CAF50', // Green
+                '#FF9800', // Orange
+                '#9C27B0', // Purple
+                '#00BCD4', // Cyan
+                '#FFC107', // Amber
+                '#795548', // Brown
+                '#607D8B', // Blue Grey
+                '#F44336', // Red
+                '#3F51B5', // Indigo
+                '#009688', // Teal
+                '#CDDC39', // Lime
+                '#FF5722', // Deep Orange
+                '#673AB7'  // Deep Purple
+            ];
+
+            // Find which colors are already used
+            const usedColors = Object.values(services).map(s => s.color).filter(c => c);
+
+            // Find first unused color from palette
+            let assignedColor = colorPalette.find(color => !usedColors.includes(color));
+
+            // If all colors are used, cycle through palette based on service count
+            if (!assignedColor) {
+                const colorIndex = Object.keys(services).length % colorPalette.length;
+                assignedColor = colorPalette[colorIndex];
+            }
+
+            // Create service object with translations and color
             const newService = {
                 name: name,
                 duration: duration,
                 price: Math.round(price * 100) / 100,
                 enabled: enabled,
-                hasActiveTime: hasActive
+                hasActiveTime: hasActive,
+                color: assignedColor
             };
+
+            console.log(`New service "${name}" assigned color: ${assignedColor}`);
+
+            // Add translations based on current language
+            if (isZh) {
+                newService.name_zh = name;
+                // Use provided translation or try auto-translation
+                if (translation) {
+                    newService.name_en = translation;
+                } else {
+                    // Try to find auto-translation
+                    newService.name_en = apiTranslations.zh_to_en[name] || name;
+                }
+                newService.name = newService.name_en; // For backward compatibility
+            } else {
+                newService.name_en = name;
+                // Use provided translation or try auto-translation
+                if (translation) {
+                    newService.name_zh = translation;
+                } else {
+                    // Try to find auto-translation
+                    newService.name_zh = apiTranslations.en_to_zh[name] || '';
+                }
+                newService.name = name;
+            }
 
             if (activePeriods) {
                 newService.activePeriods = activePeriods;
@@ -4876,10 +5639,12 @@
             // Save to services
             services[serviceId] = newService;
             SharedData.saveServices(services);
-            // Don't add to UI - let loadServices() handle it via storage event
 
             // Close modal
             closeAddServiceModal();
+
+            // Reload services to show the new one
+            loadServices();
 
             // Show success message
             showServiceSaveMessage();
@@ -6451,7 +7216,7 @@
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <div>
                                     <div style="font-weight: bold;">${apt.customerName || 'Guest'}</div>
-                                    <div style="display: none;">
+                                    <div style="font-size: 13px; color: #666; margin-top: 4px;">
                                         <span style="display: inline-block; width: 12px; height: 12px; background: ${serviceColor}; border-radius: 2px; margin-right: 5px; vertical-align: middle;"></span>
                                         ${apt.serviceNames.join(', ')}
                                     </div>
