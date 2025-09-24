@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verify Fix Applied</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js?v=<?php echo time(); ?>"></script>
+    <script src="supabase-bridge.js?v=<?php echo time(); ?>"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .error { color: red; font-weight: bold; font-size: 1.2em; }
+        .success { color: green; font-weight: bold; font-size: 1.2em; }
+        .code { background: #f0f0f0; padding: 10px; margin: 10px 0; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>Verify Fix is Applied</h1>
+    <div id="results"></div>
+
+    <script>
+        // Check the actual function code
+        const funcCode = SharedData.getAvailableSlots.toString();
+        const results = document.getElementById('results');
+
+        results.innerHTML = '<h2>Checking getAvailableSlots function...</h2>';
+
+        // Look for the loop condition
+        const loopMatch = funcCode.match(/for\s*\([^)]*minutes[^)]*\)/);
+        if (loopMatch) {
+            results.innerHTML += '<div class="code">Found loop: ' + loopMatch[0] + '</div>';
+
+            // Check if it has the correct condition
+            if (loopMatch[0].includes('minutes <= lastValidSlot')) {
+                results.innerHTML += '<p class="success">✓ Loop condition is CORRECT (uses <= lastValidSlot only)</p>';
+            } else if (loopMatch[0].includes('minutes < closeMinutes')) {
+                results.innerHTML += '<p class="error">✗ Loop condition is WRONG (still has closeMinutes check)</p>';
+                results.innerHTML += '<p>The fix may not have been applied or the browser is caching the old file.</p>';
+            }
+        } else {
+            results.innerHTML += '<p class="error">Could not find loop in function</p>';
+        }
+
+        // Now test with actual data
+        results.innerHTML += '<h2>Testing with Sep 24, 2025...</h2>';
+
+        setTimeout(() => {
+            const testDate = new Date(2025, 8, 24);
+            const slots = SharedData.getAvailableSlots(testDate, 30);
+
+            results.innerHTML += '<p>Generated ' + slots.length + ' slots</p>';
+            results.innerHTML += '<p>Last 5 slots: ' + slots.slice(-5).join(', ') + '</p>';
+
+            // Check for invalid slots
+            const invalidSlots = slots.filter(slot => {
+                const min = SharedData.timeToMinutes(slot);
+                return min > 1050; // 5:30 PM
+            });
+
+            if (invalidSlots.length > 0) {
+                results.innerHTML += '<p class="error">✗ PROBLEM: Found ' + invalidSlots.length + ' invalid slots: ' + invalidSlots.join(', ') + '</p>';
+                results.innerHTML += '<p class="error">Try clearing your browser cache and refreshing the page!</p>';
+            } else {
+                results.innerHTML += '<p class="success">✓ No invalid slots - fix is working!</p>';
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

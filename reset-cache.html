@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Reset Store Hours Cache</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .success { color: green; font-weight: bold; }
+        button { padding: 10px 20px; margin: 10px; cursor: pointer; background: #2196F3; color: white; border: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Reset Store Hours Cache</h1>
+    <div id="status"></div>
+
+    <script>
+        async function resetCache() {
+            const status = document.getElementById('status');
+
+            status.innerHTML = '<p>Resetting cache...</p>';
+
+            // Clear the cache
+            SharedData.storeHoursCache = null;
+
+            // Force reload from database
+            await SharedData.loadStoreHours();
+
+            const hours = SharedData.getStoreHours();
+
+            status.innerHTML = '<h2>Store Hours After Reset:</h2>';
+            status.innerHTML += '<pre>' + JSON.stringify(hours, null, 2) + '</pre>';
+
+            // Test Sep 25
+            const sep25 = new Date(2025, 8, 25);
+            const slots = SharedData.getAvailableSlots(sep25, 30);
+
+            status.innerHTML += '<h2>Sep 25 Test:</h2>';
+            status.innerHTML += '<p>Slots available: ' + slots.length + '</p>';
+
+            if (slots.length > 0) {
+                status.innerHTML += '<p class="success">✅ Success! Sep 25 now has slots.</p>';
+                status.innerHTML += '<button onclick="window.open(\'customer-app.html\', \'_blank\')">Open Customer App</button>';
+            } else {
+                status.innerHTML += '<p>Still no slots. Thursday might be marked as closed.</p>';
+            }
+        }
+
+        // Run on load
+        setTimeout(resetCache, 1000);
+    </script>
+</body>
+</html>

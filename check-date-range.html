@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Booking Date Range</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .error { color: red; font-weight: bold; }
+        .success { color: green; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Check Booking Date Range Issue</h1>
+    <div id="results"></div>
+
+    <script>
+        async function checkDateRange() {
+            const results = document.getElementById('results');
+
+            // Wait for SharedData
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            const today = new Date();
+            const sep24 = new Date(2025, 8, 24); // Sep 24
+            const sep25 = new Date(2025, 8, 25); // Sep 25
+
+            // Get booking policies
+            const policies = SharedData.getBookingPolicies();
+
+            // Calculate days
+            const daysToSep24 = Math.floor((sep24 - today) / (1000 * 60 * 60 * 24));
+            const daysToSep25 = Math.floor((sep25 - today) / (1000 * 60 * 60 * 24));
+
+            // Calculate max booking date
+            const maxDate = new Date();
+            maxDate.setDate(maxDate.getDate() + policies.maxBookingDays);
+
+            results.innerHTML = `
+                <h2>Current Date & Time</h2>
+                <p>Today: ${today.toDateString()}</p>
+                <p>Current time: ${today.toLocaleTimeString()}</p>
+
+                <h2>Booking Policies</h2>
+                <p>Max booking days in advance: <strong>${policies.maxBookingDays}</strong></p>
+                <p>Min booking hours notice: ${policies.minBookingHours}</p>
+
+                <h2>Date Calculations</h2>
+                <p>Days from today to Sep 24: ${daysToSep24}</p>
+                <p>Days from today to Sep 25: ${daysToSep25}</p>
+                <p>Maximum bookable date: ${maxDate.toDateString()}</p>
+
+                <h2>Can Book?</h2>
+                <p>Sep 24: ${daysToSep24 <= policies.maxBookingDays ?
+                    '<span class="success">✅ YES - Within range</span>' :
+                    '<span class="error">❌ NO - Too far ahead</span>'}</p>
+                <p>Sep 25: ${daysToSep25 <= policies.maxBookingDays ?
+                    '<span class="success">✅ YES - Within range</span>' :
+                    '<span class="error">❌ NO - Too far ahead</span>'}</p>
+
+                <hr>
+                <h2>Solution</h2>
+            `;
+
+            if (daysToSep25 > policies.maxBookingDays) {
+                results.innerHTML += `
+                    <p class="error">The problem is that September 25th is ${daysToSep25} days away,
+                    but the maximum advance booking is set to ${policies.maxBookingDays} days.</p>
+                    <p>To fix this, the shop owner needs to increase the "Maximum advance booking days"
+                    in the Booking Policies section of the owner app.</p>
+                    <p>Alternatively, try booking a date within the next ${policies.maxBookingDays} days
+                    (before ${maxDate.toDateString()}).</p>
+                `;
+            } else {
+                results.innerHTML += `
+                    <p class="success">September 25th should be bookable. If no slots are showing,
+                    there might be another issue.</p>
+                `;
+            }
+        }
+
+        checkDateRange();
+    </script>
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Booking Dates</title>
+    <script src="shared-data.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .date-test { border: 1px solid #ddd; padding: 15px; margin: 10px 0; }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        pre { background: #f4f4f4; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Testing Booking Dates - Sep 24 & Sep 25</h1>
+    <div id="current-info"></div>
+    <div id="results"></div>
+
+    <script>
+        function testDate(date, serviceDuration = 30) {
+            const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+            const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', weekday: 'long' });
+
+            let html = `<div class="date-test">`;
+            html += `<h2>${dateStr}</h2>`;
+
+            // Get store hours
+            const storeHours = SharedData.getStoreHours();
+            const dayHours = storeHours[dayName];
+
+            html += `<p><strong>Store Hours:</strong> `;
+            if (!dayHours || dayHours.closed) {
+                html += `<span class="error">CLOSED</span></p>`;
+            } else {
+                html += `${dayHours.open} - ${dayHours.close}</p>`;
+
+                // Calculate expected slots
+                const [openHour, openMin] = dayHours.open.split(':').map(Number);
+                const [closeHour, closeMin] = dayHours.close.split(':').map(Number);
+                const openMinutes = openHour * 60 + openMin;
+                const closeMinutes = closeHour * 60 + closeMin;
+                const lastValidSlot = closeMinutes - serviceDuration;
+
+                html += `<p><strong>Service Duration:</strong> ${serviceDuration} minutes</p>`;
+                html += `<p><strong>Last Valid Slot Time:</strong> ${Math.floor(lastValidSlot/60)}:${(lastValidSlot%60).toString().padStart(2, '0')}</p>`;
+
+                // Get available slots
+                try {
+                    const availableSlots = SharedData.getAvailableSlots(date, serviceDuration);
+
+                    if (availableSlots.length === 0) {
+                        html += `<p class="error">❌ No available slots returned!</p>`;
+
+                        // Debug why
+                        html += `<div class="warning">`;
+                        html += `<p><strong>Debugging:</strong></p>`;
+
+                        // Test the actual loop
+                        let debugSlots = [];
+                        for (let minutes = openMinutes; minutes < closeMinutes && minutes <= lastValidSlot; minutes += 15) {
+                            const hour = Math.floor(minutes / 60);
+                            const min = minutes % 60;
+                            debugSlots.push(`${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`);
+                        }
+
+                        html += `<p>Manual calculation: ${debugSlots.length} slots should be available</p>`;
+                        if (debugSlots.length > 0) {
+                            html += `<p>First slot: ${debugSlots[0]}, Last slot: ${debugSlots[debugSlots.length - 1]}</p>`;
+                        }
+
+                        // Check if it's a date format issue
+                        const testDate2 = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                        const slots2 = SharedData.getAvailableSlots(testDate2, serviceDuration);
+                        if (slots2.length > 0) {
+                            html += `<p class="warning">Date format issue detected! Alternative date object works.</p>`;
+                        }
+
+                        html += `</div>`;
+
+                    } else {
+                        html += `<p class="success">✅ ${availableSlots.length} slots available</p>`;
+
+                        // Show first and last few slots
+                        html += `<p><strong>First 3 slots:</strong> ${availableSlots.slice(0, 3).join(', ')}</p>`;
+                        html += `<p><strong>Last 3 slots:</strong> ${availableSlots.slice(-3).join(', ')}</p>`;
+
+                        // Verify last slot doesn't exceed closing time
+                        const lastSlot = availableSlots[availableSlots.length - 1];
+                        const [lastHour, lastMin] = lastSlot.split(':').map(Number);
+                        const slotEndTime = lastHour * 60 + lastMin + serviceDuration;
+
+                        if (slotEndTime > closeMinutes) {
+                            html += `<p class="error">❌ ERROR: Last slot ${lastSlot} ends after closing time!</p>`;
+                        } else if (slotEndTime === closeMinutes) {
+                            html += `<p class="success">✅ Perfect: Last slot ends exactly at closing time</p>`;
+                        } else {
+                            html += `<p class="success">✅ Good: Last slot ends before closing time</p>`;
+                        }
+                    }
+
+                } catch (error) {
+                    html += `<p class="error">Error: ${error.message}</p>`;
+                    console.error('Full error:', error);
+                }
+            }
+
+            html += `</div>`;
+            return html;
+        }
+
+        function runTests() {
+            const currentInfo = document.getElementById('current-info');
+            const results = document.getElementById('results');
+
+            // Show current date/time
+            const now = new Date();
+            currentInfo.innerHTML = `
+                <div style="background: #e3f2fd; padding: 10px; margin-bottom: 20px;">
+                    <p><strong>Current System Date/Time:</strong> ${now.toString()}</p>
+                    <p><strong>Timezone:</strong> ${Intl.DateTimeFormat().resolvedOptions().timeZone}</p>
+                </div>
+            `;
+
+            // Test Sep 24 (Wednesday)
+            const sep24 = new Date(2025, 8, 24); // Month is 0-indexed
+            results.innerHTML += testDate(sep24, 30); // Men's Cut
+
+            // Test Sep 25 (Thursday)
+            const sep25 = new Date(2025, 8, 25); // Month is 0-indexed
+            results.innerHTML += testDate(sep25, 30); // Men's Cut
+
+            // Test with longer service on Sep 24
+            results.innerHTML += `<h3>Testing with 45-minute service (Women's Cut)</h3>`;
+            results.innerHTML += testDate(sep24, 45);
+
+            // Show booking policies
+            const policies = SharedData.getBookingPolicies();
+            results.innerHTML += `
+                <div class="date-test">
+                    <h3>Booking Policies</h3>
+                    <pre>${JSON.stringify(policies, null, 2)}</pre>
+                </div>
+            `;
+        }
+
+        // Run tests on load
+        runTests();
+    </script>
+</body>
+</html>

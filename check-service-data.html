@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Service Data</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .service-item {
+            background: #fff;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .field {
+            margin: 5px 0;
+        }
+        .field-name {
+            font-weight: bold;
+            display: inline-block;
+            width: 100px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Service Data Check</h1>
+    <div id="output"></div>
+
+    <script src="shared-data.js"></script>
+    <script>
+        async function checkData() {
+            const output = document.getElementById('output');
+
+            // Initialize SharedData
+            await SharedData.initialize();
+
+            // Get services
+            const services = SharedData.getServices();
+
+            // Display raw data
+            output.innerHTML = '<h2>Raw Service Data:</h2>';
+            output.innerHTML += '<pre>' + JSON.stringify(services, null, 2) + '</pre>';
+
+            // Display formatted data
+            output.innerHTML += '<h2>Formatted Service Data:</h2>';
+
+            Object.entries(services).forEach(([id, service]) => {
+                const div = document.createElement('div');
+                div.className = 'service-item';
+                div.innerHTML = `
+                    <h3>Service ID: ${id}</h3>
+                    <div class="field"><span class="field-name">name:</span> ${service.name || '(not set)'}</div>
+                    <div class="field"><span class="field-name">name_en:</span> ${service.name_en || '(not set)'}</div>
+                    <div class="field"><span class="field-name">name_zh:</span> ${service.name_zh || '(not set)'}</div>
+                    <div class="field"><span class="field-name">duration:</span> ${service.duration}</div>
+                    <div class="field"><span class="field-name">price:</span> $${service.price}</div>
+                    <div class="field"><span class="field-name">enabled:</span> ${service.enabled}</div>
+                `;
+                output.appendChild(div);
+            });
+        }
+
+        checkData();
+    </script>
+</body>
+</html>

@@ -540,9 +540,6 @@
             text-align: center;
             width: 100%;
         }
-        input[type="time"]::-webkit-datetime-edit-ampm-field {
-            display: none;
-        }
         .time-input:invalid {
             border-color: #f44336;
             background: #ffebee;
@@ -1051,6 +1048,7 @@
                 <!-- Store Hours Section -->
                 <div style="border-top: 1px solid #e0e0e0; margin-top: 20px; padding-top: 15px;">
                     <h4 id="store-hours-heading" style="margin-bottom: 10px;">Store Hours</h4>
+                    <p id="store-hours-hint" style="font-size: 12px; color: #666; margin: -5px 0 10px 0;">Use 24-hour format (e.g., 20:00 for 8 PM)</p>
 
                     <div style="background: #f9f9f9; padding: 10px; border-radius: 5px;">
                         <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 5px; font-size: 12px; font-weight: 600; color: #666;">
@@ -1064,9 +1062,9 @@
                         <!-- Sunday -->
                         <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
                             <div id="store-day-sunday" style="font-size: 14px;">Sunday</div>
-                            <input type="time" id="store-sunday-open" value="09:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <input type="text" id="store-sunday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                             <span style="text-align: center;">–</span>
-                            <input type="time" id="store-sunday-close" value="18:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <input type="text" id="store-sunday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                             <div style="text-align: center;">
                                 <input type="checkbox" id="store-sunday-closed" onchange="toggleStoreDayClosed('sunday')">
                             </div>
@@ -1075,9 +1073,9 @@
                         <!-- Monday -->
                         <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
                             <div id="store-day-monday" style="font-size: 14px;">Monday</div>
-                            <input type="time" id="store-monday-open" value="09:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <input type="text" id="store-monday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                             <span style="text-align: center;">–</span>
-                            <input type="time" id="store-monday-close" value="18:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <input type="text" id="store-monday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                             <div style="text-align: center;">
                                 <input type="checkbox" id="store-monday-closed" onchange="toggleStoreDayClosed('monday')">
                             </div>
@@ -1086,9 +1084,9 @@
                         <!-- Tuesday -->
                         <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
                             <div id="store-day-tuesday" style="font-size: 14px;">Tuesday</div>
-                            <input type="time" id="store-tuesday-open" value="09:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <input type="text" id="store-tuesday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                             <span style="text-align: center;">–</span>
-                            <input type="time" id="store-tuesday-close" value="18:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <input type="text" id="store-tuesday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                             <div style="text-align: center;">
                                 <input type="checkbox" id="store-tuesday-closed" onchange="toggleStoreDayClosed('tuesday')">
                             </div>
@@ -1097,9 +1095,9 @@
                         <!-- Wednesday -->
                         <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
                             <div id="store-day-wednesday" style="font-size: 14px;">Wednesday</div>
-                            <input type="time" id="store-wednesday-open" value="09:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <input type="text" id="store-wednesday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                             <span style="text-align: center;">–</span>
-                            <input type="time" id="store-wednesday-close" value="18:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <input type="text" id="store-wednesday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                             <div style="text-align: center;">
                                 <input type="checkbox" id="store-wednesday-closed" onchange="toggleStoreDayClosed('wednesday')">
                             </div>
@@ -1108,9 +1106,9 @@
                         <!-- Thursday -->
                         <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
                             <div id="store-day-thursday" style="font-size: 14px;">Thursday</div>
-                            <input type="time" id="store-thursday-open" value="09:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <input type="text" id="store-thursday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                             <span style="text-align: center;">–</span>
-                            <input type="time" id="store-thursday-close" value="18:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <input type="text" id="store-thursday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                             <div style="text-align: center;">
                                 <input type="checkbox" id="store-thursday-closed" onchange="toggleStoreDayClosed('thursday')">
                             </div>
@@ -1119,9 +1117,9 @@
                         <!-- Friday -->
                         <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
                             <div id="store-day-friday" style="font-size: 14px;">Friday</div>
-                            <input type="time" id="store-friday-open" value="09:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <input type="text" id="store-friday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                             <span style="text-align: center;">–</span>
-                            <input type="time" id="store-friday-close" value="18:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <input type="text" id="store-friday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                             <div style="text-align: center;">
                                 <input type="checkbox" id="store-friday-closed" onchange="toggleStoreDayClosed('friday')">
                             </div>
@@ -1130,9 +1128,9 @@
                         <!-- Saturday -->
                         <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
                             <div id="store-day-saturday" style="font-size: 14px;">Saturday</div>
-                            <input type="time" id="store-saturday-open" value="09:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <input type="text" id="store-saturday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                             <span style="text-align: center;">–</span>
-                            <input type="time" id="store-saturday-close" value="18:00" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                            <input type="text" id="store-saturday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                             <div style="text-align: center;">
                                 <input type="checkbox" id="store-saturday-closed" onchange="toggleStoreDayClosed('saturday')">
                             </div>
@@ -1362,8 +1360,8 @@
 
                 <div id="qr-code-section" style="display: none; margin-top: 20px; text-align: center;">
                     <div style="font-weight: bold; margin-bottom: 10px;" id="qr-code-title">QR Code</div>
-                    <div id="qr-code" style="padding: 20px; background: white; border: 1px solid #e0e0e0; border-radius: 8px;">
-                        <canvas id="booking-qr-canvas"></canvas>
+                    <div id="qr-code" style="padding: 20px; background: white; border: 1px solid #e0e0e0; border-radius: 8px; display: flex; flex-direction: column; align-items: center;">
+                        <canvas id="booking-qr-canvas" style="margin: 0 auto; display: block;"></canvas>
                         <div style="margin-top: 10px;">
                             <button onclick="downloadBookingQRCode()" style="padding: 8px 15px; background: #4A90E2; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">
                                 <span id="download-booking-qr-btn">Download QR Code</span>
@@ -1748,6 +1746,7 @@
                         <!-- Page 2: Store Hours -->
                         <div class="services-page">
                             <h2 id="staff-hours-title">Staff Hours</h2>
+                            <p id="staff-hours-hint" style="font-size: 12px; color: #666; margin: -5px 0 15px 0;">Use 24-hour format (e.g., 20:00 for 8 PM)</p>
 
                             <!-- Same as store hours checkbox (only show for non-owner staff) -->
                             <div id="same-as-store-hours-container" style="margin: 15px 0; display: none;">
@@ -1767,63 +1766,63 @@
                                 </div>
                                 <div class="hours-row">
                                     <div class="day-label" id="monday2">Monday</div>
-                                    <input type="time" class="time-input" id="monday-open" value="09:00">
+                                    <input type="text" class="time-input" id="monday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <span style="text-align: center; font-size: 12px;">–</span>
-                                    <input type="time" class="time-input" id="monday-close" value="18:00">
+                                    <input type="text" class="time-input" id="monday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <div class="closed-toggle">
                                         <input type="checkbox" class="closed-checkbox" id="monday-closed" onchange="toggleDayClosed('monday')">
                                     </div>
                                 </div>
                                 <div class="hours-row">
                                     <div class="day-label" id="tuesday2">Tuesday</div>
-                                    <input type="time" class="time-input" id="tuesday-open" value="09:00">
+                                    <input type="text" class="time-input" id="tuesday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <span style="text-align: center; font-size: 12px;">–</span>
-                                    <input type="time" class="time-input" id="tuesday-close" value="18:00">
+                                    <input type="text" class="time-input" id="tuesday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <div class="closed-toggle">
                                         <input type="checkbox" class="closed-checkbox" id="tuesday-closed" onchange="toggleDayClosed('tuesday')">
                                     </div>
                                 </div>
                                 <div class="hours-row">
                                     <div class="day-label" id="wednesday2">Wednesday</div>
-                                    <input type="time" class="time-input" id="wednesday-open" value="09:00">
+                                    <input type="text" class="time-input" id="wednesday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <span style="text-align: center; font-size: 12px;">–</span>
-                                    <input type="time" class="time-input" id="wednesday-close" value="18:00">
+                                    <input type="text" class="time-input" id="wednesday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <div class="closed-toggle">
                                         <input type="checkbox" class="closed-checkbox" id="wednesday-closed" onchange="toggleDayClosed('wednesday')">
                                     </div>
                                 </div>
                                 <div class="hours-row">
                                     <div class="day-label" id="thursday2">Thursday</div>
-                                    <input type="time" class="time-input" id="thursday-open" value="09:00">
+                                    <input type="text" class="time-input" id="thursday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <span style="text-align: center; font-size: 12px;">–</span>
-                                    <input type="time" class="time-input" id="thursday-close" value="18:00">
+                                    <input type="text" class="time-input" id="thursday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <div class="closed-toggle">
                                         <input type="checkbox" class="closed-checkbox" id="thursday-closed" onchange="toggleDayClosed('thursday')">
                                     </div>
                                 </div>
                                 <div class="hours-row">
                                     <div class="day-label" id="friday2">Friday</div>
-                                    <input type="time" class="time-input" id="friday-open" value="09:00">
+                                    <input type="text" class="time-input" id="friday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <span style="text-align: center; font-size: 12px;">–</span>
-                                    <input type="time" class="time-input" id="friday-close" value="20:00">
+                                    <input type="text" class="time-input" id="friday-close" value="20:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <div class="closed-toggle">
                                         <input type="checkbox" class="closed-checkbox" id="friday-closed" onchange="toggleDayClosed('friday')">
                                     </div>
                                 </div>
                                 <div class="hours-row">
                                     <div class="day-label" id="saturday2">Saturday</div>
-                                    <input type="time" class="time-input" id="saturday-open" value="10:00">
+                                    <input type="text" class="time-input" id="saturday-open" value="10:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <span style="text-align: center; font-size: 12px;">–</span>
-                                    <input type="time" class="time-input" id="saturday-close" value="17:00">
+                                    <input type="text" class="time-input" id="saturday-close" value="17:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <div class="closed-toggle">
                                         <input type="checkbox" class="closed-checkbox" id="saturday-closed" onchange="toggleDayClosed('saturday')">
                                     </div>
                                 </div>
                                 <div class="hours-row">
                                     <div class="day-label" id="sunday2">Sunday</div>
-                                    <input type="time" class="time-input" id="sunday-open" value="" disabled>
+                                    <input type="text" class="time-input" id="sunday-open" value="" disabled pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <span style="text-align: center; font-size: 12px;">–</span>
-                                    <input type="time" class="time-input" id="sunday-close" value="" disabled>
+                                    <input type="text" class="time-input" id="sunday-close" value="" disabled pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <div class="closed-toggle">
                                         <input type="checkbox" class="closed-checkbox" id="sunday-closed" checked onchange="toggleDayClosed('sunday')">
                                     </div>
@@ -2037,6 +2036,7 @@
                 storeHoursTitle: '营业时间',
                 staffHoursTitle: '员工时间',
                 sameAsStoreHours: '与店铺营业时间相同',
+                storeHoursHint: '使用24小时格式（例如：20:00表示晚上8点）',
                 storeOpenTime: '开店时间',
                 storeCloseTime: '关店时间',
                 businessDays: '营业日',
@@ -2064,7 +2064,7 @@
                 servicesTab: '服务项目',
                 staffHoursTab: '员工时间',
                 minLabel: '分钟',
-                hasActivePeriodsLabel: '有活动时间段',
+                hasActivePeriodsLabel: '有间断性的活跃时间段',
                 periodLabel: '时段',
                 addPeriodBtn: '添加时段',
                 services: {
@@ -2201,6 +2201,7 @@
                 storeHoursTitle: 'Store Hours',
                 staffHoursTitle: 'Staff Hours',
                 sameAsStoreHours: 'Same as store hours',
+                storeHoursHint: 'Use 24-hour format (e.g., 20:00 for 8 PM)',
                 storeOpenTime: 'Opening Time',
                 storeCloseTime: 'Closing Time',
                 businessDays: 'Business Days',
@@ -2391,22 +2392,6 @@
             }
         }
 
-        // Helper function to translate service names
-        function translateServiceName(name) {
-            if (!isZh) return name;
-            const serviceTranslations = {
-                "Men's Cut": '男士理发',
-                "Women's Cut": '女士理发',
-                "Children's Cut": '儿童理发',
-                "Hair Coloring": '染发',
-                "Highlights": '挑染',
-                "Perm": '烫发',
-                "Hair Treatment": '护理',
-                "Beard": '修胡子',
-                "Beard Trim": '修胡子'
-            };
-            return serviceTranslations[name] || name;
-        }
 
         function updateLanguage() {
             const t = isZh ? translations.zh : translations.en;
@@ -2500,6 +2485,8 @@
 
             // Store hours labels in Profile modal
             updateElement('store-hours-heading', t.storeHoursTitle);
+            updateElement('store-hours-hint', t.storeHoursHint);
+            updateElement('staff-hours-hint', t.storeHoursHint);
             updateElement('store-hours-label-day', t.storeHoursDay);
             updateElement('store-hours-label-opens', t.storeHoursOpens);
             updateElement('store-hours-label-closes', t.storeHoursCloses);
@@ -2681,121 +2668,14 @@
 
                 if (!nameInput || !translationInput) return;
 
-                // Get stored translations from data attributes (already saved by saveCurrentServiceTranslations)
+                // Get stored translations from data attributes
                 const enName = nameInput.getAttribute('data-name-en') || '';
                 const zhName = nameInput.getAttribute('data-name-zh') || '';
 
-                // Extended API translations for common services
-                const apiTranslations = {
-                    en_to_zh: {
-                        "Men's Cut": "男士理发",
-                        "Women's Cut": "女士理发",
-                        "Children's Cut": "儿童理发",
-                        "Hair Coloring": "染发",
-                        "Highlights": "挑染",
-                        "Beard Trim": "修胡须",
-                        "Hair Wash": "洗发",
-                        "Perm": "烫发",
-                        "Hair Treatment": "护发",
-                        "Styling": "造型",
-                        "Haircut": "理发",
-                        "Shampoo": "洗头",
-                        "Blowdry": "吹干",
-                        "Hair Spa": "头发护理",
-                        "Hair Mask": "发膜",
-                        "Scalp Treatment": "头皮护理",
-                        "Hair Extensions": "接发",
-                        "Braiding": "编发",
-                        "Updo": "盘发",
-                        // Common test names
-                        "Testing": "测试",
-                        "Test": "测试",
-                        "Custom": "自定义",
-                        "Service": "服务",
-                        "New Service": "新服务",
-                        // Additional common services
-                        "Trim": "修剪",
-                        "Bang Trim": "修刘海",
-                        "Deep Conditioning": "深层护理",
-                        "Color Touch-up": "补染",
-                        "Root Touch-up": "补根",
-                        "Balayage": "渐变染",
-                        "Ombre": "渐变色",
-                        "Straightening": "拉直",
-                        "Relaxer": "软化",
-                        "Keratin Treatment": "角蛋白护理"
-                    },
-                    zh_to_en: {
-                        "男士理发": "Men's Cut",
-                        "女士理发": "Women's Cut",
-                        "儿童理发": "Children's Cut",
-                        "染发": "Hair Coloring",
-                        "挑染": "Highlights",
-                        "修胡须": "Beard Trim",
-                        "洗发": "Hair Wash",
-                        "烫发": "Perm",
-                        "护发": "Hair Treatment",
-                        "造型": "Styling",
-                        "理发": "Haircut",
-                        "洗头": "Shampoo",
-                        "吹干": "Blowdry",
-                        "头发护理": "Hair Spa",
-                        "发膜": "Hair Mask",
-                        "头皮护理": "Scalp Treatment",
-                        "接发": "Hair Extensions",
-                        "编发": "Braiding",
-                        "盘发": "Updo",
-                        // Common test names
-                        "测试": "Testing",
-                        "自定义": "Custom",
-                        "服务": "Service",
-                        "新服务": "New Service",
-                        // Additional common services
-                        "修剪": "Trim",
-                        "修刘海": "Bang Trim",
-                        "深层护理": "Deep Conditioning",
-                        "补染": "Color Touch-up",
-                        "补根": "Root Touch-up",
-                        "渐变染": "Balayage",
-                        "渐变色": "Ombre",
-                        "拉直": "Straightening",
-                        "软化": "Relaxer",
-                        "角蛋白护理": "Keratin Treatment"
-                    }
-                };
-
                 if (isZh) {
-                    // Now in Chinese mode
-                    let mainName = zhName;
-                    let placeholderValue = enName;
-
-                    // If no Chinese name, try API translation
-                    if (!mainName && enName) {
-                        // Try exact match first
-                        mainName = apiTranslations.en_to_zh[enName];
-
-                        // If no exact match, try case-insensitive match
-                        if (!mainName) {
-                            const lowerEnName = enName.toLowerCase();
-                            for (const [key, value] of Object.entries(apiTranslations.en_to_zh)) {
-                                if (key.toLowerCase() === lowerEnName) {
-                                    mainName = value;
-                                    break;
-                                }
-                            }
-                        }
-
-                        // If still no match, keep original
-                        mainName = mainName || enName;
-
-                        // If we found a translation, update the data attribute
-                        if (mainName !== enName) {
-                            nameInput.setAttribute('data-name-zh', mainName);
-                        }
-                    }
-
-                    nameInput.value = mainName || enName || '';
-                    translationInput.value = placeholderValue || '';
+                    // Now in Chinese mode - show what owner provided
+                    nameInput.value = zhName || enName || '';
+                    translationInput.value = enName || '';
                     translationInput.placeholder = '英文名称（可选）';
                     translationInput.setAttribute('data-lang', 'en');
 
@@ -2803,36 +2683,9 @@
                     const hint = item.querySelector('.translation-hint');
                     if (hint) hint.textContent = '提供翻译以支持多语言';
                 } else {
-                    // Now in English mode
-                    let mainName = enName;
-                    let placeholderValue = zhName;
-
-                    // If no English name, try API translation
-                    if (!mainName && zhName) {
-                        // Try exact match first
-                        mainName = apiTranslations.zh_to_en[zhName];
-
-                        // If no exact match, try partial match (for compound words)
-                        if (!mainName) {
-                            for (const [key, value] of Object.entries(apiTranslations.zh_to_en)) {
-                                if (zhName.includes(key)) {
-                                    mainName = value;
-                                    break;
-                                }
-                            }
-                        }
-
-                        // If still no match, keep original
-                        mainName = mainName || zhName;
-
-                        // If we found a translation, update the data attribute
-                        if (mainName !== zhName) {
-                            nameInput.setAttribute('data-name-en', mainName);
-                        }
-                    }
-
-                    nameInput.value = mainName || zhName || '';
-                    translationInput.value = placeholderValue || '';
+                    // Now in English mode - show what owner provided
+                    nameInput.value = enName || zhName || '';
+                    translationInput.value = zhName || '';
                     translationInput.placeholder = 'Chinese name (optional)';
                     translationInput.setAttribute('data-lang', 'zh');
 
@@ -2873,7 +2726,7 @@
 
             // Update "Has active time periods" labels
             document.querySelectorAll('.active-periods-label').forEach(label => {
-                label.textContent = isZh ? '有活动时间段' : 'Has active time periods';
+                label.textContent = isZh ? '有间断性的活跃时间段' : 'Has active time periods';
             });
 
             // Update "Period X:" labels
@@ -2944,19 +2797,29 @@
 
             // Generate calendar if showing calendar section
             if (section === 'calendar') {
-                // Generate appropriate view based on selected barber
-                if (calendarBarberId === '') {
-                    calendarViewMode = 'day';
-                    generateDayViewCalendar();
-                } else {
-                    calendarViewMode = 'week';
-                    generateWeeklyCalendar();
-                }
+                // Refresh appointments from database before displaying calendar
+                console.log('Calendar view selected - refreshing appointments from database');
+                SharedData.getAppointments().then(() => {
+                    console.log('Appointments refreshed, generating calendar view');
+                    // Generate appropriate view based on selected barber
+                    if (calendarBarberId === '') {
+                        calendarViewMode = 'day';
+                        generateDayViewCalendar();
+                    } else {
+                        calendarViewMode = 'week';
+                        generateWeeklyCalendar();
+                    }
+                });
             }
 
             // Update dashboard metrics if showing dashboard section
             if (section === 'dashboard') {
-                updateDashboardMetrics().catch(console.error);
+                // Refresh appointments from database before updating dashboard
+                console.log('Dashboard view selected - refreshing appointments from database');
+                SharedData.getAppointments().then(() => {
+                    console.log('Appointments refreshed, updating dashboard metrics');
+                    updateDashboardMetrics().catch(console.error);
+                });
             }
 
             // Re-populate barber selectors with translated "All Staff" option
@@ -3114,6 +2977,34 @@
                 closeInput.disabled = false;
                 openInput.value = '09:00';
                 closeInput.value = '18:00';
+            }
+        }
+
+        function validateTimeFormat(input) {
+            const value = input.value;
+            const pattern = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+
+            if (value && !pattern.test(value)) {
+                // Try to auto-format common inputs
+                let formatted = value.replace(/[^\d]/g, ''); // Remove non-digits
+                if (formatted.length === 3) {
+                    // e.g., "900" -> "9:00"
+                    formatted = formatted[0] + ':' + formatted.substring(1);
+                } else if (formatted.length === 4) {
+                    // e.g., "0900" -> "09:00" or "2000" -> "20:00"
+                    formatted = formatted.substring(0, 2) + ':' + formatted.substring(2);
+                }
+
+                if (pattern.test(formatted)) {
+                    input.value = formatted;
+                    input.style.borderColor = '';
+                } else {
+                    input.style.borderColor = '#f44336';
+                    input.title = 'Please enter time in 24-hour format (HH:MM)';
+                }
+            } else {
+                input.style.borderColor = '';
+                input.title = '';
             }
         }
 
@@ -4415,21 +4306,22 @@
             if (!hasErrors) {
                 SharedData.saveServices(services);
 
-                // ALWAYS update all barbers to have access to all enabled services
-                // This ensures customer app shows correct services
-                const enabledServiceIds = Object.keys(services).filter(id => services[id].enabled);
+                // ALWAYS update all barbers to have access to ALL services
+                // This ensures customer app can filter based on enabled status
+                const allServiceIds = Object.keys(services);
                 const serviceAssignment = {};
-                enabledServiceIds.forEach(id => {
+                allServiceIds.forEach(id => {
+                    // Include all services, the customer app will filter by enabled status
                     serviceAssignment[id] = true;
                 });
 
                 // Update all barbers with the new service assignment
                 const barbers = await SharedData.getBarbers();
-                console.log('Updating barbers with enabled services:', enabledServiceIds);
+                console.log('Updating barbers with all services:', allServiceIds);
                 console.log('Service assignment object:', serviceAssignment);
 
                 barbers.forEach(barber => {
-                    console.log(`Updating ${barber.name} (${barber.id}) with ${enabledServiceIds.length} services`);
+                    console.log(`Updating ${barber.name} (${barber.id}) with ${allServiceIds.length} services`);
                     SharedData.updateBarber(barber.id, { services: serviceAssignment });
                 });
 
@@ -4474,6 +4366,9 @@
         }
 
         function createServiceItemElement(serviceId, service) {
+            console.log(`📦 createServiceItemElement called for ${serviceId}:`, service);
+            console.log(`📦 Service name_en: "${service.name_en}", name_zh: "${service.name_zh}"`);
+
             const div = document.createElement('div');
             div.className = 'service-item';
             div.dataset.service = serviceId;
@@ -4508,117 +4403,21 @@
                 console.warn('SharedData.getServiceColor not found, using default');
             }
 
-            // Get translations from service object or use defaults
+            // Get translations from service object - use what the owner provided
             let enName = service.name_en || '';
             let zhName = service.name_zh || '';
 
-            // Extended API translations mapping for common services
-            const apiTranslations = {
-                en_to_zh: {
-                    "Men's Cut": '男士理发',
-                    "Women's Cut": '女士理发',
-                    "Children's Cut": '儿童理发',
-                    "Hair Coloring": '染发',
-                    "Highlights": '挑染',
-                    "Beard Trim": "修胡须",
-                    "Hair Wash": "洗发",
-                    "Perm": "烫发",
-                    "Hair Treatment": "护发",
-                    "Styling": "造型",
-                    "Haircut": "理发",
-                    "Shampoo": "洗头",
-                    "Blowdry": "吹干",
-                    "Hair Spa": "头发护理",
-                    "Hair Mask": "发膜",
-                    "Scalp Treatment": "头皮护理",
-                    "Hair Extensions": "接发",
-                    "Braiding": "编发",
-                    "Updo": "盘发",
-                    // Common test names
-                    "Testing": "测试",
-                    "Test": "测试",
-                    "Custom": "自定义",
-                    "Service": "服务",
-                    "New Service": "新服务",
-                    // Additional common services
-                    "Trim": "修剪",
-                    "Bang Trim": "修刘海",
-                    "Deep Conditioning": "深层护理",
-                    "Color Touch-up": "补染",
-                    "Root Touch-up": "补根",
-                    "Balayage": "渐变染",
-                    "Ombre": "渐变色",
-                    "Straightening": "拉直",
-                    "Relaxer": "软化",
-                    "Keratin Treatment": "角蛋白护理"
-                },
-                zh_to_en: {
-                    '男士理发': "Men's Cut",
-                    '女士理发': "Women's Cut",
-                    '儿童理发': "Children's Cut",
-                    '染发': "Hair Coloring",
-                    '挑染': "Highlights",
-                    "修胡须": "Beard Trim",
-                    "洗发": "Hair Wash",
-                    "烫发": "Perm",
-                    "护发": "Hair Treatment",
-                    "造型": "Styling",
-                    "理发": "Haircut",
-                    "洗头": "Shampoo",
-                    "吹干": "Blowdry",
-                    "头发护理": "Hair Spa",
-                    "发膜": "Hair Mask",
-                    "头皮护理": "Scalp Treatment",
-                    "接发": "Hair Extensions",
-                    "编发": "Braiding",
-                    "盘发": "Updo",
-                    // Common test names
-                    "测试": "Testing",
-                    "自定义": "Custom",
-                    "服务": "Service",
-                    "新服务": "New Service",
-                    // Additional common services
-                    "修剪": "Trim",
-                    "修刘海": "Bang Trim",
-                    "深层护理": "Deep Conditioning",
-                    "补染": "Color Touch-up",
-                    "补根": "Root Touch-up",
-                    "渐变染": "Balayage",
-                    "渐变色": "Ombre",
-                    "拉直": "Straightening",
-                    "软化": "Relaxer",
-                    "角蛋白护理": "Keratin Treatment"
+            // If we only have service.name (legacy), use it as primary for current language
+            if (!enName && !zhName && service.name) {
+                if (isZh) {
+                    zhName = service.name;
+                } else {
+                    enName = service.name;
                 }
-            };
-
-            // If we don't have both translations, try to fill them in
-            if (!enName && !zhName) {
-                // If we only have service.name, determine what it is
-                if (service.name) {
-                    // Check if it's Chinese or English
-                    if (apiTranslations.zh_to_en[service.name]) {
-                        // It's a Chinese name
-                        zhName = service.name;
-                        enName = apiTranslations.zh_to_en[service.name];
-                    } else if (apiTranslations.en_to_zh[service.name]) {
-                        // It's an English name
-                        enName = service.name;
-                        zhName = apiTranslations.en_to_zh[service.name];
-                    } else {
-                        // Unknown service, use as-is for both
-                        enName = service.name;
-                        zhName = service.name;
-                    }
-                }
-            } else if (!enName && zhName) {
-                // We have Chinese but not English - try to translate
-                enName = apiTranslations.zh_to_en[zhName] || zhName;
-            } else if (enName && !zhName) {
-                // We have English but not Chinese - try to translate
-                zhName = apiTranslations.en_to_zh[enName] || enName;
             }
 
-            const displayName = isZh ? (zhName || enName) : (enName || zhName);
+            // Display exactly what the owner provided
+            const displayName = isZh ? (zhName || enName || service.name || '') : (enName || zhName || service.name || '');
             const translationValue = isZh ? enName : zhName;
             const translationPlaceholder = isZh ? '英文名称（可选）' : 'Chinese name (optional)';
             const translationLang = isZh ? 'en' : 'zh';
@@ -4652,7 +4451,7 @@
                     <div style="margin-top: 8px;">
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <input type="checkbox" class="active-time-toggle" id="toggle-active-${serviceId}" ${service.hasActiveTime ? 'checked' : ''} onchange="toggleActiveTime('${serviceId}')" style="cursor: pointer;">
-                            <label for="toggle-active-${serviceId}" class="active-periods-label" style="font-size: 12px; color: #666; cursor: pointer;">${isZh ? '有活动时间段' : 'Has active time periods'}</label>
+                            <label for="toggle-active-${serviceId}" class="active-periods-label" style="font-size: 12px; color: #666; cursor: pointer;">${isZh ? '有间断性的活跃时间段' : 'Has active time periods'}</label>
                         </div>
                         <div class="active-time-container" id="active-container-${serviceId}" style="${service.hasActiveTime ? 'display: block;' : 'display: none;'} margin-left: 24px; margin-top: 8px;">
                             <div class="active-periods-list" id="periods-${serviceId}">
@@ -5004,9 +4803,13 @@
                 if (closedCheckbox.checked) {
                     storeHours[day] = { open: '', close: '', closed: true };
                 } else {
+                    const openTime = openInput.value || '09:00';
+                    const closeTime = closeInput.value || '18:00';
+
+                    // Save exactly what the owner enters without any auto-correction
                     storeHours[day] = {
-                        open: openInput.value || '09:00',
-                        close: closeInput.value || '18:00',
+                        open: openTime,
+                        close: closeTime,
                         closed: false
                     };
                 }
@@ -5134,118 +4937,6 @@
 
         function openAbout() {
             alert(isZh ? '关于页面' : 'About page');
-        }
-
-        // Auto-translate service name when typing using Google Translate API
-        async function autoTranslateService() {
-            console.log('autoTranslateService called');
-            const nameInput = document.getElementById('new-service-name');
-            const translationInput = document.getElementById('new-service-translation');
-
-            if (!nameInput || !translationInput) {
-                console.log('Input elements not found');
-                return;
-            }
-
-            const name = nameInput.value.trim();
-            console.log('Service name entered:', name, 'Language mode:', isZh ? 'Chinese' : 'English');
-            console.log('Translation input userModified flag:', translationInput.dataset.userModified);
-
-            // Don't override if user has manually entered a translation
-            if (translationInput.dataset.userModified === 'true') {
-                console.log('User has manually modified translation, not auto-translating');
-                return;
-            }
-
-            // Clear translation if input is empty
-            if (!name) {
-                translationInput.value = '';
-                translationInput.dataset.userModified = 'false';
-                return;
-            }
-
-            // Determine source and target languages
-            const sourceLang = isZh ? 'zh' : 'en';
-            const targetLang = isZh ? 'en' : 'zh';
-
-            try {
-                // Use Google Translate API (free tier through a proxy)
-                const translation = await translateText(name, sourceLang, targetLang);
-
-                if (translation) {
-                    translationInput.value = translation;
-                    translationInput.dataset.userModified = 'false';
-                    console.log('Translation successful:', name, '->', translation);
-                }
-            } catch (error) {
-                console.error('Translation API error:', error);
-                // Fall back to dictionary translation
-                fallbackDictionaryTranslation(name, isZh, translationInput);
-            }
-        }
-
-        // Translation API function
-        async function translateText(text, sourceLang, targetLang) {
-            // Using MyMemory Translation API (free, no key required for basic use)
-            const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`;
-
-            try {
-                const response = await fetch(url);
-                const data = await response.json();
-
-                if (data.responseStatus === 200 && data.responseData) {
-                    return data.responseData.translatedText;
-                }
-            } catch (error) {
-                console.error('Translation API request failed:', error);
-            }
-
-            return null;
-        }
-
-        // Fallback dictionary translation (keeping existing logic)
-        function fallbackDictionaryTranslation(name, isZh, translationInput) {
-            console.log('Using fallback dictionary translation');
-
-            // Extended dictionary for common terms (as fallback)
-            const apiTranslations = {
-                en_to_zh: {
-                    "Men's Cut": "男士理发",
-                    "Women's Cut": "女士理发",
-                    "Hair Coloring": "染发",
-                    "Cut": "理发",
-                    "Haircut": "理发"
-                },
-                zh_to_en: {
-                    "男士理发": "Men's Cut",
-                    "女士理发": "Women's Cut",
-                    "染发": "Hair Coloring",
-                    "理发": "Haircut"
-                }
-            };
-
-            let translation = '';
-            if (isZh) {
-                translation = apiTranslations.zh_to_en[name] || '';
-            } else {
-                translation = apiTranslations.en_to_zh[name] || '';
-                // Try case-insensitive
-                if (!translation) {
-                    const lowerName = name.toLowerCase();
-                    for (const [key, value] of Object.entries(apiTranslations.en_to_zh)) {
-                        if (key.toLowerCase() === lowerName) {
-                            translation = value;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (translation) {
-                translationInput.value = translation;
-                translationInput.dataset.userModified = 'false';
-                console.log('Fallback translation found:', translation);
-            }
         }
 
         // Handle manual translation input
@@ -5541,31 +5232,6 @@
                 serviceId = `custom-${counter}`;
             }
 
-            // API translations for auto-population
-            const apiTranslations = {
-                en_to_zh: {
-                    "Testing": "测试",
-                    "Test": "测试",
-                    "Custom": "自定义",
-                    "Service": "服务",
-                    "New Service": "新服务",
-                    "Trim": "修剪",
-                    "Haircut": "理发",
-                    "Styling": "造型",
-                    "Treatment": "护理"
-                },
-                zh_to_en: {
-                    "测试": "Testing",
-                    "自定义": "Custom",
-                    "服务": "Service",
-                    "新服务": "New Service",
-                    "修剪": "Trim",
-                    "理发": "Haircut",
-                    "造型": "Styling",
-                    "护理": "Treatment"
-                }
-            };
-
             // Get a unique color for the new service
             const colorPalette = [
                 '#2196F3', // Blue
@@ -5609,26 +5275,14 @@
 
             console.log(`New service "${name}" assigned color: ${assignedColor}`);
 
-            // Add translations based on current language
+            // Add translations based on current language - only what owner provides
             if (isZh) {
                 newService.name_zh = name;
-                // Use provided translation or try auto-translation
-                if (translation) {
-                    newService.name_en = translation;
-                } else {
-                    // Try to find auto-translation
-                    newService.name_en = apiTranslations.zh_to_en[name] || name;
-                }
-                newService.name = newService.name_en; // For backward compatibility
+                newService.name_en = translation || '';
+                newService.name = name; // For backward compatibility
             } else {
                 newService.name_en = name;
-                // Use provided translation or try auto-translation
-                if (translation) {
-                    newService.name_zh = translation;
-                } else {
-                    // Try to find auto-translation
-                    newService.name_zh = apiTranslations.en_to_zh[name] || '';
-                }
+                newService.name_zh = translation || '';
                 newService.name = name;
             }
 
@@ -5720,7 +5374,7 @@
                     legendItem.style.cssText = 'display: flex; align-items: center; gap: 5px;';
                     legendItem.innerHTML = `
                         <div style="width: 20px; height: 20px; background: ${service.color}; border-radius: 3px;"></div>
-                        <span>${translateServiceName(service.name)}</span>
+                        <span>${isZh ? (service.name_zh || service.name_en || service.name) : (service.name_en || service.name_zh || service.name)}</span>
                     `;
                     legendContainer.appendChild(legendItem);
                 }
@@ -5993,15 +5647,14 @@
 
         // Load appointments for day view (all staff)
         function loadDayAppointments() {
-            const appointments = SharedData.getAppointments();
             const selectedDate = new Date(currentWeekStart);
             const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
 
             // Clear existing appointments and periods
             document.querySelectorAll('.appointment-block, .appointment-period').forEach(block => block.remove());
 
-            // Filter appointments for selected date
-            const todayAppointments = appointments.filter(apt => apt.date === dateStr);
+            // Get appointments for selected date using the synchronous method
+            const todayAppointments = SharedData.getAppointmentsByDate(dateStr);
             const heightPerHour = 50;
 
             todayAppointments.forEach(apt => {
@@ -6321,7 +5974,7 @@
         }
 
         function loadWeekAppointments() {
-            let appointments = SharedData.getAppointments();
+            let appointments = SharedData.getAppointmentsSync();
 
             // Filter by selected barber if one is selected
             if (calendarBarberId) {
@@ -7548,7 +7201,7 @@
                 // Add to legend
                 const legendItem = document.createElement('div');
                 legendItem.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 12px;';
-                const serviceName = translateServiceName(service.name);
+                const serviceName = isZh ? (service.name_zh || service.name_en || service.name) : (service.name_en || service.name_zh || service.name);
                 legendItem.innerHTML = `
                     <div style="width: 16px; height: 16px; background: ${service.color}; border-radius: 2px;"></div>
                     <span>${serviceName}: ${Math.round(percentage)}%</span>
@@ -7672,7 +7325,8 @@
                 if (services[serviceId].enabled) {
                     const option = document.createElement('option');
                     option.value = serviceId;
-                    option.textContent = translateServiceName(services[serviceId].name);
+                    const svc = services[serviceId];
+                    option.textContent = isZh ? (svc.name_zh || svc.name_en || svc.name) : (svc.name_en || svc.name_zh || svc.name);
                     select.insertBefore(option, select.lastElementChild);
                 }
             });
@@ -7716,7 +7370,7 @@
                     endTimeInput.setAttribute('readonly', 'readonly');
 
                     // Show summary
-                    document.getElementById('summary-service').textContent = translateServiceName(service.name);
+                    document.getElementById('summary-service').textContent = isZh ? (service.name_zh || service.name_en || service.name) : (service.name_en || service.name_zh || service.name);
                     document.getElementById('summary-duration').textContent = `${service.duration} ${isZh ? '分钟' : 'minutes'}`;
                     summaryDiv.style.display = 'block';
                 }
@@ -7967,7 +7621,8 @@
 
             // Populate modal with appointment details
             document.getElementById('modal-customer-name').textContent = apt.customerName || 'Guest';
-            const translatedServices = apt.serviceNames.map(name => translateServiceName(name));
+            // Use the service names as-is without translation
+            const translatedServices = apt.serviceNames;
             document.getElementById('modal-services').textContent = translatedServices.join(', ');
 
             // Add barber name
@@ -8755,7 +8410,12 @@
                         }
                     });
 
-                    SharedData.updateBarber(window.currentBarberId, { services: Object.keys(services) });
+                    // Convert services to proper boolean mapping for barber update
+                    const serviceAssignment = {};
+                    Object.keys(services).forEach(id => {
+                        serviceAssignment[id] = services[id].enabled || false;
+                    });
+                    SharedData.updateBarber(window.currentBarberId, { services: serviceAssignment });
                     // Show save message
                     showServiceSaveMessage();
                 } else {
@@ -8763,7 +8423,12 @@
                     originalSaveServices();
                     // Also update owner barber
                     const services = SharedData.getServices();
-                    SharedData.updateBarber('owner', { services: Object.keys(services) });
+                    // Convert services to proper format (object with boolean values)
+                    const serviceAssignment = {};
+                    Object.keys(services).forEach(id => {
+                        serviceAssignment[id] = true;
+                    });
+                    SharedData.updateBarber('owner', { services: serviceAssignment });
                 }
             };
 

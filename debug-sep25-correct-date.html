@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Sep 25 - With Correct Date</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .section { border: 2px solid #333; padding: 15px; margin: 15px 0; }
+        .error { color: red; font-weight: bold; }
+        .success { color: green; font-weight: bold; }
+        .warning { color: orange; }
+        pre { background: #f4f4f4; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Debug: Why Sep 25, 2025 Shows No Available Slots</h1>
+    <h2>Current Date: September 23, 2025 @ 8:37 PM</h2>
+    <div id="results"></div>
+
+    <script>
+        async function debugSep25() {
+            const results = document.getElementById('results');
+
+            // Wait for SharedData to initialize
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            // CORRECT current date and time
+            const actualToday = new Date(2025, 8, 23, 20, 37); // Sep 23, 2025, 8:37 PM
+            const testDate = new Date(2025, 8, 25); // Sep 25, 2025 (Thursday)
+
+            results.innerHTML = `
+                <div class="section">
+                    <h2>Date Information</h2>
+                    <p>Actual Current Date: ${actualToday.toString()}</p>
+                    <p>Test Date (Sep 25): ${testDate.toString()}</p>
+                    <p>Day of Week: ${testDate.toLocaleDateString('en-US', { weekday: 'long' })}</p>
+                    <p>Days from now: ${Math.floor((testDate - actualToday) / (1000 * 60 * 60 * 24))} days</p>
+                </div>
+            `;
+
+            // Check what JavaScript thinks today is
+            const jsToday = new Date();
+            results.innerHTML += `
+                <div class="section">
+                    <h2>JavaScript Date Detection</h2>
+                    <p>What JS thinks today is: ${jsToday.toString()}</p>
+                    <p class="warning">If this is wrong, the system is using incorrect date!</p>
+                </div>
+            `;
+
+            // Check store hours
+            const storeHours = SharedData.getStoreHours();
+            const thursdayHours = storeHours.thursday;
+
+            results.innerHTML += `
+                <div class="section">
+                    <h2>Store Hours for Thursday</h2>
+                    <pre>${JSON.stringify(thursdayHours, null, 2)}</pre>
+                    <p>Is Closed? ${thursdayHours.closed ? '<span class="error">YES - CLOSED</span>' : '<span class="success">No - Open</span>'}</p>
+                </div>
+            `;
+
+            // Check booking policies with CORRECT date
+            const policies = SharedData.getBookingPolicies();
+            const hoursUntilSep25 = (testDate - actualToday) / (1000 * 60 * 60);
+
+            results.innerHTML += `
+                <div class="section">
+                    <h2>Booking Policies Check</h2>
+                    <p>Min booking hours: ${policies.minBookingHours} hours</p>
+                    <p>Hours until Sep 25: ${hoursUntilSep25.toFixed(1)} hours</p>
+                    <p>Meets minimum notice? ${hoursUntilSep25 >= policies.minBookingHours ?
+                        '<span class="success">YES</span>' :
+                        '<span class="error">NO - Too soon</span>'}</p>
+                    <p>Max booking days: ${policies.maxBookingDays} days</p>
+                    <p>Within max range? <span class="success">YES (only 2 days away)</span></p>
+                </div>
+            `;
+
+            // Test slot generation
+            results.innerHTML += `<div class="section"><h2>Testing Slot Generation</h2>`;
+
+            try {
+                const slots = SharedData.getAvailableSlots(testDate, 30); // 30 min service
+
+                if (slots.length === 0) {
+                    results.innerHTML += `<p class="error">❌ No slots returned for Sep 25!</p>`;
+
+                    // Debug why
+                    if (!thursdayHours || thursdayHours.closed) {
+                        results.innerHTML += `<p>Reason: Store is closed on Thursdays</p>`;
+                    } else {
+                        results.innerHTML += `<p>Unexpected - store should have slots!</p>`;
+
+                        // Manual calculation
+                        const openMin = SharedData.timeToMinutes(thursdayHours.open);
+                        const closeMin = SharedData.timeToMinutes(thursdayHours.close);
+                        const expectedSlots = Math.floor((closeMin - openMin - 30) / 15) + 1;
+
+                        results.innerHTML += `
+                            <p>Expected approximately ${expectedSlots} slots</p>
+                            <p>Open: ${thursdayHours.open} (${openMin} min)</p>
+                            <p>Close: ${thursdayHours.close} (${closeMin} min)</p>
+                        `;
+                    }
+                } else {
+                    results.innerHTML += `<p class="success">✅ ${slots.length} slots available</p>`;
+                    results.innerHTML += `<p>First: ${slots[0]}, Last: ${slots[slots.length - 1]}</p>`;
+                }
+            } catch (error) {
+                results.innerHTML += `<p class="error">Error: ${error.message}</p>`;
+            }
+
+            results.innerHTML += `</div>`;
+
+            // Check customer-app date filtering
+            results.innerHTML += `
+                <div class="section">
+                    <h2>Customer App Date Filtering</h2>
+                    <p>The customer app might be filtering dates incorrectly.</p>
+                    <p>It should allow booking Sep 25 since it's only 2 days away.</p>
+                </div>
+            `;
+
+            // Final diagnosis
+            results.innerHTML += `
+                <div class="section" style="background: #ffffcc;">
+                    <h2>Diagnosis</h2>
+            `;
+
+            if (thursdayHours.closed) {
+                results.innerHTML += `<p class="error">Store is CLOSED on Thursdays - that's the issue!</p>`;
+            } else if (jsToday.getFullYear() !== 2025 || jsToday.getMonth() !== 8) {
+                results.innerHTML += `<p class="error">System is using wrong date! It thinks today is ${jsToday.toDateString()} instead of Sep 23, 2025</p>`;
+            } else {
+                results.innerHTML += `<p class="success">Store should show slots for Sep 25. Need to check customer app date logic.</p>`;
+            }
+
+            results.innerHTML += `</div>`;
+        }
+
+        debugSep25();
+    </script>
+</body>
+</html>

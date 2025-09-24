@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Trace Slot Display Issue</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .section { border: 1px solid #ddd; padding: 15px; margin: 10px 0; }
+        .error { color: red; font-weight: bold; }
+        .success { color: green; }
+        .warning { color: orange; }
+        pre { background: #f4f4f4; padding: 10px; }
+        .time-slot {
+            display: inline-block;
+            padding: 8px 16px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .time-slot.unavailable {
+            background: #f5f5f5;
+            color: #999;
+            cursor: not-allowed;
+        }
+        .time-slot.invalid {
+            background: #ffebee;
+            color: #f44336;
+            border-color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <h1>Trace Slot Display Issue</h1>
+
+    <div class="section">
+        <h2>Test Parameters</h2>
+        <p>Date: Wednesday, Sep 24, 2025</p>
+        <p>Service: Men's Cut (30 minutes)</p>
+        <p>Store Hours: 9:00 AM - 6:00 PM</p>
+        <p>Expected last slot: 5:30 PM</p>
+    </div>
+
+    <div id="raw-slots" class="section">
+        <h2>1. Raw Slots from SharedData.getAvailableSlots()</h2>
+        <div id="raw-slots-content"></div>
+    </div>
+
+    <div id="filtered-slots" class="section">
+        <h2>2. After Filtering (as done in customer-app.html)</h2>
+        <div id="filtered-slots-content"></div>
+    </div>
+
+    <div id="display-slots" class="section">
+        <h2>3. Final Display (with unavailable marking)</h2>
+        <div id="display-slots-content"></div>
+    </div>
+
+    <script>
+        async function traceSlots() {
+            // Wait for SharedData
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            const testDate = new Date(2025, 8, 24); // Sep 24, 2025
+            const serviceDuration = 30;
+            const selectedServices = ['mens-cut']; // Simulate selection
+
+            // Step 1: Get raw slots
+            const rawSlots = SharedData.getAvailableSlots(testDate, serviceDuration);
+            const rawContent = document.getElementById('raw-slots-content');
+
+            rawContent.innerHTML = `<p>Total slots returned: ${rawSlots.length}</p>`;
+            rawContent.innerHTML += `<p>Last 10 slots: ${rawSlots.slice(-10).join(', ')}</p>`;
+
+            // Check for invalid slots
+            const closeMinutes = 18 * 60; // 6 PM
+            const lastValidMinutes = closeMinutes - serviceDuration;
+
+            rawSlots.forEach(slot => {
+                const slotMinutes = SharedData.timeToMinutes(slot);
+                if (slotMinutes > lastValidMinutes) {
+                    rawContent.innerHTML += `<p class="error">❌ Invalid slot found: ${slot} (${slotMinutes} minutes > ${lastValidMinutes} minutes)</p>`;
+                }
+            });
+
+            // Step 2: Apply filtering (simulate customer-app.html logic)
+            const now = new Date();
+            const minBookingTime = new Date();
+            minBookingTime.setHours(minBookingTime.getHours() + 2); // Default 2 hours notice
+
+            let filteredSlots = rawSlots;
+
+            // Since test date is in future, no filtering for past times
+            const isToday = false;
+
+            const filteredContent = document.getElementById('filtered-slots-content');
+            filteredContent.innerHTML = `<p>Slots after filtering: ${filteredSlots.length}</p>`;
+            filteredContent.innerHTML += `<p>Last 10 slots: ${filteredSlots.slice(-10).join(', ')}</p>`;
+
+            // Step 3: Display with availability check (simulate final display)
+            const displayContent = document.getElementById('display-slots-content');
+
+            filteredSlots.forEach(time => {
+                const slot = document.createElement('div');
+                slot.className = 'time-slot';
+
+                // Format time
+                const [hours, minutes] = time.split(':').map(Number);
+                const period = hours >= 12 ? 'PM' : 'AM';
+                const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+                const displayTime = `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+                slot.textContent = displayTime;
+
+                // Check if enough time remains
+                const slotMinutes = hours * 60 + minutes;
+                const endMinutes = slotMinutes + serviceDuration;
+
+                if (slotMinutes > lastValidMinutes) {
+                    slot.classList.add('invalid');
+                    slot.title = 'This slot should not exist!';
+                } else if (endMinutes > closeMinutes) {
+                    slot.classList.add('unavailable');
+                    slot.title = 'Not enough time remaining';
+                }
+
+                displayContent.appendChild(slot);
+            });
+
+            // Summary
+            const invalidCount = filteredSlots.filter(slot => {
+                const min = SharedData.timeToMinutes(slot);
+                return min > lastValidMinutes;
+            }).length;
+
+            if (invalidCount > 0) {
+                displayContent.innerHTML = `<p class="error">❌ ERROR: ${invalidCount} slots are past 5:30 PM!</p>` + displayContent.innerHTML;
+            } else {
+                displayContent.innerHTML = `<p class="success">✓ All slots are valid (none past 5:30 PM)</p>` + displayContent.innerHTML;
+            }
+        }
+
+        traceSlots();
+    </script>
+</body>
+</html>

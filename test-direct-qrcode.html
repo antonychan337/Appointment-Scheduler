@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Direct QRCode Loading</title>
+</head>
+<body>
+    <h1>Testing QRCode Library Loading</h1>
+
+    <h2>Test 1: Using unpkg CDN with .js extension</h2>
+    <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.js"></script>
+    <canvas id="canvas1"></canvas>
+    <div id="status1"></div>
+
+    <h2>Test 2: Using different CDN</h2>
+    <canvas id="canvas2"></canvas>
+    <div id="status2"></div>
+
+    <h2>Test 3: Using standalone QRCode.js library</h2>
+    <div id="qrcode3"></div>
+    <div id="status3"></div>
+
+    <script>
+        // Wait a moment for scripts to load
+        setTimeout(() => {
+            // Test 1
+            const status1 = document.getElementById('status1');
+            if (typeof QRCode !== 'undefined') {
+                status1.innerHTML = '✅ QRCode loaded from unpkg';
+                console.log('QRCode object:', QRCode);
+
+                if (QRCode.toCanvas) {
+                    QRCode.toCanvas(document.getElementById('canvas1'), 'https://test.com', (error) => {
+                        if (error) {
+                            status1.innerHTML += '<br>❌ Error: ' + error;
+                        } else {
+                            status1.innerHTML += '<br>✅ QR Code generated!';
+                        }
+                    });
+                } else {
+                    status1.innerHTML += '<br>❌ toCanvas method not found';
+                }
+            } else {
+                status1.innerHTML = '❌ QRCode not loaded';
+
+                // Try loading with a different approach
+                const script2 = document.createElement('script');
+                script2.src = 'https://cdn.jsdelivr.net/npm/qrcode@latest/build/qrcode.js';
+                script2.onload = () => {
+                    const status2 = document.getElementById('status2');
+                    if (typeof QRCode !== 'undefined') {
+                        status2.innerHTML = '✅ QRCode loaded from jsdelivr';
+                        QRCode.toCanvas(document.getElementById('canvas2'), 'https://test.com', (error) => {
+                            if (error) {
+                                status2.innerHTML += '<br>❌ Error: ' + error;
+                            } else {
+                                status2.innerHTML += '<br>✅ QR Code generated!';
+                            }
+                        });
+                    } else {
+                        status2.innerHTML = '❌ QRCode still not loaded';
+                    }
+                };
+                script2.onerror = () => {
+                    document.getElementById('status2').innerHTML = '❌ Failed to load from jsdelivr';
+                };
+                document.head.appendChild(script2);
+            }
+
+            // Test 3: Try qrcode-generator library as alternative
+            const script3 = document.createElement('script');
+            script3.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+            script3.onload = () => {
+                const status3 = document.getElementById('status3');
+                try {
+                    new QRCode(document.getElementById("qrcode3"), {
+                        text: "https://test.com",
+                        width: 128,
+                        height: 128
+                    });
+                    status3.innerHTML = '✅ Alternative QRCodeJS library works!';
+                } catch (e) {
+                    status3.innerHTML = '❌ Error with alternative library: ' + e.message;
+                }
+            };
+            script3.onerror = () => {
+                document.getElementById('status3').innerHTML = '❌ Failed to load alternative library';
+            };
+            document.head.appendChild(script3);
+
+        }, 1000);
+    </script>
+</body>
+</html>

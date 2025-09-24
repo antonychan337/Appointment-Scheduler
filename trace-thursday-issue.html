@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Trace Thursday Issue</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .error { color: red; font-weight: bold; }
+        .success { color: green; font-weight: bold; }
+        .warning { color: orange; font-weight: bold; }
+        .step { border: 2px solid #333; padding: 15px; margin: 15px 0; }
+        pre { background: #f4f4f4; padding: 10px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Trace: Why Thursday Shows No Time Slots</h1>
+    <div id="results"></div>
+
+    <script>
+        async function traceIssue() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h2>Starting Trace...</h2>';
+
+            // Wait for initialization
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            // Step 1: Check what onDateSelected sees for Thursday
+            results.innerHTML += '<div class="step"><h3>Step 1: What Date Selection Sees</h3>';
+
+            const testDate = new Date(2025, 8, 25); // Sep 25, 2025
+            const dayName = testDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+
+            results.innerHTML += '<p>Date: ' + testDate.toString() + '</p>';
+            results.innerHTML += '<p>Day name: ' + dayName + '</p>';
+
+            // Simulate what onDateSelected does
+            let storeHours;
+            try {
+                storeHours = SharedData.getStoreHours();
+            } catch (e) {
+                storeHours = {
+                    monday: { open: '09:00', close: '18:00', closed: false },
+                    tuesday: { open: '09:00', close: '18:00', closed: false },
+                    wednesday: { open: '09:00', close: '18:00', closed: false },
+                    thursday: { open: '09:00', close: '18:00', closed: false },
+                    friday: { open: '09:00', close: '20:00', closed: false },
+                    saturday: { open: '10:00', close: '17:00', closed: false },
+                    sunday: { open: '', close: '', closed: true }
+                };
+            }
+
+            const dayHours = storeHours[dayName];
+            const isClosed = !dayHours || dayHours.closed;
+
+            results.innerHTML += '<p>Store hours for Thursday: <pre>' + JSON.stringify(dayHours, null, 2) + '</pre></p>';
+            results.innerHTML += '<p>Is closed check (!dayHours || dayHours.closed): ' + isClosed + '</p>';
+
+            if (!isClosed) {
+                results.innerHTML += '<p class="success">✅ Date selection sees Thursday as OPEN</p>';
+            } else {
+                results.innerHTML += '<p class="error">❌ Date selection sees Thursday as CLOSED</p>';
+            }
+
+            results.innerHTML += '</div>';
+
+            // Step 2: Check what generateTimeSlots does
+            results.innerHTML += '<div class="step"><h3>Step 2: What generateTimeSlots Does</h3>';
+
+            // Simulate the service selection
+            const selectedServices = ['mens-cut']; // Simulate selecting men's cut
+            const services = SharedData.getServices();
+            const totalDuration = 30; // Men's cut is 30 minutes
+
+            results.innerHTML += '<p>Selected services: ' + selectedServices.join(', ') + '</p>';
+            results.innerHTML += '<p>Total duration: ' + totalDuration + ' minutes</p>';
+
+            // Now simulate the slot generation
+            let availableSlots;
+            try {
+                results.innerHTML += '<p>Calling SharedData.getAvailableSlots(' + testDate + ', ' + totalDuration + ', null)</p>';
+                availableSlots = SharedData.getAvailableSlots(testDate, totalDuration, null);
+                results.innerHTML += '<p>Returned slots: ' + availableSlots.length + '</p>';
+            } catch (e) {
+                results.innerHTML += '<p class="error">Error calling getAvailableSlots: ' + e.message + '</p>';
+                availableSlots = [];
+            }
+
+            if (availableSlots.length === 0) {
+                results.innerHTML += '<p class="error">❌ generateTimeSlots gets 0 slots from SharedData.getAvailableSlots</p>';
+            } else {
+                results.innerHTML += '<p class="success">✅ generateTimeSlots gets ' + availableSlots.length + ' slots</p>';
+            }
+
+            results.innerHTML += '</div>';
+
+            // Step 3: Deep dive into getAvailableSlots
+            results.innerHTML += '<div class="step"><h3>Step 3: Inside getAvailableSlots</h3>';
+
+            // Get the hours that getAvailableSlots would use
+            let hours = SharedData.getStoreHours();
+            const getAvailableSlotsHours = hours[dayName];
+
+            results.innerHTML += '<p>getStoreHours() returns:</p>';
+            results.innerHTML += '<pre>' + JSON.stringify(hours, null, 2) + '</pre>';
+            results.innerHTML += '<p>Thursday from getStoreHours: <pre>' + JSON.stringify(getAvailableSlotsHours, null, 2) + '</pre></p>';
+
+            if (!getAvailableSlotsHours) {
+                results.innerHTML += '<p class="error">❌ getAvailableSlotsHours is undefined/null!</p>';
+            } else if (getAvailableSlotsHours.closed) {
+                results.innerHTML += '<p class="error">❌ getAvailableSlotsHours.closed is true!</p>';
+            } else {
+                results.innerHTML += '<p class="success">✅ Thursday should be open</p>';
+
+                // Check the time conversion
+                const openMinutes = SharedData.timeToMinutes(getAvailableSlotsHours.open);
+                const closeMinutes = SharedData.timeToMinutes(getAvailableSlotsHours.close);
+                const lastValidSlot = closeMinutes - totalDuration;
+
+                results.innerHTML += '<p>Open minutes: ' + openMinutes + '</p>';
+                results.innerHTML += '<p>Close minutes: ' + closeMinutes + '</p>';
+                results.innerHTML += '<p>Last valid slot: ' + lastValidSlot + '</p>';
+
+                if (openMinutes >= lastValidSlot) {
+                    results.innerHTML += '<p class="error">❌ No valid slots because openMinutes >= lastValidSlot!</p>';
+                } else {
+                    results.innerHTML += '<p>Should generate slots from ' + openMinutes + ' to ' + lastValidSlot + '</p>';
+                }
+            }
+
+            results.innerHTML += '</div>';
+
+            // Step 4: Check different data sources
+            results.innerHTML += '<div class="step"><h3>Step 4: Compare Data Sources</h3>';
+
+            // Check localStorage
+            const localStoreHours = localStorage.getItem('storeHours');
+            if (localStoreHours) {
+                const parsed = JSON.parse(localStoreHours);
+                results.innerHTML += '<p>localStorage storeHours Thursday: <pre>' + JSON.stringify(parsed.thursday, null, 2) + '</pre></p>';
+            } else {
+                results.innerHTML += '<p>No storeHours in localStorage</p>';
+            }
+
+            // Check cache
+            results.innerHTML += '<p>SharedData.storeHoursCache: ' + (SharedData.storeHoursCache ? 'EXISTS' : 'NULL') + '</p>';
+            if (SharedData.storeHoursCache) {
+                results.innerHTML += '<p>Cache Thursday: <pre>' + JSON.stringify(SharedData.storeHoursCache.thursday, null, 2) + '</pre></p>';
+            }
+
+            // Check defaults
+            results.innerHTML += '<p>Default Thursday: <pre>' + JSON.stringify(SharedData.defaultStoreHours.thursday, null, 2) + '</pre></p>';
+
+            results.innerHTML += '</div>';
+
+            // Step 5: Force fix
+            results.innerHTML += '<div class="step"><h3>Step 5: Attempted Fix</h3>';
+
+            results.innerHTML += '<button onclick="forceFix()">Force Fix Thursday Hours</button>';
+            results.innerHTML += '<div id="fix-results"></div>';
+
+            results.innerHTML += '</div>';
+        }
+
+        async function forceFix() {
+            const fixResults = document.getElementById('fix-results');
+            fixResults.innerHTML = '<p>Applying fix...</p>';
+
+            // Force set Thursday as open in all places
+            const thursdayOpen = {
+                open: '09:00',
+                close: '18:00',
+                closed: false
+            };
+
+            // Update cache
+            if (!SharedData.storeHoursCache) {
+                SharedData.storeHoursCache = SharedData.defaultStoreHours;
+            }
+            SharedData.storeHoursCache.thursday = thursdayOpen;
+
+            // Update defaults
+            SharedData.defaultStoreHours.thursday = thursdayOpen;
+
+            // Update localStorage
+            const stored = localStorage.getItem('storeHours');
+            if (stored) {
+                const hours = JSON.parse(stored);
+                hours.thursday = thursdayOpen;
+                localStorage.setItem('storeHours', JSON.stringify(hours));
+            }
+
+            // Save to database
+            await SharedData.saveStoreHours(SharedData.storeHoursCache);
+
+            // Test again
+            const testDate = new Date(2025, 8, 25);
+            const slots = SharedData.getAvailableSlots(testDate, 30);
+
+            fixResults.innerHTML = '<p class="success">✅ Force set Thursday as open</p>';
+            fixResults.innerHTML += '<p>Testing Sep 25 again: ' + slots.length + ' slots</p>';
+
+            if (slots.length > 0) {
+                fixResults.innerHTML += '<p class="success">✅ FIXED! Thursday now has slots.</p>';
+                fixResults.innerHTML += '<button onclick="window.open(\'customer-app.html\', \'_blank\')">Open Customer App</button>';
+            } else {
+                fixResults.innerHTML += '<p class="error">Still not working. Check console for errors.</p>';
+            }
+        }
+
+        traceIssue();
+    </script>
+</body>
+</html>

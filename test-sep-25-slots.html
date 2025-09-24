@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Sep 25 Availability</title>
+    <script src="shared-data.js"></script>
+    <script src="supabase-bridge.js"></script>
+</head>
+<body>
+    <h1>Testing Sep 25 (Thursday) Availability</h1>
+    <div id="results"></div>
+
+    <script>
+        async function testAvailability() {
+            const results = document.getElementById('results');
+
+            // Test date: Sep 25, 2025 (Thursday)
+            const testDate = new Date('2025-09-25');
+            const dayName = testDate.toLocaleDateString('en-US', { weekday: 'long' });
+
+            results.innerHTML = `<h2>Testing ${dayName}, Sep 25, 2025</h2>`;
+
+            // Get store hours
+            const storeHours = SharedData.getStoreHours();
+            const thursdayHours = storeHours.thursday;
+
+            results.innerHTML += `
+                <p><strong>Store Hours for Thursday:</strong></p>
+                <pre>${JSON.stringify(thursdayHours, null, 2)}</pre>
+            `;
+
+            // Test with 30-minute service (Men's Cut)
+            const serviceDuration = 30;
+            results.innerHTML += `<p><strong>Testing with ${serviceDuration}-minute service:</strong></p>`;
+
+            // Get available slots
+            try {
+                const availableSlots = SharedData.getAvailableSlots(testDate, serviceDuration);
+
+                if (availableSlots.length === 0) {
+                    results.innerHTML += `<p style="color: red;">❌ No available slots returned!</p>`;
+
+                    // Debug: Manual calculation
+                    const openMinutes = 9 * 60; // 9:00 AM
+                    const closeMinutes = 18 * 60; // 6:00 PM
+                    const lastValidSlot = closeMinutes - serviceDuration; // 5:30 PM
+
+                    results.innerHTML += `
+                        <p><strong>Debug Info:</strong></p>
+                        <ul>
+                            <li>Open time: 9:00 AM (${openMinutes} minutes)</li>
+                            <li>Close time: 6:00 PM (${closeMinutes} minutes)</li>
+                            <li>Last valid slot: ${lastValidSlot / 60}:${(lastValidSlot % 60).toString().padStart(2, '0')} (${lastValidSlot} minutes)</li>
+                            <li>Expected slots: ${Math.floor((lastValidSlot - openMinutes) / 15) + 1} slots</li>
+                        </ul>
+                    `;
+
+                    // Test the loop condition
+                    let testSlots = [];
+                    for (let minutes = openMinutes; minutes < closeMinutes && minutes <= lastValidSlot; minutes += 15) {
+                        const hour = Math.floor(minutes / 60);
+                        const min = minutes % 60;
+                        testSlots.push(`${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`);
+                    }
+
+                    results.innerHTML += `
+                        <p><strong>Manual calculation results:</strong></p>
+                        <p>${testSlots.length} slots: ${testSlots.slice(0, 5).join(', ')}... ${testSlots.slice(-3).join(', ')}</p>
+                    `;
+
+                } else {
+                    results.innerHTML += `
+                        <p style="color: green;">✅ ${availableSlots.length} slots available</p>
+                        <p><strong>First 5 slots:</strong> ${availableSlots.slice(0, 5).join(', ')}</p>
+                        <p><strong>Last 3 slots:</strong> ${availableSlots.slice(-3).join(', ')}</p>
+                    `;
+
+                    // Verify last slot is correct
+                    const lastSlot = availableSlots[availableSlots.length - 1];
+                    const [hours, minutes] = lastSlot.split(':').map(Number);
+                    const slotEndMinutes = hours * 60 + minutes + serviceDuration;
+                    const closeMinutes = 18 * 60;
+
+                    if (slotEndMinutes > closeMinutes) {
+                        results.innerHTML += `<p style="color: red;">❌ ERROR: Last slot ${lastSlot} ends at ${Math.floor(slotEndMinutes/60)}:${(slotEndMinutes%60).toString().padStart(2, '0')}, after closing time!</p>`;
+                    } else {
+                        results.innerHTML += `<p style="color: green;">✅ Last slot ${lastSlot} ends at ${Math.floor(slotEndMinutes/60)}:${(slotEndMinutes%60).toString().padStart(2, '0')}, before closing time</p>`;
+                    }
+                }
+
+            } catch (error) {
+                results.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+                console.error('Full error:', error);
+            }
+
+            // Also test in customer-app context
+            results.innerHTML += `<h3>Testing in Customer App Context</h3>`;
+
+            // Check if it's being filtered by booking policies
+            const bookingPolicies = SharedData.getBookingPolicies();
+            results.innerHTML += `<p><strong>Booking Policies:</strong></p>`;
+            results.innerHTML += `<pre>${JSON.stringify(bookingPolicies, null, 2)}</pre>`;
+
+            // Check current date/time
+            const now = new Date();
+            results.innerHTML += `<p><strong>Current Date/Time:</strong> ${now.toString()}</p>`;
+            results.innerHTML += `<p><strong>Test Date:</strong> ${testDate.toString()}</p>`;
+            results.innerHTML += `<p><strong>Days until Sep 25:</strong> ${Math.floor((testDate - now) / (24 * 60 * 60 * 1000))} days</p>`;
+
+            // Check if date might be in the past (system date issue)
+            if (testDate < now) {
+                results.innerHTML += `<p style="color: red;">⚠️ WARNING: Sep 25, 2025 appears to be in the past according to system time!</p>`;
+            }
+        }
+
+        // Run test on load
+        testAvailability();
+    </script>
+</body>
+</html>

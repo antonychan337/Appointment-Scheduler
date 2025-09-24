@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS services (
     id TEXT PRIMARY KEY,
     shop_id UUID REFERENCES shops(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
+    name_en TEXT,
     name_zh TEXT,
     duration INTEGER NOT NULL,
     price NUMERIC(10,2) NOT NULL,
@@ -99,6 +100,9 @@ CREATE TABLE IF NOT EXISTS services (
 );
 
 -- Add any missing columns to existing services table
+ALTER TABLE services
+ADD COLUMN IF NOT EXISTS name_en TEXT;
+
 ALTER TABLE services
 ADD COLUMN IF NOT EXISTS name_zh TEXT;
 

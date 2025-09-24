@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fix Services Issue</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .error { color: red; font-weight: bold; }
+        .success { color: green; font-weight: bold; }
+        .warning { color: orange; font-weight: bold; }
+        button { padding: 10px 20px; margin: 10px; cursor: pointer; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Fix Services Not Showing in Customer App</h1>
+    <div id="diagnosis"></div>
+    <div id="actions"></div>
+    <div id="results"></div>
+
+    <script>
+        async function diagnoseAndFix() {
+            const diagnosis = document.getElementById('diagnosis');
+            const actions = document.getElementById('actions');
+            const results = document.getElementById('results');
+
+            // Wait for initialization
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            diagnosis.innerHTML = '<h2>Diagnosing Issue...</h2>';
+
+            // 1. Check shop context
+            const shopId = SharedData.getCurrentShopId() || localStorage.getItem('supabase_shop_id');
+            diagnosis.innerHTML += `<p>Shop ID: <strong>${shopId || 'NOT SET'}</strong></p>`;
+
+            if (!shopId) {
+                diagnosis.innerHTML += '<p class="error">❌ No shop ID set!</p>';
+                actions.innerHTML = `
+                    <h2>Fix: Set Shop ID</h2>
+                    <p>Enter your shop ID:</p>
+                    <input type="text" id="shopIdInput" placeholder="Enter shop ID">
+                    <button onclick="setShopId()">Set Shop ID</button>
+                `;
+                return;
+            }
+
+            // 2. Check and initialize SharedData properly
+            if (!SharedData.barbersCache || SharedData.barbersCache.length === 0) {
+                diagnosis.innerHTML += '<p class="warning">⚠️ Barbers cache not loaded, loading now...</p>';
+                await SharedData.initialize();
+                SharedData.barbersCache = await SharedData.getBarbers();
+            }
+
+            // 3. Check barbers
+            const barbers = await SharedData.getBarbers();
+            diagnosis.innerHTML += `<p>Number of barbers: <strong>${barbers.length}</strong></p>`;
+
+            if (barbers.length === 0) {
+                diagnosis.innerHTML += '<p class="error">❌ No barbers found!</p>';
+                actions.innerHTML = `
+                    <h2>Fix: Create Default Barber</h2>
+                    <button onclick="createDefaultBarber()">Create Owner Barber</button>
+                `;
+                return;
+            }
+
+            // Show barber details
+            const firstBarber = barbers[0];
+            diagnosis.innerHTML += `<p>First barber: <strong>${firstBarber.name}</strong> (ID: ${firstBarber.id})</p>`;
+            diagnosis.innerHTML += `<p>Barber services: <code>${JSON.stringify(firstBarber.services)}</code></p>`;
+
+            // 4. Check services
+            let services = SharedData.getServices();
+
+            // If no services in cache, try loading
+            if (!services || Object.keys(services).length === 0) {
+                diagnosis.innerHTML += '<p class="warning">⚠️ No services in cache, loading...</p>';
+                await SharedData.loadServices();
+                services = SharedData.getServices();
+            }
+
+            diagnosis.innerHTML += `<p>Number of services: <strong>${Object.keys(services).length}</strong></p>`;
+
+            if (Object.keys(services).length === 0) {
+                diagnosis.innerHTML += '<p class="error">❌ No services configured!</p>';
+                actions.innerHTML = `
+                    <h2>Fix: Create Default Services</h2>
+                    <button onclick="createDefaultServices()">Create Default Services</button>
+                `;
+                return;
+            }
+
+            // Show service details
+            diagnosis.innerHTML += '<h3>Available Services:</h3><ul>';
+            Object.entries(services).forEach(([id, service]) => {
+                diagnosis.innerHTML += `<li>${service.name} - $${service.price}, ${service.duration}min (enabled: ${service.enabled})</li>`;
+            });
+            diagnosis.innerHTML += '</ul>';
+
+            // 5. Check if barber has services assigned
+            const barberServiceIds = Array.isArray(firstBarber.services)
+                ? firstBarber.services
+                : (firstBarber.services ? Object.keys(firstBarber.services).filter(id => firstBarber.services[id]) : []);
+
+            diagnosis.innerHTML += `<p>Services assigned to barber: <strong>${barberServiceIds.length}</strong></p>`;
+
+            if (barberServiceIds.length === 0) {
+                diagnosis.innerHTML += '<p class="error">❌ Barber has no services assigned!</p>';
+                actions.innerHTML = `
+                    <h2>Fix: Assign All Services to Barber</h2>
+                    <button onclick="assignServicesToBarber('${firstBarber.id}')">Assign All Services to ${firstBarber.name}</button>
+                `;
+                return;
+            }
+
+            // If we get here, everything should work
+            diagnosis.innerHTML += '<p class="success">✅ Everything looks correct!</p>';
+            diagnosis.innerHTML += '<p>Services should be showing in the customer app.</p>';
+
+            actions.innerHTML = `
+                <h2>Actions:</h2>
+                <button onclick="openCustomerApp()">Open Customer App</button>
+                <button onclick="forceRefresh()">Force Refresh All Data</button>
+            `;
+        }
+
+        async function setShopId() {
+            const shopId = document.getElementById('shopIdInput').value;
+            if (shopId) {
+                SharedData.setCurrentShopId(shopId);
+                localStorage.setItem('supabase_shop_id', shopId);
+                localStorage.setItem('customer_shop_id', shopId);
+                alert('Shop ID set! Refreshing...');
+                location.reload();
+            }
+        }
+
+        async function createDefaultBarber() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Creating owner barber...</p>';
+
+            // Create a default owner barber
+            const barberId = await SharedData.addBarber('Owner', null);
+
+            if (barberId) {
+                results.innerHTML = '<p class="success">✅ Owner barber created!</p>';
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                results.innerHTML = '<p class="error">Failed to create barber</p>';
+            }
+        }
+
+        async function createDefaultServices() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Creating default services...</p>';
+
+            // Save default services
+            await SharedData.saveServices(SharedData.defaultServices);
+
+            results.innerHTML = '<p class="success">✅ Default services created!</p>';
+            setTimeout(() => location.reload(), 1000);
+        }
+
+        async function assignServicesToBarber(barberId) {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Assigning services to barber...</p>';
+
+            // Get all services
+            const services = SharedData.getServices();
+            const serviceObj = {};
+
+            // Create object with all services set to true
+            Object.keys(services).forEach(id => {
+                serviceObj[id] = true;
+            });
+
+            // Update barber with services
+            const success = await SharedData.updateBarber(barberId, {
+                services: serviceObj
+            });
+
+            if (success) {
+                results.innerHTML = '<p class="success">✅ Services assigned to barber!</p>';
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                results.innerHTML = '<p class="error">Failed to assign services</p>';
+            }
+        }
+
+        function openCustomerApp() {
+            window.open('customer-app.html', '_blank');
+        }
+
+        async function forceRefresh() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Force refreshing all data...</p>';
+
+            // Clear caches
+            SharedData.barbersCache = [];
+            SharedData.servicesCache = {};
+
+            // Reinitialize
+            await SharedData.initialize();
+
+            results.innerHTML = '<p class="success">✅ Data refreshed!</p>';
+            setTimeout(() => location.reload(), 1000);
+        }
+
+        // Run diagnosis on load
+        diagnoseAndFix();
+    </script>
+</body>
+</html>

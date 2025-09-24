@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Slot Generation</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-case { border: 1px solid #ddd; padding: 15px; margin: 10px 0; }
+        .success { color: green; }
+        .error { color: red; }
+        pre { background: #f4f4f4; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Testing Slot Generation for Sep 24 (Wednesday)</h1>
+    <div id="results"></div>
+
+    <script>
+        async function testSlotGeneration() {
+            const results = document.getElementById('results');
+
+            // Wait for SharedData to initialize
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Test date: Sep 24, 2025 (Wednesday)
+            const testDate = new Date(2025, 8, 24); // Month is 0-indexed
+            const serviceDuration = 30; // Men's Cut
+
+            results.innerHTML = '<h2>Test Date: Wednesday, Sep 24, 2025</h2>';
+
+            // Get store hours
+            const storeHours = SharedData.getStoreHours();
+            results.innerHTML += `
+                <div class="test-case">
+                    <h3>Store Hours for Wednesday:</h3>
+                    <pre>${JSON.stringify(storeHours.wednesday, null, 2)}</pre>
+                </div>
+            `;
+
+            // Test SharedData.getAvailableSlots
+            results.innerHTML += '<div class="test-case"><h3>Testing SharedData.getAvailableSlots()</h3>';
+
+            try {
+                const slots = SharedData.getAvailableSlots(testDate, serviceDuration);
+
+                if (slots.length === 0) {
+                    results.innerHTML += '<p class="error">❌ No slots returned!</p>';
+                } else {
+                    results.innerHTML += `<p class="success">✅ ${slots.length} slots returned</p>`;
+                    results.innerHTML += `<p><strong>First 3 slots:</strong> ${slots.slice(0, 3).join(', ')}</p>`;
+                    results.innerHTML += `<p><strong>Last 3 slots:</strong> ${slots.slice(-3).join(', ')}</p>`;
+
+                    // Check last slot timing
+                    const lastSlot = slots[slots.length - 1];
+                    const [hours, minutes] = lastSlot.split(':').map(Number);
+                    const slotEndMinutes = hours * 60 + minutes + serviceDuration;
+                    const closeMinutes = 18 * 60; // 6:00 PM
+
+                    if (slotEndMinutes > closeMinutes) {
+                        results.innerHTML += `<p class="error">❌ Last slot ${lastSlot} ends at ${Math.floor(slotEndMinutes/60)}:${(slotEndMinutes%60).toString().padStart(2, '0')}, AFTER closing time!</p>`;
+                    } else if (slotEndMinutes === closeMinutes) {
+                        results.innerHTML += `<p class="success">✅ Last slot ${lastSlot} ends exactly at closing time (6:00 PM)</p>`;
+                    } else {
+                        results.innerHTML += `<p class="success">✅ Last slot ${lastSlot} ends before closing time</p>`;
+                    }
+                }
+            } catch (error) {
+                results.innerHTML += `<p class="error">❌ Error: ${error.message}</p>`;
+            }
+
+            results.innerHTML += '</div>';
+
+            // Test the manual calculation
+            results.innerHTML += '<div class="test-case"><h3>Manual Calculation Check</h3>';
+
+            const openMinutes = 9 * 60; // 9:00 AM
+            const closeMinutes = 18 * 60; // 6:00 PM
+            const lastValidSlot = closeMinutes - serviceDuration; // 5:30 PM for 30-min service
+
+            let manualSlots = [];
+            for (let minutes = openMinutes; minutes < closeMinutes && minutes <= lastValidSlot; minutes += 15) {
+                const hour = Math.floor(minutes / 60);
+                const min = minutes % 60;
+                manualSlots.push(`${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`);
+            }
+
+            results.innerHTML += `
+                <p>Open: 9:00 AM (${openMinutes} minutes)</p>
+                <p>Close: 6:00 PM (${closeMinutes} minutes)</p>
+                <p>Service Duration: ${serviceDuration} minutes</p>
+                <p>Last Valid Slot: ${Math.floor(lastValidSlot/60)}:${(lastValidSlot%60).toString().padStart(2, '0')} (${lastValidSlot} minutes)</p>
+                <p><strong>Expected slots:</strong> ${manualSlots.length}</p>
+                <p><strong>Last slot should be:</strong> ${manualSlots[manualSlots.length - 1]}</p>
+            `;
+
+            results.innerHTML += '</div>';
+
+            // Check what condition would generate wrong slots
+            results.innerHTML += '<div class="test-case"><h3>Testing Wrong Condition (for comparison)</h3>';
+
+            let wrongSlots = [];
+            for (let minutes = openMinutes; minutes <= lastValidSlot; minutes += 15) { // Wrong: using <= without checking closeMinutes
+                const hour = Math.floor(minutes / 60);
+                const min = minutes % 60;
+                wrongSlots.push(`${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`);
+            }
+
+            results.innerHTML += `
+                <p class="error">Wrong condition (minutes <= lastValidSlot only) would generate: ${wrongSlots.length} slots</p>
+                <p>Last wrong slot would be: ${wrongSlots[wrongSlots.length - 1]}</p>
+            `;
+
+            results.innerHTML += '</div>';
+        }
+
+        // Run test
+        testSlotGeneration();
+    </script>
+</body>
+</html>

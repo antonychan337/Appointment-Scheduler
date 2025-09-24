@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Thursday Store Hours</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .error { color: red; font-weight: bold; }
+        .success { color: green; font-weight: bold; }
+        .warning { color: orange; font-weight: bold; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Check Thursday Store Hours</h1>
+    <div id="results"></div>
+
+    <script>
+        async function checkThursdayHours() {
+            const results = document.getElementById('results');
+
+            // Wait for SharedData to initialize
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            // Get store hours
+            const storeHours = SharedData.getStoreHours();
+
+            results.innerHTML = '<h2>All Store Hours:</h2>';
+            results.innerHTML += '<pre>' + JSON.stringify(storeHours, null, 2) + '</pre>';
+
+            // Check Thursday specifically
+            const thursdayHours = storeHours.thursday;
+
+            results.innerHTML += '<h2>Thursday Hours:</h2>';
+            results.innerHTML += '<pre>' + JSON.stringify(thursdayHours, null, 2) + '</pre>';
+
+            if (!thursdayHours) {
+                results.innerHTML += '<p class="error">❌ Thursday hours are missing!</p>';
+            } else if (thursdayHours.closed) {
+                results.innerHTML += '<p class="error">❌ Thursday is marked as CLOSED!</p>';
+                results.innerHTML += '<p>This is why September 25th shows no available slots.</p>';
+                results.innerHTML += '<h3>To Fix:</h3>';
+                results.innerHTML += '<ol>';
+                results.innerHTML += '<li>Open the Owner App</li>';
+                results.innerHTML += '<li>Go to Store Hours settings</li>';
+                results.innerHTML += '<li>Make sure Thursday is set to OPEN</li>';
+                results.innerHTML += '<li>Set appropriate opening and closing times (e.g., 9:00 AM - 6:00 PM)</li>';
+                results.innerHTML += '<li>Save the changes</li>';
+                results.innerHTML += '</ol>';
+            } else {
+                results.innerHTML += '<p class="success">✅ Thursday is OPEN</p>';
+                results.innerHTML += `<p>Hours: ${thursdayHours.open} - ${thursdayHours.close}</p>`;
+            }
+
+            // Test slot generation
+            results.innerHTML += '<h2>Testing Slot Generation for Sep 25:</h2>';
+            const testDate = new Date(2025, 8, 25); // Sep 25, 2025
+            const slots = SharedData.getAvailableSlots(testDate, 30);
+
+            if (slots.length === 0) {
+                results.innerHTML += '<p class="error">No slots generated - Store is closed on Thursday</p>';
+            } else {
+                results.innerHTML += `<p class="success">${slots.length} slots would be available if store was open</p>`;
+            }
+        }
+
+        checkThursdayHours();
+    </script>
+</body>
+</html>

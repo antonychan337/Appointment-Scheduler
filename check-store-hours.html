@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Store Hours</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #f5f5f5;
+        }
+        .closed {
+            color: #f44336;
+            font-weight: bold;
+        }
+        .open {
+            color: #4CAF50;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Database Store Hours Check</h1>
+
+    <h2>Raw Database Values</h2>
+    <pre id="raw-data">Loading...</pre>
+
+    <h2>Formatted Store Hours</h2>
+    <table id="hours-table">
+        <thead>
+            <tr>
+                <th>Day</th>
+                <th>Status</th>
+                <th>Open Time</th>
+                <th>Close Time</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody id="hours-body">
+        </tbody>
+    </table>
+
+    <h2>Time Input Test</h2>
+    <p>Test how time inputs behave in your browser:</p>
+    <div>
+        <label>24-hour value "20:00" displays as: </label>
+        <input type="time" value="20:00" readonly>
+    </div>
+    <div style="margin-top: 10px;">
+        <label>24-hour value "08:00" displays as: </label>
+        <input type="time" value="08:00" readonly>
+    </div>
+
+    <script>
+        async function checkHours() {
+            try {
+                await SharedData.initialize();
+
+                // Get raw data from database
+                const shopId = SharedData.getCurrentShopId();
+                const { data, error } = await supabaseClient
+                    .from('shops')
+                    .select('store_hours')
+                    .eq('id', shopId)
+                    .single();
+
+                if (error) {
+                    document.getElementById('raw-data').textContent = 'Error: ' + error.message;
+                    return;
+                }
+
+                // Display raw JSON
+                document.getElementById('raw-data').textContent = JSON.stringify(data.store_hours, null, 2);
+
+                // Display formatted
+                const hours = data.store_hours;
+                const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                const tbody = document.getElementById('hours-body');
+
+                days.forEach(day => {
+                    const dayHours = hours[day];
+                    const row = document.createElement('tr');
+
+                    let notes = '';
+                    if (day === 'thursday' && dayHours.close === '08:00') {
+                        notes = '⚠️ Should be 20:00 (8 PM)';
+                    } else if (day === 'friday' && dayHours.close === '09:00') {
+                        notes = '⚠️ Should be 21:00 (9 PM)';
+                    } else if (day === 'saturday' && dayHours.close === '10:00') {
+                        notes = '⚠️ Should be 22:00 (10 PM)';
+                    }
+
+                    row.innerHTML = `
+                        <td>${day.charAt(0).toUpperCase() + day.slice(1)}</td>
+                        <td class="${dayHours.closed ? 'closed' : 'open'}">
+                            ${dayHours.closed ? 'CLOSED' : 'OPEN'}
+                        </td>
+                        <td>${dayHours.open || '-'}</td>
+                        <td>${dayHours.close || '-'}</td>
+                        <td>${notes}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('raw-data').textContent = 'Error: ' + error.message;
+            }
+        }
+
+        // Run check
+        checkHours();
+    </script>
+</body>
+</html>

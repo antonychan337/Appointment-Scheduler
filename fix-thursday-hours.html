@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fix Thursday Hours</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .error { color: red; font-weight: bold; }
+        .success { color: green; font-weight: bold; }
+        .warning { color: orange; font-weight: bold; }
+        button { padding: 10px 20px; margin: 10px; cursor: pointer; background: #2196F3; color: white; border: none; border-radius: 5px; }
+        button:hover { background: #1976D2; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 5px; }
+        .hours-form { margin: 20px 0; }
+        .hours-form input { padding: 5px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Fix Thursday Hours (September 25th Issue)</h1>
+
+    <div id="current-status"></div>
+    <div id="fix-section"></div>
+    <div id="results"></div>
+
+    <script>
+        async function checkAndFixThursday() {
+            const statusDiv = document.getElementById('current-status');
+            const fixDiv = document.getElementById('fix-section');
+            const resultsDiv = document.getElementById('results');
+
+            // Wait for initialization
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            statusDiv.innerHTML = '<h2>Current Thursday Status:</h2>';
+
+            // Get current store hours
+            const storeHours = SharedData.getStoreHours();
+            const thursdayHours = storeHours.thursday;
+
+            statusDiv.innerHTML += '<pre>' + JSON.stringify(thursdayHours, null, 2) + '</pre>';
+
+            if (!thursdayHours || thursdayHours.closed) {
+                statusDiv.innerHTML += '<p class="error">❌ Thursday is CLOSED - This is why Sep 25th shows no slots!</p>';
+
+                fixDiv.innerHTML = `
+                    <h2>Fix: Open Thursday</h2>
+                    <div class="hours-form">
+                        <p>Set Thursday hours:</p>
+                        <label>Open: <input type="time" id="thursday-open" value="09:00"></label>
+                        <label>Close: <input type="time" id="thursday-close" value="18:00"></label>
+                        <br>
+                        <button onclick="fixThursdayHours()">Set Thursday as Open</button>
+                    </div>
+                `;
+            } else {
+                statusDiv.innerHTML += '<p class="success">✅ Thursday is OPEN</p>';
+                statusDiv.innerHTML += `<p>Hours: ${thursdayHours.open} - ${thursdayHours.close}</p>`;
+
+                // Test Sep 25
+                const testDate = new Date(2025, 8, 25); // Sep 25, 2025
+                const slots = SharedData.getAvailableSlots(testDate, 30); // 30 min service
+
+                fixDiv.innerHTML = '<h2>Testing September 25, 2025:</h2>';
+                if (slots.length > 0) {
+                    fixDiv.innerHTML += `<p class="success">✅ ${slots.length} slots available on Sep 25!</p>`;
+                    fixDiv.innerHTML += `<p>First slot: ${slots[0]}, Last slot: ${slots[slots.length - 1]}</p>`;
+                    fixDiv.innerHTML += '<button onclick="openCustomerApp()">Open Customer App to Test</button>';
+                } else {
+                    fixDiv.innerHTML += '<p class="error">Still no slots on Sep 25. Checking other issues...</p>';
+                }
+            }
+
+            // Show all days for reference
+            resultsDiv.innerHTML = '<h3>All Store Hours:</h3>';
+            resultsDiv.innerHTML += '<table border="1" cellpadding="5">';
+            resultsDiv.innerHTML += '<tr><th>Day</th><th>Open</th><th>Close</th><th>Status</th></tr>';
+
+            ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
+                const dayHours = storeHours[day];
+                const status = dayHours.closed ? '<span class="error">CLOSED</span>' : '<span class="success">OPEN</span>';
+                resultsDiv.innerHTML += `
+                    <tr>
+                        <td>${day.charAt(0).toUpperCase() + day.slice(1)}</td>
+                        <td>${dayHours.open || '-'}</td>
+                        <td>${dayHours.close || '-'}</td>
+                        <td>${status}</td>
+                    </tr>
+                `;
+            });
+            resultsDiv.innerHTML += '</table>';
+        }
+
+        async function fixThursdayHours() {
+            const resultsDiv = document.getElementById('results');
+            const openTime = document.getElementById('thursday-open').value;
+            const closeTime = document.getElementById('thursday-close').value;
+
+            resultsDiv.innerHTML = '<p>Updating Thursday hours...</p>';
+
+            // Get current store hours
+            const storeHours = SharedData.getStoreHours();
+
+            // Update Thursday to be open
+            storeHours.thursday = {
+                open: openTime,
+                close: closeTime,
+                closed: false
+            };
+
+            // Save updated hours
+            await SharedData.saveStoreHours(storeHours);
+
+            resultsDiv.innerHTML = '<p class="success">✅ Thursday hours updated!</p>';
+
+            // Test the change
+            const testDate = new Date(2025, 8, 25); // Sep 25, 2025
+            const slots = SharedData.getAvailableSlots(testDate, 30);
+
+            if (slots.length > 0) {
+                resultsDiv.innerHTML += `<p class="success">✅ Success! ${slots.length} slots now available on Sep 25!</p>`;
+                resultsDiv.innerHTML += '<p>The issue is fixed. September 25th should now show time slots in the customer app.</p>';
+                resultsDiv.innerHTML += '<button onclick="openCustomerApp()">Open Customer App</button>';
+            } else {
+                resultsDiv.innerHTML += '<p class="warning">Hours updated but still showing no slots. Try refreshing.</p>';
+            }
+
+            // Refresh to show new status
+            setTimeout(() => location.reload(), 2000);
+        }
+
+        function openCustomerApp() {
+            window.open('customer-app.html', '_blank');
+        }
+
+        // Run check on load
+        checkAndFixThursday();
+    </script>
+</body>
+</html>

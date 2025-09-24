@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Sep 25 After Fix</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+        .info { color: blue; }
+        .section { border: 1px solid #ccc; padding: 15px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <h1>Test September 25, 2025 Date Selection</h1>
+    <p>Testing after date parsing fix</p>
+    <div id="results"></div>
+
+    <script>
+        async function testDateParsing() {
+            const results = document.getElementById('results');
+
+            // Wait for SharedData to initialize
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Test 1: Create date like the date picker does
+            results.innerHTML += `<div class="section"><h3>Test 1: Date Picker Simulation</h3>`;
+
+            // Simulate what happens when user selects Sep 25, 2025 in date picker
+            const datePickerValue = '2025-09-25'; // This is what HTML date input gives us
+
+            // OLD WAY (buggy)
+            const oldDate = new Date(datePickerValue + 'T00:00:00');
+            results.innerHTML += `<p>Old parsing: new Date('${datePickerValue}T00:00:00')</p>`;
+            results.innerHTML += `<p>Result: ${oldDate.toString()}</p>`;
+            results.innerHTML += `<p>Day of week: ${oldDate.toLocaleDateString('en-US', { weekday: 'long' })}</p>`;
+
+            // NEW WAY (fixed)
+            const [year, month, day] = datePickerValue.split('-').map(Number);
+            const newDate = new Date(year, month - 1, day); // month is 0-indexed
+            results.innerHTML += `<p>New parsing: new Date(${year}, ${month - 1}, ${day})</p>`;
+            results.innerHTML += `<p>Result: ${newDate.toString()}</p>`;
+            results.innerHTML += `<p>Day of week: ${newDate.toLocaleDateString('en-US', { weekday: 'long' })}</p>`;
+
+            results.innerHTML += `</div>`;
+
+            // Test 2: Check store hours for Thursday
+            results.innerHTML += `<div class="section"><h3>Test 2: Store Hours for Thursday</h3>`;
+
+            const storeHours = SharedData.getStoreHours();
+            const thursdayHours = storeHours.thursday;
+
+            results.innerHTML += `<pre>${JSON.stringify(thursdayHours, null, 2)}</pre>`;
+            results.innerHTML += `<p>Store is ${thursdayHours.closed ? '<span class="error">CLOSED</span>' : '<span class="success">OPEN</span>'} on Thursday</p>`;
+
+            results.innerHTML += `</div>`;
+
+            // Test 3: Generate slots for Sep 25
+            results.innerHTML += `<div class="section"><h3>Test 3: Available Slots for Sep 25</h3>`;
+
+            try {
+                const slots = SharedData.getAvailableSlots(newDate, 30); // 30 min service
+
+                if (slots.length === 0) {
+                    results.innerHTML += `<p class="error">❌ No slots available!</p>`;
+                    if (thursdayHours.closed) {
+                        results.innerHTML += `<p>Reason: Store is closed on Thursdays</p>`;
+                    }
+                } else {
+                    results.innerHTML += `<p class="success">✅ ${slots.length} slots available!</p>`;
+                    results.innerHTML += `<p>First slot: ${slots[0]}</p>`;
+                    results.innerHTML += `<p>Last slot: ${slots[slots.length - 1]}</p>`;
+
+                    // Show first 10 slots
+                    results.innerHTML += `<p>First 10 slots: ${slots.slice(0, 10).join(', ')}</p>`;
+                }
+            } catch (error) {
+                results.innerHTML += `<p class="error">Error generating slots: ${error.message}</p>`;
+            }
+
+            results.innerHTML += `</div>`;
+
+            // Test 4: Check booking policies
+            results.innerHTML += `<div class="section"><h3>Test 4: Booking Policy Check</h3>`;
+
+            const policies = SharedData.getBookingPolicies();
+            const today = new Date();
+            const daysUntilSep25 = Math.floor((newDate - today) / (1000 * 60 * 60 * 24));
+
+            results.innerHTML += `<p>Today: ${today.toDateString()}</p>`;
+            results.innerHTML += `<p>Days until Sep 25: ${daysUntilSep25}</p>`;
+            results.innerHTML += `<p>Max booking days: ${policies.maxBookingDays}</p>`;
+            results.innerHTML += `<p>Can book Sep 25? ${daysUntilSep25 <= policies.maxBookingDays ?
+                '<span class="success">YES</span>' :
+                '<span class="error">NO - Too far in advance</span>'}</p>`;
+
+            results.innerHTML += `</div>`;
+
+            // Summary
+            results.innerHTML += `<div class="section" style="background: #f0f0f0;">`;
+            results.innerHTML += `<h3>Summary</h3>`;
+
+            if (slots && slots.length > 0 && !thursdayHours.closed && daysUntilSep25 <= policies.maxBookingDays) {
+                results.innerHTML += `<p class="success">✅ September 25, 2025 should now work correctly!</p>`;
+                results.innerHTML += `<p>The date parsing fix has resolved the issue.</p>`;
+            } else {
+                results.innerHTML += `<p class="error">⚠️ Issues found:</p>`;
+                if (thursdayHours.closed) {
+                    results.innerHTML += `<p>- Store is closed on Thursdays</p>`;
+                }
+                if (daysUntilSep25 > policies.maxBookingDays) {
+                    results.innerHTML += `<p>- Date is too far in advance (${daysUntilSep25} days vs max ${policies.maxBookingDays})</p>`;
+                }
+                if (!slots || slots.length === 0) {
+                    results.innerHTML += `<p>- No time slots being generated</p>`;
+                }
+            }
+
+            results.innerHTML += `</div>`;
+        }
+
+        testDateParsing();
+    </script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Actual Flow</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .section { border: 2px solid #333; padding: 15px; margin: 15px 0; }
+        .error { color: red; font-weight: bold; }
+        .success { color: green; font-weight: bold; }
+        pre { background: #f4f4f4; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Testing Actual Customer App Flow</h1>
+    <div id="results"></div>
+
+    <script>
+        async function testActualFlow() {
+            const results = document.getElementById('results');
+
+            // Wait for SharedData
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            results.innerHTML = '<h2>Simulating customer-app.html flow for Sep 24, 2025</h2>';
+
+            // Simulate the exact flow from customer-app.html
+            const selectedDate = new Date(2025, 8, 24); // Sep 24, 2025
+            const selectedBarberId = null; // No specific barber
+            const selectedServices = ['mens-cut']; // Men's cut selected
+
+            // This is from customer-app.html line 897-899
+            const serviceData = SharedData.getServices();
+            const totalDuration = selectedServices.reduce((sum, serviceId) => {
+                return sum + (serviceData[serviceId]?.duration || 30);
+            }, 0);
+
+            results.innerHTML += `
+                <div class="section">
+                    <h3>Step 1: Calculate Total Duration</h3>
+                    <p>Selected services: ${selectedServices.join(', ')}</p>
+                    <p>Total duration: ${totalDuration} minutes</p>
+                </div>
+            `;
+
+            // This is from customer-app.html line 904
+            let availableSlots;
+            try {
+                availableSlots = SharedData.getAvailableSlots(selectedDate, totalDuration, selectedBarberId);
+            } catch (e) {
+                results.innerHTML += '<p class="error">Error getting slots: ' + e.message + '</p>';
+                return;
+            }
+
+            results.innerHTML += `
+                <div class="section">
+                    <h3>Step 2: Get Available Slots from SharedData</h3>
+                    <p>Slots returned: ${availableSlots.length}</p>
+                    <p>First 3: ${availableSlots.slice(0, 3).join(', ')}</p>
+                    <p>Last 10: ${availableSlots.slice(-10).join(', ')}</p>
+                </div>
+            `;
+
+            // Check what's in supabase-bridge.js
+            results.innerHTML += `
+                <div class="section">
+                    <h3>Step 3: Debug supabase-bridge.js Logic</h3>
+            `;
+
+            const dayName = 'wednesday';
+            const storeHours = SharedData.getStoreHours();
+            const dayHours = storeHours[dayName];
+
+            const openMinutes = SharedData.timeToMinutes(dayHours.open);
+            const closeMinutes = SharedData.timeToMinutes(dayHours.close);
+            const lastValidSlot = closeMinutes - totalDuration;
+
+            results.innerHTML += `
+                    <p>Day hours: ${JSON.stringify(dayHours)}</p>
+                    <p>Open: ${dayHours.open} = ${openMinutes} minutes</p>
+                    <p>Close: ${dayHours.close} = ${closeMinutes} minutes</p>
+                    <p>Last valid slot calculation: ${closeMinutes} - ${totalDuration} = ${lastValidSlot} minutes</p>
+                    <p>Last valid slot time: ${SharedData.minutesToTime(lastValidSlot)}</p>
+                </div>
+            `;
+
+            // Manually check what the loop SHOULD generate
+            results.innerHTML += `
+                <div class="section">
+                    <h3>Step 4: Manual Loop Simulation</h3>
+            `;
+
+            let manualSlots = [];
+            let debugInfo = [];
+            for (let minutes = openMinutes; minutes <= lastValidSlot; minutes += 15) {
+                const time = SharedData.minutesToTime(minutes);
+                manualSlots.push(time);
+                if (minutes >= lastValidSlot - 60) { // Log last hour
+                    debugInfo.push(`${minutes} min -> ${time}`);
+                }
+            }
+
+            results.innerHTML += `
+                    <p>Manual loop generated: ${manualSlots.length} slots</p>
+                    <p>Last hour of slots:</p>
+                    <pre>${debugInfo.join('\n')}</pre>
+                    <p>Manual last slot: ${manualSlots[manualSlots.length - 1]}</p>
+                </div>
+            `;
+
+            // Compare
+            results.innerHTML += `
+                <div class="section">
+                    <h3>Step 5: Comparison</h3>
+            `;
+
+            if (availableSlots.length === manualSlots.length) {
+                results.innerHTML += '<p class="success">✓ Slot counts match!</p>';
+            } else {
+                results.innerHTML += `<p class="error">❌ Slot count mismatch! SharedData: ${availableSlots.length}, Manual: ${manualSlots.length}</p>`;
+            }
+
+            // Find any slots past 17:30
+            const invalidSlots = availableSlots.filter(slot => {
+                const min = SharedData.timeToMinutes(slot);
+                return min > lastValidSlot;
+            });
+
+            if (invalidSlots.length > 0) {
+                results.innerHTML += `<p class="error">❌ Found ${invalidSlots.length} slots past ${SharedData.minutesToTime(lastValidSlot)}:</p>`;
+                results.innerHTML += `<pre>${invalidSlots.join(', ')}</pre>`;
+            } else {
+                results.innerHTML += '<p class="success">✓ No invalid slots found</p>';
+            }
+
+            results.innerHTML += '</div>';
+
+            // Final check - what's the actual last slot?
+            const actualLastSlot = availableSlots[availableSlots.length - 1];
+            const actualLastMinutes = SharedData.timeToMinutes(actualLastSlot);
+
+            results.innerHTML += `
+                <div class="section" style="background: #ffffcc;">
+                    <h3>FINAL CHECK</h3>
+                    <p><strong>Expected last slot:</strong> 17:30 (1050 minutes)</p>
+                    <p><strong>Actual last slot:</strong> ${actualLastSlot} (${actualLastMinutes} minutes)</p>
+                    ${actualLastMinutes > lastValidSlot ?
+                        '<p class="error">❌ PROBLEM: Last slot is AFTER the valid time!</p>' :
+                        '<p class="success">✓ Last slot is valid</p>'}
+                </div>
+            `;
+        }
+
+        testActualFlow();
+    </script>
+</body>
+</html>

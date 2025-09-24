@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Service Colors</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .service {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .color-box {
+            width: 40px;
+            height: 40px;
+            border-radius: 5px;
+            border: 2px solid #333;
+        }
+        button {
+            padding: 15px 30px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 20px 0;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        #status {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .success {
+            background: #d4edda !important;
+            border-color: #c3e6cb !important;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da !important;
+            border-color: #f5c6cb !important;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fix Service Colors</h1>
+    <p>This will assign different colors to each service and save them to the database.</p>
+
+    <div id="status">Ready to fix colors...</div>
+
+    <button onclick="fixColors()">Fix Service Colors Now</button>
+
+    <div id="services-list"></div>
+
+    <script>
+        const status = document.getElementById('status');
+        const list = document.getElementById('services-list');
+
+        async function fixColors() {
+            status.textContent = 'Loading services...';
+            status.className = '';
+            list.innerHTML = '';
+
+            try {
+                // Initialize and load services
+                await SharedData.initialize();
+                await SharedData.loadServices();
+                const services = SharedData.getServices();
+
+                console.log('Loaded services:', services);
+
+                // Define distinct colors
+                const colorPalette = [
+                    '#2196F3', // Blue
+                    '#E91E63', // Pink
+                    '#4CAF50', // Green
+                    '#FF9800', // Orange
+                    '#9C27B0', // Purple
+                    '#00BCD4', // Cyan
+                    '#FFC107', // Amber
+                    '#795548', // Brown
+                    '#607D8B', // Blue Grey
+                    '#F44336', // Red
+                    '#3F51B5', // Indigo
+                    '#009688'  // Teal
+                ];
+
+                const serviceEntries = Object.entries(services);
+                status.textContent = `Found ${serviceEntries.length} services. Assigning colors...`;
+
+                // Create service updates with colors
+                const updatedServices = {};
+                serviceEntries.forEach(([id, service], index) => {
+                    // Assign color based on service name or position
+                    let assignedColor;
+                    const nameLower = service.name.toLowerCase();
+
+                    if (nameLower.includes("men") && nameLower.includes("cut")) {
+                        assignedColor = '#2196F3'; // Blue
+                    } else if (nameLower.includes("women") && nameLower.includes("cut")) {
+                        assignedColor = '#E91E63'; // Pink
+                    } else if (nameLower.includes("child") || nameLower.includes("kid")) {
+                        assignedColor = '#4CAF50'; // Green
+                    } else if (nameLower.includes("color")) {
+                        assignedColor = '#FF9800'; // Orange
+                    } else if (nameLower.includes("highlight")) {
+                        assignedColor = '#9C27B0'; // Purple
+                    } else {
+                        // Use sequential colors for other services
+                        assignedColor = colorPalette[index % colorPalette.length];
+                    }
+
+                    updatedServices[id] = {
+                        ...service,
+                        color: assignedColor
+                    };
+
+                    console.log(`Service "${service.name}" assigned color: ${assignedColor}`);
+                });
+
+                status.textContent = 'Saving colors to database...';
+
+                // Save directly to Supabase
+                const shopId = SharedData.getCurrentShopId();
+                if (!shopId) {
+                    throw new Error('No shop ID found. Please log in first.');
+                }
+
+                // Update each service with its color
+                for (const [id, service] of Object.entries(updatedServices)) {
+                    try {
+                        const { error } = await supabaseClient
+                            .from('services')
+                            .update({ color: service.color })
+                            .eq('id', id)
+                            .eq('shop_id', shopId);
+
+                        if (error) {
+                            console.error(`Failed to update service ${id}:`, error);
+                        } else {
+                            console.log(`Updated service ${id} with color ${service.color}`);
+                        }
+                    } catch (err) {
+                        console.error(`Error updating service ${id}:`, err);
+                    }
+                }
+
+                // Reload services to verify
+                await SharedData.loadServices();
+                const verifiedServices = SharedData.getServices();
+
+                // Display results
+                list.innerHTML = '<h2>Services with Updated Colors:</h2>';
+                for (const [id, service] of Object.entries(verifiedServices)) {
+                    const div = document.createElement('div');
+                    div.className = 'service';
+                    div.innerHTML = `
+                        <div class="color-box" style="background: ${service.color || '#ccc'}"></div>
+                        <div>
+                            <strong>${service.name}</strong><br>
+                            Color: ${service.color || 'Not set'}<br>
+                            <small>ID: ${id}</small>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                }
+
+                status.textContent = 'Colors fixed successfully! Refresh the owner-app to see the changes.';
+                status.className = 'success';
+
+            } catch (error) {
+                console.error('Error:', error);
+                status.textContent = 'Error: ' + error.message;
+                status.className = 'error';
+            }
+        }
+    </script>
+</body>
+</html>

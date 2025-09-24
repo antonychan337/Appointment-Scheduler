@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Auto-Translation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        #log {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            background: white;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Auto-Translation Function</h1>
+
+    <div>
+        <label>Language Mode:</label>
+        <button onclick="setLanguage(false)">English</button>
+        <button onclick="setLanguage(true)">Chinese</button>
+        <span id="current-lang">Current: English</span>
+    </div>
+
+    <div>
+        <label>Service Name:</label>
+        <input type="text" id="new-service-name" placeholder="Enter service name" oninput="testAutoTranslate()">
+    </div>
+
+    <div>
+        <label>Translation (should auto-fill):</label>
+        <input type="text" id="new-service-translation" placeholder="Translation will appear here" data-lang="zh">
+    </div>
+
+    <div>
+        <button onclick="clearInputs()">Clear</button>
+        <button onclick="testCommonNames()">Test Common Names</button>
+    </div>
+
+    <div id="log">
+        <h3>Debug Log:</h3>
+    </div>
+
+    <script>
+        let isZh = false;
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function setLanguage(chinese) {
+            isZh = chinese;
+            document.getElementById('current-lang').textContent = 'Current: ' + (isZh ? 'Chinese' : 'English');
+            log('Language set to: ' + (isZh ? 'Chinese' : 'English'));
+            clearInputs();
+        }
+
+        function clearInputs() {
+            document.getElementById('new-service-name').value = '';
+            document.getElementById('new-service-translation').value = '';
+            document.getElementById('new-service-translation').dataset.userModified = 'false';
+            log('Inputs cleared');
+        }
+
+        function testAutoTranslate() {
+            log('testAutoTranslate called');
+
+            const nameInput = document.getElementById('new-service-name');
+            const translationInput = document.getElementById('new-service-translation');
+
+            if (!nameInput || !translationInput) {
+                log('ERROR: Input elements not found');
+                return;
+            }
+
+            const name = nameInput.value.trim();
+            log('Input value: "' + name + '"');
+
+            // Check if user has manually modified
+            if (translationInput.dataset.userModified === 'true') {
+                log('User has manually modified translation, skipping auto-translate');
+                return;
+            }
+
+            // Translation dictionary
+            const apiTranslations = {
+                en_to_zh: {
+                    "Men's Cut": "男士理发",
+                    "Women's Cut": "女士理发",
+                    "Children's Cut": "儿童理发",
+                    "Hair Coloring": "染发",
+                    "Cut": "理发",
+                    "Color": "染发",
+                    "Haircut": "理发",
+                    "Test": "测试",
+                    "Trim": "修剪"
+                },
+                zh_to_en: {
+                    "男士理发": "Men's Cut",
+                    "女士理发": "Women's Cut",
+                    "儿童理发": "Children's Cut",
+                    "染发": "Hair Coloring",
+                    "理发": "Haircut",
+                    "测试": "Test",
+                    "修剪": "Trim"
+                }
+            };
+
+            let translation = '';
+
+            if (isZh) {
+                translation = apiTranslations.zh_to_en[name] || '';
+                log('Looking up Chinese->English: "' + name + '" -> "' + (translation || 'NOT FOUND') + '"');
+            } else {
+                translation = apiTranslations.en_to_zh[name] || '';
+                log('Looking up English->Chinese: "' + name + '" -> "' + (translation || 'NOT FOUND') + '"');
+
+                // Try case-insensitive
+                if (!translation && name) {
+                    const lowerName = name.toLowerCase();
+                    for (const [key, value] of Object.entries(apiTranslations.en_to_zh)) {
+                        if (key.toLowerCase() === lowerName) {
+                            translation = value;
+                            log('Found case-insensitive match: "' + key + '" -> "' + value + '"');
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (translation) {
+                translationInput.value = translation;
+                translationInput.dataset.userModified = 'false';
+                log('SUCCESS: Set translation to: "' + translation + '"');
+            } else if (!name) {
+                translationInput.value = '';
+                translationInput.dataset.userModified = 'false';
+                log('Cleared translation (empty input)');
+            } else {
+                log('No translation found for: "' + name + '"');
+            }
+        }
+
+        // Track manual modifications
+        document.getElementById('new-service-translation').addEventListener('input', function() {
+            this.dataset.userModified = 'true';
+            log('User manually modified translation field');
+        });
+
+        function testCommonNames() {
+            const testNames = ['Cut', 'Hair Coloring', "Men's Cut", 'Test'];
+            let index = 0;
+
+            function testNext() {
+                if (index < testNames.length) {
+                    const name = testNames[index];
+                    document.getElementById('new-service-name').value = name;
+                    document.getElementById('new-service-translation').dataset.userModified = 'false';
+                    log('Testing: "' + name + '"');
+                    testAutoTranslate();
+                    index++;
+                    setTimeout(testNext, 2000);
+                }
+            }
+
+            clearInputs();
+            testNext();
+        }
+
+        log('Page loaded - ready to test');
+    </script>
+</body>
+</html>

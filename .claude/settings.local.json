@@ -58,7 +58,18 @@
       "Bash(Copy-Item owner-app.html owner-app-backup-multibarber.html)",
       "Bash(findstr:*)",
       "Bash(git checkout:*)",
-      "Bash(del check-appointments.html check-queenie-id.html clear-all-bookings.html compare-appointments.html debug-appointments-detailed.html debug-employee-save.html debug-menscut.html debug-menscut-rendering.html)"
+      "Bash(del check-appointments.html check-queenie-id.html clear-all-bookings.html compare-appointments.html debug-appointments-detailed.html debug-employee-save.html debug-menscut.html debug-menscut-rendering.html)",
+      "Bash(del CHECKPOINT_GITHUB_PUSH.md)",
+      "Bash(Remove-Item CHECKPOINT_GITHUB_PUSH.md)",
+      "Bash(start setup-wizard-app.html)",
+      "Bash(start reset-setup.html)",
+      "Bash(Remove-Item auth.html)",
+      "Bash(Select-Object -First 20)",
+      "WebSearch",
+      "Bash(cp:*)",
+      "Bash(cat:*)",
+      "Bash(node:*)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []

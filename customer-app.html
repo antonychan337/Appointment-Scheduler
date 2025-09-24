@@ -382,8 +382,7 @@
         let selectedTime = null;
         let currentScreen = 'barber-screen';
 
-        // Load booking policies
-        const bookingPolicies = SharedData.getBookingPolicies();
+        // Note: Booking policies are loaded dynamically when needed to ensure they're always up-to-date
 
         const translations = {
             zh: {
@@ -482,13 +481,8 @@
             }
         };
 
-        const serviceData = {
-            'mens-cut': { name: "Men's Cut", duration: 30, price: 25 },
-            'womens-cut': { name: "Women's Cut", duration: 45, price: 35 },
-            'kids-cut': { name: "Children's Cut", duration: 15, price: 15 },
-            'coloring': { name: "Hair Coloring", duration: 90, price: 80, activeTime: 30 },
-            'highlights': { name: "Highlights", duration: 120, price: 120, activeTime: 40 }
-        };
+        // Service data is now loaded dynamically from SharedData.getServices()
+        // No longer using hardcoded service data
 
         function toggleLang() {
             isZh = !isZh;
@@ -597,10 +591,16 @@
 
             // Update confirmation screen if active and data is available
             if (currentScreen === 'confirmation-screen' && selectedServices.length > 0 && selectedDate) {
-                // Re-translate service names
+                // Get service names - use what owner provided
+                const allServices = SharedData.getServices();
                 const serviceNames = selectedServices.map(s => {
-                    const serviceName = serviceData[s].name;
-                    return t.services[serviceName] || serviceName;
+                    const service = allServices[s];
+                    if (!service) return '';
+                    if (isZh) {
+                        return service.name_zh || service.name_en || service.name || '';
+                    } else {
+                        return service.name_en || service.name_zh || service.name || '';
+                    }
                 });
                 document.getElementById('selected-services').textContent = serviceNames.join(', ');
 
@@ -621,10 +621,16 @@
 
             // Update success screen if active and data is available
             if (currentScreen === 'success-screen' && selectedServices.length > 0 && selectedDate && selectedTime) {
-                // Re-translate service names
+                // Get service names - use what owner provided
+                const allServices = SharedData.getServices();
                 const serviceNames = selectedServices.map(s => {
-                    const serviceName = serviceData[s].name;
-                    return t.services[serviceName] || serviceName;
+                    const service = allServices[s];
+                    if (!service) return '';
+                    if (isZh) {
+                        return service.name_zh || service.name_en || service.name || '';
+                    } else {
+                        return service.name_en || service.name_zh || service.name || '';
+                    }
                 });
                 document.getElementById('final-services').textContent = serviceNames.join(', ');
 
@@ -638,7 +644,7 @@
 
         // Load barbers for selection
         function loadBarbers() {
-            const barbers = SharedData.getBarbers();
+            const barbers = SharedData.getBarbersSync();
             const container = document.getElementById('barber-container');
             container.innerHTML = '';
 
@@ -737,8 +743,9 @@
             const today = new Date();
             const maxDate = new Date();
 
-            // Apply maximum advance booking policy
-            const maxDays = bookingPolicies.maxBookingDays || bookingPolicies.maxAdvanceDays || 30;
+            // Apply maximum advance booking policy - get fresh policies in case they were updated
+            const policies = SharedData.getBookingPolicies();
+            const maxDays = policies.maxBookingDays || 30;
             maxDate.setDate(maxDate.getDate() + maxDays);
 
             // Set min and max dates on the picker
@@ -839,8 +846,8 @@
         }
 
         function displayCancellationPolicy() {
-            const policy = JSON.parse(localStorage.getItem('cancellationPolicy') || '{}');
-            const minNoticeHours = policy.minNoticeHours || 0;
+            const policy = SharedData.getBookingPolicies();
+            const minNoticeHours = policy.cancellationHours || 0;
             const policyNotice = document.getElementById('policy-notice');
 
             if (minNoticeHours > 0) {
@@ -958,14 +965,15 @@
                 }
             }
 
-            // Apply minimum booking notice policy
+            // Apply minimum booking notice policy - get fresh policies
+            const policies = SharedData.getBookingPolicies();
             const now = new Date();
             const minBookingTime = new Date();
-            minBookingTime.setHours(minBookingTime.getHours() + bookingPolicies.minBookingHours);
+            minBookingTime.setHours(minBookingTime.getHours() + policies.minBookingHours);
 
             // Filter out slots that don't meet minimum booking notice
             if (selectedDate.toDateString() === now.toDateString() ||
-                (selectedDate.getTime() - now.getTime()) < (bookingPolicies.minBookingHours * 60 * 60 * 1000)) {
+                (selectedDate.getTime() - now.getTime()) < (policies.minBookingHours * 60 * 60 * 1000)) {
                 availableSlots = availableSlots.filter(slot => {
                     const [hours, minutes] = slot.split(':').map(Number);
                     const slotTime = new Date(selectedDate);
@@ -1034,14 +1042,12 @@
                 const slot = document.createElement('div');
                 slot.className = 'time-slot';
 
-                // Format time for display (convert 24hr to 12hr with AM/PM)
-                const [hours, minutes] = time.split(':').map(Number);
-                const period = hours >= 12 ? 'PM' : 'AM';
-                const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-                const displayTime = `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+                // Format time for display in 24-hour format
+                const displayTime = time;
                 slot.textContent = displayTime;
 
-                // Check if enough time remains for the service
+                // Parse the time for this slot
+                const [hours, minutes] = time.split(':').map(Number);
                 const slotMinutes = hours * 60 + minutes;
                 const endMinutes = slotMinutes + totalDuration;
                 const dayName = selectedDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
@@ -1131,12 +1137,17 @@
 
             // Update summary
             const t = isZh ? translations.zh : translations.en;
+            const allServices = SharedData.getServices();
             const serviceNames = selectedServices.map(s => {
-                const service = serviceData[s];
+                const service = allServices[s];
+                if (!service) {
+                    console.error('Service not found:', s);
+                    return '';
+                }
                 if (isZh) {
-                    return service.name_zh || t.services[service.name] || service.name;
+                    return service.name_zh || service.name_en || service.name || '';
                 } else {
-                    return service.name_en || service.name;
+                    return service.name_en || service.name_zh || service.name || '';
                 }
             });
             document.getElementById('selected-services').textContent = serviceNames.join(', ');
@@ -1202,9 +1213,9 @@
             const serviceNames = selectedServices.map(s => {
                 const service = services[s];
                 if (isZh) {
-                    return service.name_zh || t.services[service.name] || service.name;
+                    return service.name_zh || service.name_en || service.name || '';
                 } else {
-                    return service.name_en || service.name;
+                    return service.name_en || service.name_zh || service.name || '';
                 }
             });
             const totalDuration = selectedServices.reduce((sum, s) => {
@@ -1272,12 +1283,28 @@
             // Save appointment
             let bookingId;
             try {
+                // Check if shop context is set
+                const currentShopId = SharedData.getCurrentShopId();
+                if (!currentShopId) {
+                    console.error('No shop ID set - cannot save appointment');
+                    alert(isZh ? '无法保存预约。请刷新页面后重试。' : 'Unable to save appointment. Please refresh the page and try again.');
+                    return;
+                }
+
                 bookingId = SharedData.saveAppointment(appointment);
+                if (!bookingId) {
+                    console.error('Failed to get booking ID');
+                    alert(isZh ? '保存预约失败。请重试。' : 'Failed to save appointment. Please try again.');
+                    return;
+                }
+
                 // Send confirmation email
                 SharedData.sendConfirmationEmail(appointment);
             } catch (e) {
+                console.error('Error saving appointment:', e);
                 // Fallback booking ID if SharedData not available
                 bookingId = 'BK' + Math.random().toString(36).substr(2, 9).toUpperCase();
+                alert(isZh ? '预约可能未成功保存。请联系店铺确认。' : 'Appointment may not have been saved. Please contact the shop to confirm.');
             }
 
             document.getElementById('booking-id').textContent = bookingId;
@@ -1316,8 +1343,8 @@
         }
 
         function checkCancellationPolicy(appointment) {
-            const policy = JSON.parse(localStorage.getItem('cancellationPolicy') || '{}');
-            const minNoticeHours = policy.minNoticeHours || 0;
+            const policy = SharedData.getBookingPolicies();
+            const minNoticeHours = policy.cancellationHours || 0;
 
             if (minNoticeHours === 0) {
                 return { allowed: true };
@@ -1411,9 +1438,9 @@
             const serviceNames = selectedServices.map(s => {
                 const service = services[s];
                 if (isZh) {
-                    return service.name_zh || t.services[service.name] || service.name;
+                    return service.name_zh || service.name_en || service.name || '';
                 } else {
-                    return service.name_en || service.name;
+                    return service.name_en || service.name_zh || service.name || '';
                 }
             });
             const totalDuration = selectedServices.reduce((sum, s) => {
@@ -1591,7 +1618,7 @@
             document.getElementById('service-next').disabled = true;
 
             // Check number of barbers and show appropriate screen
-            const barbers = SharedData.getBarbers();
+            const barbers = SharedData.getBarbersSync();
             if (barbers.length === 1) {
                 // Single barber - skip barber selection and go straight to services
                 selectedBarberId = barbers[0].id;
@@ -1627,9 +1654,8 @@
                     if (isZh) {
                         return `${hour}:${minute.toString().padStart(2, '0')}`;
                     }
-                    const ampm = hour >= 12 ? 'PM' : 'AM';
-                    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-                    return `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`;
+                    // Use 24-hour format
+                    return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
                 };
 
                 // Update notice text
@@ -1665,24 +1691,45 @@
             const barber = SharedData.getBarberById(barberId);
             const allServices = SharedData.getServices();
 
+            console.log('[DEBUG] Barber object:', barber);
+            console.log('[DEBUG] Barber.services:', barber?.services);
+            console.log('[DEBUG] All available services:', allServices);
+
             // Handle both array and object formats for barber.services
             let barberServiceIds;
             console.log('[DEBUG] Barber services format:', typeof barber.services, barber.services);
-            if (Array.isArray(barber.services)) {
+
+            // Check if this is the only barber or if they're the owner
+            const barbers = SharedData.getBarbersSync();
+            const isSingleBarber = barbers.length === 1;
+            const isOwnerBarber = barber?.isOwner === true;
+
+            if ((isSingleBarber || isOwnerBarber) && (!barber.services || Object.keys(barber.services).length === 0)) {
+                // If single barber (or owner) with no services assigned, show ALL enabled services
+                console.log('[DEBUG] Single/Owner barber with no services - showing all enabled services');
+                barberServiceIds = Object.keys(allServices).filter(id => allServices[id].enabled);
+            } else if (Array.isArray(barber.services)) {
                 barberServiceIds = barber.services;
             } else if (barber.services && typeof barber.services === 'object') {
                 // If it's an object, get the keys that have truthy values
                 barberServiceIds = Object.keys(barber.services).filter(key => barber.services[key]);
+
+                // If no services assigned but multiple barbers exist, still show all enabled services
+                if (barberServiceIds.length === 0) {
+                    console.warn('[DEBUG] ⚠️ Barber has no services assigned! Showing all enabled services as fallback');
+                    barberServiceIds = Object.keys(allServices).filter(id => allServices[id].enabled);
+                }
             } else {
-                // Default to all services
-                barberServiceIds = Object.keys(allServices);
+                // Fallback: show all enabled services
+                console.warn('[DEBUG] ⚠️ Unknown service format! Showing all enabled services as fallback');
+                barberServiceIds = Object.keys(allServices).filter(id => allServices[id].enabled);
             }
 
             const container = document.getElementById('services-container');
             container.innerHTML = '';
 
             // Show/hide back button based on number of barbers
-            const barbers = SharedData.getBarbers();
+            // Note: barbers variable already declared above on line 1687
             const backButton = document.getElementById('service-back');
             if (backButton) {
                 backButton.style.display = barbers.length > 1 ? 'block' : 'none';
@@ -1693,29 +1740,60 @@
             // Only show services that the barber offers
             console.log('[DEBUG] Barber service IDs:', barberServiceIds);
             console.log('[DEBUG] All services:', Object.keys(allServices));
-            barberServiceIds.forEach(serviceId => {
+
+            // Filter for enabled services first
+            const enabledServiceIds = barberServiceIds.filter(serviceId => {
                 const service = allServices[serviceId];
-                if (!service || !service.enabled) return;
+                return service && service.enabled;
+            });
+
+            // Check if barber has any ENABLED services
+            if (enabledServiceIds.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #f44336; background: #ffebee; border-radius: 10px;">
+                        <div style="font-size: 24px; margin-bottom: 10px;">⚠️</div>
+                        ${isZh ?
+                            '当前没有可用的服务。请稍后再试。' :
+                            'No services are currently available. Please try again later.'}
+                    </div>`;
+                return;
+            }
+
+            enabledServiceIds.forEach(serviceId => {
+                const service = allServices[serviceId];
 
                 const card = document.createElement('div');
                 card.className = 'service-card';
                 card.onclick = function() { toggleService(this, serviceId); };
 
-                // Get the correct translation for the service name
-                let serviceName;
+                // Display logic: show what owner provided
+                // If both languages provided, show primary first, secondary below
+                // If only one language provided, show that language
+                let primaryName = '';
+                let secondaryName = '';
+
                 if (isZh) {
-                    // Try to use the Chinese name from the service, fall back to default translation
-                    serviceName = service.name_zh || t.services[service.name] || service.name;
+                    // Chinese mode
+                    primaryName = service.name_zh || service.name_en || service.name || '';
+                    // Only show secondary if both languages were provided
+                    if (service.name_zh && service.name_en) {
+                        secondaryName = service.name_en;
+                    }
                 } else {
-                    // Use English name or the main name field
-                    serviceName = service.name_en || service.name;
+                    // English mode
+                    primaryName = service.name_en || service.name_zh || service.name || '';
+                    // Only show secondary if both languages were provided
+                    if (service.name_en && service.name_zh) {
+                        secondaryName = service.name_zh;
+                    }
                 }
 
                 const minText = t.min || 'min';
 
                 card.innerHTML = `
                     <div>
-                        <div class="service-name" style="font-weight: bold;">${serviceName}</div>
+                        <div class="service-name" style="font-weight: bold;">${primaryName}</div>
+                        ${secondaryName ? `<div style="font-size: 12px; color: #888; margin-top: 2px;">${secondaryName}</div>` : ''}
                         <div style="font-size: 14px; color: #666;">
                             ${service.duration} ${minText} • $${service.price}
                         </div>
@@ -1753,18 +1831,33 @@
                 serviceCard.onclick = () => toggleService(serviceCard, serviceId);
 
                 const t = isZh ? translations.zh : translations.en;
-                // Use translated names from service object
-                let serviceName;
+
+                // Display logic: show what owner provided
+                let primaryName = '';
+                let secondaryName = '';
+
                 if (isZh) {
-                    serviceName = service.name_zh || t.services[service.name] || service.name;
+                    // Chinese mode
+                    primaryName = service.name_zh || service.name_en || service.name || '';
+                    // Only show secondary if both languages were provided
+                    if (service.name_zh && service.name_en) {
+                        secondaryName = service.name_en;
+                    }
                 } else {
-                    serviceName = service.name_en || service.name;
+                    // English mode
+                    primaryName = service.name_en || service.name_zh || service.name || '';
+                    // Only show secondary if both languages were provided
+                    if (service.name_en && service.name_zh) {
+                        secondaryName = service.name_zh;
+                    }
                 }
+
                 const minText = isZh ? '分钟' : 'min';
 
                 serviceCard.innerHTML = `
                     <div>
-                        <div class="service-name">${serviceName}</div>
+                        <div class="service-name">${primaryName}</div>
+                        ${secondaryName ? `<div style="font-size: 12px; color: #888; margin-top: 2px;">${secondaryName}</div>` : ''}
                         <div style="color: #666; font-size: 14px;">${service.duration} ${minText} • $${service.price}</div>
                     </div>
                     <div class="checkbox"></div>
@@ -1810,6 +1903,16 @@
                     if (testShopId) {
                         localStorage.setItem('supabase_shop_id', testShopId);
                         console.log('Using test shop ID:', testShopId);
+                    } else if (shopSlug) {
+                        // Resolve shop ID from slug
+                        console.log('Resolving shop ID from slug:', shopSlug);
+                        const shopId = await SharedData.getShopIdFromSlug(shopSlug);
+                        if (shopId) {
+                            localStorage.setItem('supabase_shop_id', shopId);
+                            console.log('Resolved shop ID:', shopId);
+                        } else {
+                            console.error('Failed to resolve shop ID from slug:', shopSlug);
+                        }
                     }
                     console.log('Loading shop:', shopSlug || testShopSlug);
                 }
@@ -1827,9 +1930,10 @@
 
                     // IMPORTANT: Force set the shop ID after initialization
                     // This ensures SharedData has the correct shop context
-                    if (testShopId) {
-                        SharedData.setCurrentShopId(testShopId);
-                        console.log('Forced shop ID in SharedData:', testShopId);
+                    const shopIdToUse = localStorage.getItem('supabase_shop_id');
+                    if (shopIdToUse) {
+                        SharedData.setCurrentShopId(shopIdToUse);
+                        console.log('Forced shop ID in SharedData:', shopIdToUse);
 
                         // Reload barbers after setting shop ID
                         SharedData.barbersCache = await SharedData.getBarbers();
@@ -1839,6 +1943,10 @@
                     // Log current shop context
                     const currentShopId = SharedData.getCurrentShopId() || localStorage.getItem('supabase_shop_id');
                     console.log('Current shop ID after init:', currentShopId);
+
+                    // Load appointments to ensure conflict checking works
+                    await SharedData.getAppointments();
+                    console.log('Appointments loaded for conflict checking');
 
                     // Normal initialization - check for barbers first
                     const barbers = await SharedData.getBarbers();

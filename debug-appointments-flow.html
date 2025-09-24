@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Appointments Flow</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Configuration -->
+    <script src="supabase-config.js"></script>
+    <!-- Supabase Bridge -->
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2C3E50;
+            margin-bottom: 20px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            border-left: 4px solid #2196f3;
+        }
+        .success {
+            background: #e8f5e9;
+            border-left-color: #4caf50;
+        }
+        .error {
+            background: #ffebee;
+            border-left-color: #f44336;
+        }
+        .warning {
+            background: #fff3e0;
+            border-left-color: #ff9800;
+        }
+        button {
+            background: #2C3E50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #34495e;
+        }
+        .log {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 600px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .appointment-item {
+            margin: 10px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 5px;
+            border: 1px solid #e0e0e0;
+        }
+        .appointment-header {
+            font-weight: bold;
+            color: #2C3E50;
+            margin-bottom: 10px;
+        }
+        .appointment-details {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 5px;
+            font-size: 14px;
+        }
+        .detail-label {
+            font-weight: 600;
+            color: #666;
+        }
+        .detail-value {
+            color: #333;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #e3f2fd;
+            border-radius: 5px;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Debug Appointments Flow</h1>
+
+        <div class="section">
+            <h2>Shop Context</h2>
+            <div id="shop-info"></div>
+        </div>
+
+        <button onclick="checkDatabase()">1. Check Direct Database</button>
+        <button onclick="checkCache()">2. Check Cache</button>
+        <button onclick="testBooking()">3. Test New Booking</button>
+        <button onclick="refreshAndCheck()">4. Refresh & Check</button>
+        <button onclick="checkToday()">5. Check Today's Appointments</button>
+        <button onclick="clearCache()">Clear Cache</button>
+
+        <div class="test-section">
+            <h3>Test Booking</h3>
+            Customer Name: <input type="text" id="test-name" value="Test Customer" />
+            Date: <input type="date" id="test-date" />
+            Time: <input type="time" id="test-time" value="10:00" />
+            <button onclick="createTestBooking()">Create Test Booking</button>
+        </div>
+
+        <div id="results" class="log"></div>
+    </div>
+
+    <script>
+        // Set today's date as default
+        document.getElementById('test-date').value = new Date().toISOString().split('T')[0];
+
+        function log(message, type = 'info') {
+            const results = document.getElementById('results');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#f44336' :
+                         type === 'success' ? '#4caf50' :
+                         type === 'warning' ? '#ff9800' : '#333';
+            results.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            results.scrollTop = results.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function initShop() {
+            clearLog();
+            log('Initializing SharedData...');
+            await SharedData.initialize();
+
+            const shopId = SharedData.getCurrentShopId();
+            const shopInfo = document.getElementById('shop-info');
+
+            if (shopId) {
+                shopInfo.innerHTML = `
+                    <div class="appointment-details">
+                        <div class="detail-label">Shop ID:</div>
+                        <div class="detail-value">${shopId}</div>
+                        <div class="detail-label">Status:</div>
+                        <div class="detail-value" style="color: #4caf50">✓ Connected</div>
+                    </div>
+                `;
+                log(`Shop ID: ${shopId}`, 'success');
+            } else {
+                shopInfo.innerHTML = '<div style="color: #f44336">⚠ No shop ID found - please login first</div>';
+                log('No shop ID found!', 'error');
+            }
+        }
+
+        async function checkDatabase() {
+            clearLog();
+            log('Checking appointments directly from Supabase...');
+
+            const shopId = SharedData.getCurrentShopId();
+            if (!shopId) {
+                log('No shop ID available', 'error');
+                return;
+            }
+
+            try {
+                // Query directly from Supabase
+                const { data, error } = await supabaseClient
+                    .from('appointments')
+                    .select('*')
+                    .eq('shop_id', shopId)
+                    .order('appointment_date', { ascending: false })
+                    .limit(10);
+
+                if (error) {
+                    log(`Database error: ${error.message}`, 'error');
+                    return;
+                }
+
+                log(`Found ${data ? data.length : 0} appointments in database`, 'success');
+
+                if (data && data.length > 0) {
+                    log('\n=== Appointments in Database ===\n', 'info');
+                    data.forEach((apt, index) => {
+                        log(`\n--- Appointment ${index + 1} ---`, 'info');
+                        log(`ID: ${apt.id}`, 'info');
+                        log(`Date: ${apt.appointment_date}`, 'info');
+                        log(`Time: ${apt.start_time} - ${apt.end_time}`, 'info');
+                        log(`Customer: ${apt.customer_name}`, 'info');
+                        log(`Barber ID: ${apt.barber_id}`, 'info');
+                        log(`Service IDs: ${JSON.stringify(apt.service_ids)}`, 'info');
+                        log(`Status: ${apt.status}`, 'info');
+                        log(`Created: ${apt.created_at}`, 'info');
+                    });
+                } else {
+                    log('No appointments found in database', 'warning');
+                }
+            } catch (error) {
+                log(`Exception: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkCache() {
+            clearLog();
+            log('Checking SharedData cache...');
+
+            // Check the cache
+            const cachedAppointments = SharedData.appointmentsCache;
+
+            if (!cachedAppointments) {
+                log('Cache is null - not initialized', 'warning');
+            } else if (cachedAppointments.length === 0) {
+                log('Cache is empty array', 'warning');
+            } else {
+                log(`Cache has ${cachedAppointments.length} appointments`, 'success');
+
+                log('\n=== Appointments in Cache ===\n', 'info');
+                cachedAppointments.forEach((apt, index) => {
+                    log(`\n--- Cached Appointment ${index + 1} ---`, 'info');
+                    log(`ID: ${apt.id}`, 'info');
+                    log(`Date: ${apt.date}`, 'info');
+                    log(`Time: ${apt.time} - ${apt.endTime}`, 'info');
+                    log(`Customer: ${apt.customerName}`, 'info');
+                    log(`Barber ID: ${apt.barberId}`, 'info');
+                    log(`Services: ${JSON.stringify(apt.services)}`, 'info');
+                });
+            }
+
+            // Try getAppointmentsByDate for today
+            const today = new Date().toISOString().split('T')[0];
+            const todayApts = SharedData.getAppointmentsByDate(today);
+            log(`\ngetAppointmentsByDate('${today}') returns: ${todayApts.length} appointments`, 'info');
+        }
+
+        async function testBooking() {
+            clearLog();
+            log('Testing booking flow...');
+
+            const shopId = SharedData.getCurrentShopId();
+            if (!shopId) {
+                log('No shop ID available', 'error');
+                return;
+            }
+
+            // Get first barber
+            const barbers = await SharedData.getBarbers();
+            if (!barbers || barbers.length === 0) {
+                log('No barbers found', 'error');
+                return;
+            }
+
+            const barber = barbers[0];
+            log(`Using barber: ${barber.name} (${barber.id})`, 'info');
+
+            // Get first enabled service
+            const services = SharedData.getServices();
+            const enabledServiceId = Object.keys(services).find(id => services[id].enabled);
+
+            if (!enabledServiceId) {
+                log('No enabled services found', 'error');
+                return;
+            }
+
+            log(`Using service: ${services[enabledServiceId].name}`, 'info');
+
+            // Create test appointment
+            const testAppointment = {
+                barberId: barber.id,
+                customerName: 'Debug Test',
+                customerPhone: '555-0123',
+                customerEmail: 'debug@test.com',
+                services: [enabledServiceId],
+                date: new Date().toISOString().split('T')[0],
+                time: '14:00',
+                notes: 'Debug test appointment',
+                totalPrice: 25
+            };
+
+            log('\nCalling SharedData.saveAppointment()...', 'info');
+            const bookingId = SharedData.saveAppointment(testAppointment);
+            log(`Returned booking ID: ${bookingId}`, 'info');
+
+            // Wait a bit for async save
+            setTimeout(async () => {
+                log('\nChecking if appointment was saved...', 'info');
+                await checkDatabase();
+            }, 2000);
+        }
+
+        async function refreshAndCheck() {
+            clearLog();
+            log('Refreshing appointments from database...');
+
+            // Force refresh
+            const appointments = await SharedData.getAppointments();
+            log(`Fetched ${appointments ? appointments.length : 0} appointments`, 'success');
+
+            // Check cache
+            await checkCache();
+        }
+
+        async function checkToday() {
+            clearLog();
+            const today = new Date().toISOString().split('T')[0];
+            log(`Checking appointments for today: ${today}`);
+
+            // Refresh first
+            await SharedData.getAppointments();
+
+            // Get today's appointments
+            const todayAppointments = SharedData.getAppointmentsByDate(today);
+
+            log(`Found ${todayAppointments.length} appointments for today`,
+                todayAppointments.length > 0 ? 'success' : 'warning');
+
+            if (todayAppointments.length > 0) {
+                todayAppointments.forEach((apt, index) => {
+                    log(`\n--- Today's Appointment ${index + 1} ---`, 'info');
+                    log(`Time: ${apt.time}`, 'info');
+                    log(`Customer: ${apt.customerName}`, 'info');
+                    log(`Services: ${JSON.stringify(apt.services)}`, 'info');
+                });
+            }
+        }
+
+        async function clearCache() {
+            clearLog();
+            log('Clearing cache...');
+            SharedData.appointmentsCache = null;
+            log('Cache cleared. Run refresh to reload.', 'success');
+        }
+
+        async function createTestBooking() {
+            const name = document.getElementById('test-name').value;
+            const date = document.getElementById('test-date').value;
+            const time = document.getElementById('test-time').value;
+
+            clearLog();
+            log('Creating test booking...');
+
+            // Get first barber
+            const barbers = await SharedData.getBarbers();
+            if (!barbers || barbers.length === 0) {
+                log('No barbers found', 'error');
+                return;
+            }
+
+            // Get first enabled service
+            const services = SharedData.getServices();
+            const enabledServiceId = Object.keys(services).find(id => services[id].enabled);
+
+            const testAppointment = {
+                barberId: barbers[0].id,
+                customerName: name,
+                customerPhone: '555-TEST',
+                customerEmail: 'test@debug.com',
+                services: [enabledServiceId],
+                date: date,
+                time: time,
+                notes: 'Created via debug tool',
+                totalPrice: 25
+            };
+
+            log(`Creating appointment for ${name} on ${date} at ${time}...`, 'info');
+
+            // Use addAppointment directly for better error handling
+            const result = await SharedData.addAppointment(testAppointment);
+
+            if (result) {
+                log(`✓ Appointment created successfully! ID: ${result.id}`, 'success');
+                setTimeout(() => refreshAndCheck(), 1000);
+            } else {
+                log('✗ Failed to create appointment', 'error');
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(initShop, 500);
+        });
+    </script>
+</body>
+</html>

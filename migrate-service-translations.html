@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Migrate Service Translations</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .service-item {
+            background: #f9f9f9;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        input {
+            padding: 5px;
+            margin: 0 10px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 10px;
+            background: #e3f2fd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Update Service Translations</h1>
+    <p>This will help you add the English translations for your services.</p>
+
+    <div id="services-list"></div>
+
+    <button onclick="saveTranslations()">Save All Translations</button>
+    <button onclick="autoFillCommon()">Auto-fill Common Translations</button>
+
+    <div id="status" class="status" style="display: none;"></div>
+
+    <script src="shared-data.js"></script>
+    <script>
+        let services = {};
+
+        async function loadServices() {
+            await SharedData.initialize();
+            services = SharedData.getServices();
+
+            const container = document.getElementById('services-list');
+            container.innerHTML = '';
+
+            Object.entries(services).forEach(([id, service]) => {
+                const div = document.createElement('div');
+                div.className = 'service-item';
+
+                // Determine what we currently have
+                const hasZh = service.name_zh ? '✓' : '✗';
+                const hasEn = service.name_en ? '✓' : '✗';
+
+                div.innerHTML = `
+                    <h3>${service.name}</h3>
+                    <div>
+                        <label>Chinese Name (${hasZh}):</label>
+                        <input type="text" id="zh-${id}" value="${service.name_zh || ''}" placeholder="Enter Chinese name">
+                    </div>
+                    <div>
+                        <label>English Name (${hasEn}):</label>
+                        <input type="text" id="en-${id}" value="${service.name_en || ''}" placeholder="Enter English name">
+                    </div>
+                    <div style="margin-top: 5px; color: #666; font-size: 12px;">
+                        Duration: ${service.duration} min | Price: $${service.price}
+                    </div>
+                `;
+
+                container.appendChild(div);
+            });
+        }
+
+        function autoFillCommon() {
+            // Common translations mapping
+            const translations = {
+                "男士理发": "Men's Cut",
+                "女士理发": "Women's Cut",
+                "儿童理发": "Children's Cut",
+                "染发": "Hair Coloring",
+                "挑染": "Highlights"
+            };
+
+            Object.entries(services).forEach(([id, service]) => {
+                const zhInput = document.getElementById(`zh-${id}`);
+                const enInput = document.getElementById(`en-${id}`);
+
+                // If we have Chinese name but no English, try to translate
+                if (service.name_zh && !service.name_en) {
+                    const translation = translations[service.name_zh];
+                    if (translation && enInput) {
+                        enInput.value = translation;
+                        enInput.style.background = '#fff3cd';
+                    }
+                }
+
+                // If we have English name but no Chinese, try reverse translation
+                if (service.name_en && !service.name_zh) {
+                    const reverseTranslations = Object.entries(translations).find(([zh, en]) => en === service.name_en);
+                    if (reverseTranslations && zhInput) {
+                        zhInput.value = reverseTranslations[0];
+                        zhInput.style.background = '#fff3cd';
+                    }
+                }
+
+                // If we only have service.name, try to figure out what it is
+                if (!service.name_zh && !service.name_en && service.name) {
+                    // Check if it's Chinese
+                    if (translations[service.name]) {
+                        zhInput.value = service.name;
+                        enInput.value = translations[service.name];
+                        zhInput.style.background = '#fff3cd';
+                        enInput.style.background = '#fff3cd';
+                    } else {
+                        // Check if it's English
+                        const reverseTranslations = Object.entries(translations).find(([zh, en]) => en === service.name);
+                        if (reverseTranslations) {
+                            enInput.value = service.name;
+                            zhInput.value = reverseTranslations[0];
+                            zhInput.style.background = '#fff3cd';
+                            enInput.style.background = '#fff3cd';
+                        }
+                    }
+                }
+            });
+
+            showStatus('Auto-filled common translations. Please review and adjust as needed.', 'info');
+        }
+
+        async function saveTranslations() {
+            const updatedServices = {};
+
+            Object.entries(services).forEach(([id, service]) => {
+                const zhValue = document.getElementById(`zh-${id}`).value.trim();
+                const enValue = document.getElementById(`en-${id}`).value.trim();
+
+                updatedServices[id] = {
+                    ...service,
+                    name_zh: zhValue,
+                    name_en: enValue
+                };
+
+                // Ensure backward compatibility
+                if (!service.name) {
+                    updatedServices[id].name = enValue || zhValue || service.name;
+                }
+            });
+
+            try {
+                await SharedData.saveServices(updatedServices);
+                showStatus('Translations saved successfully! Refresh the owner-app to see the changes.', 'success');
+
+                // Reload to show updated status
+                setTimeout(() => loadServices(), 1000);
+            } catch (error) {
+                showStatus('Error saving translations: ' + error.message, 'error');
+            }
+        }
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.style.display = 'block';
+            status.textContent = message;
+            status.style.background = type === 'error' ? '#ffebee' : type === 'success' ? '#e8f5e9' : '#e3f2fd';
+        }
+
+        // Load on page load
+        loadServices();
+    </script>
+</body>
+</html>

@@ -44,9 +44,10 @@
         }
 
         .header h1 {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: 600;
             margin-bottom: 5px;
+            line-height: 1.2;
         }
 
         .header p {
@@ -225,6 +226,25 @@
             text-decoration: none;
         }
 
+        .lang-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            z-index: 100;
+        }
+
+        .lang-toggle:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
         .demo-note {
             background: #f0f7ff;
             border: 1px solid #d0e4ff;
@@ -244,15 +264,16 @@
 <body>
     <div class="phone-container">
         <div class="header">
-            <h1>Appointment Scheduler</h1>
-            <p>Professional Booking Management</p>
+            <button class="lang-toggle" onclick="toggleLanguage()">中文</button>
+            <h1 id="app-title">Appointment Scheduler</h1>
+            <p id="app-subtitle">Professional Booking Management</p>
         </div>
 
         <div class="content">
             <!-- Tab Navigation -->
             <div class="auth-tabs">
-                <button class="auth-tab active" onclick="switchTab('login')">Log In</button>
-                <button class="auth-tab" onclick="switchTab('signup')">Sign Up</button>
+                <button class="auth-tab active" onclick="switchTab('login')" id="login-tab">Log In</button>
+                <button class="auth-tab" onclick="switchTab('signup')" id="signup-tab">Sign Up</button>
             </div>
 
             <!-- Error/Success Messages -->
@@ -263,26 +284,26 @@
             <div class="form-section active" id="login-form">
                 <form onsubmit="handleLogin(event)">
                     <div class="form-group">
-                        <label>Email Address</label>
+                        <label id="login-email-label">Email Address</label>
                         <input type="email" id="login-email" required placeholder="shop@example.com">
                     </div>
                     <div class="form-group">
-                        <label>Password</label>
+                        <label id="login-password-label">Password</label>
                         <input type="password" id="login-password" required placeholder="Enter your password">
                     </div>
                     <button type="submit" class="btn btn-primary" id="login-btn">
-                        Log In
+                        <span id="login-btn-text">Log In</span>
                     </button>
                 </form>
 
                 <div class="forgot-password">
-                    <a href="#" onclick="handleForgotPassword()">Forgot Password?</a>
+                    <a href="#" onclick="handleForgotPassword()" id="forgot-password-link">Forgot Password?</a>
                 </div>
 
                 <div class="demo-note">
-                    <strong>Demo Account:</strong>
-                    Email: demo@example.com<br>
-                    Password: demo123
+                    <strong id="demo-account-title">Demo Account:</strong>
+                    <span id="demo-email">Email: demo@example.com</span><br>
+                    <span id="demo-password">Password: demo123</span>
                 </div>
             </div>
 
@@ -290,44 +311,206 @@
             <div class="form-section" id="signup-form">
                 <form onsubmit="handleSignup(event)">
                     <div class="form-group">
-                        <label>Shop Name</label>
+                        <label id="shop-name-label">Shop Name</label>
                         <input type="text" id="signup-shop" required placeholder="Premium Cuts Barbershop">
                     </div>
                     <div class="form-group half">
                         <div>
-                            <label>First Name</label>
+                            <label id="first-name-label">First Name</label>
                             <input type="text" id="signup-firstname" required placeholder="John">
                         </div>
                         <div>
-                            <label>Last Name</label>
+                            <label id="last-name-label">Last Name</label>
                             <input type="text" id="signup-lastname" required placeholder="Smith">
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>Email Address</label>
+                        <label id="signup-email-label">Email Address</label>
                         <input type="email" id="signup-email" required placeholder="shop@example.com">
                     </div>
                     <div class="form-group">
-                        <label>Password</label>
+                        <label id="signup-password-label">Password</label>
                         <input type="password" id="signup-password" required placeholder="At least 6 characters">
                     </div>
                     <div class="form-group">
-                        <label>Confirm Password</label>
+                        <label id="confirm-password-label">Confirm Password</label>
                         <input type="password" id="signup-confirm" required placeholder="Confirm your password">
                     </div>
                     <button type="submit" class="btn btn-primary" id="signup-btn">
-                        Create Account
+                        <span id="signup-btn-text">Create Account</span>
                     </button>
                 </form>
 
-                <div class="terms-note">
-                    By signing up, you agree to our <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>
+                <div class="terms-note" id="terms-note">
+                    <span id="terms-text">By signing up, you agree to our</span> <a href="#" id="terms-link">Terms of Service</a> <span id="terms-and">and</span> <a href="#" id="privacy-link">Privacy Policy</a>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
+        // Language state
+        let isZh = localStorage.getItem('language') === 'zh';
+
+        // Translations
+        const translations = {
+            zh: {
+                appTitle: '预约管理系统',
+                appSubtitle: '专业预约管理',
+                loginTab: '登录',
+                signupTab: '注册',
+                emailLabel: '邮箱地址',
+                passwordLabel: '密码',
+                loginBtnText: '登录',
+                forgotPassword: '忘记密码？',
+                demoAccountTitle: '演示账户：',
+                demoEmail: '邮箱：demo@example.com',
+                demoPassword: '密码：demo123',
+                shopNameLabel: '店铺名称',
+                firstNameLabel: '名',
+                lastNameLabel: '姓',
+                signupEmailLabel: '邮箱地址',
+                signupPasswordLabel: '密码',
+                confirmPasswordLabel: '确认密码',
+                signupBtnText: '创建账户',
+                termsText: '注册即表示您同意我们的',
+                termsLink: '服务条款',
+                termsAnd: '和',
+                privacyLink: '隐私政策',
+                // Placeholders
+                emailPlaceholder: 'shop@example.com',
+                passwordPlaceholder: '输入密码',
+                shopNamePlaceholder: '优质理发店',
+                firstNamePlaceholder: '张',
+                lastNamePlaceholder: '三',
+                passwordMinPlaceholder: '至少6个字符',
+                confirmPasswordPlaceholder: '确认密码',
+                // Error messages
+                passwordMismatch: '密码不匹配',
+                passwordTooShort: '密码至少需要6个字符',
+                loginFailed: '登录失败。请检查您的凭据。',
+                signupFailed: '注册失败。请重试。',
+                emailRequired: '请先输入您的邮箱地址',
+                errorOccurred: '发生错误。请重试。',
+                emailNotConfirmed: '邮箱未确认',
+                emailAlreadyRegistered: '该邮箱已被注册。请登录。',
+                // Success messages
+                loginSuccess: '登录成功！正在跳转...',
+                accountCreated: '账户创建成功！',
+                passwordResetSent: '密码重置说明已发送至',
+                // Loading states
+                loggingIn: '登录中',
+                creatingAccount: '创建账户中'
+            },
+            en: {
+                appTitle: 'Appointment<br>Scheduler',
+                appSubtitle: 'Professional Booking Management',
+                loginTab: 'Log In',
+                signupTab: 'Sign Up',
+                emailLabel: 'Email Address',
+                passwordLabel: 'Password',
+                loginBtnText: 'Log In',
+                forgotPassword: 'Forgot Password?',
+                demoAccountTitle: 'Demo Account:',
+                demoEmail: 'Email: demo@example.com',
+                demoPassword: 'Password: demo123',
+                shopNameLabel: 'Shop Name',
+                firstNameLabel: 'First Name',
+                lastNameLabel: 'Last Name',
+                signupEmailLabel: 'Email Address',
+                signupPasswordLabel: 'Password',
+                confirmPasswordLabel: 'Confirm Password',
+                signupBtnText: 'Create Account',
+                termsText: 'By signing up, you agree to our',
+                termsLink: 'Terms of Service',
+                termsAnd: 'and',
+                privacyLink: 'Privacy Policy',
+                // Placeholders
+                emailPlaceholder: 'shop@example.com',
+                passwordPlaceholder: 'Enter your password',
+                shopNamePlaceholder: 'Premium Cuts Barbershop',
+                firstNamePlaceholder: 'John',
+                lastNamePlaceholder: 'Smith',
+                passwordMinPlaceholder: 'At least 6 characters',
+                confirmPasswordPlaceholder: 'Confirm your password',
+                // Error messages
+                passwordMismatch: 'Passwords do not match',
+                passwordTooShort: 'Password must be at least 6 characters',
+                loginFailed: 'Login failed. Please check your credentials.',
+                signupFailed: 'Signup failed. Please try again.',
+                emailRequired: 'Please enter your email address first',
+                errorOccurred: 'An error occurred. Please try again.',
+                emailNotConfirmed: 'Email not confirmed',
+                emailAlreadyRegistered: 'This email is already registered. Please login instead.',
+                // Success messages
+                loginSuccess: 'Login successful! Redirecting...',
+                accountCreated: 'Account created successfully!',
+                passwordResetSent: 'Password reset instructions sent to',
+                // Loading states
+                loggingIn: 'Logging in',
+                creatingAccount: 'Creating Account'
+            }
+        };
+
+        // Toggle language
+        function toggleLanguage() {
+            isZh = !isZh;
+            localStorage.setItem('language', isZh ? 'zh' : 'en');
+            updateLanguage();
+        }
+
+        // Update all text based on language
+        function updateLanguage() {
+            const t = isZh ? translations.zh : translations.en;
+
+            // Update language toggle button
+            document.querySelector('.lang-toggle').textContent = isZh ? 'EN' : '中文';
+
+            // Update header
+            document.getElementById('app-title').innerHTML = t.appTitle;
+            document.getElementById('app-subtitle').textContent = t.appSubtitle;
+
+            // Update tabs
+            document.getElementById('login-tab').textContent = t.loginTab;
+            document.getElementById('signup-tab').textContent = t.signupTab;
+
+            // Update login form
+            document.getElementById('login-email-label').textContent = t.emailLabel;
+            document.getElementById('login-password-label').textContent = t.passwordLabel;
+            document.getElementById('login-btn-text').textContent = t.loginBtnText;
+            document.getElementById('forgot-password-link').textContent = t.forgotPassword;
+
+            // Update demo note
+            document.getElementById('demo-account-title').textContent = t.demoAccountTitle;
+            document.getElementById('demo-email').textContent = t.demoEmail;
+            document.getElementById('demo-password').textContent = t.demoPassword;
+
+            // Update signup form
+            document.getElementById('shop-name-label').textContent = t.shopNameLabel;
+            document.getElementById('first-name-label').textContent = t.firstNameLabel;
+            document.getElementById('last-name-label').textContent = t.lastNameLabel;
+            document.getElementById('signup-email-label').textContent = t.signupEmailLabel;
+            document.getElementById('signup-password-label').textContent = t.signupPasswordLabel;
+            document.getElementById('confirm-password-label').textContent = t.confirmPasswordLabel;
+            document.getElementById('signup-btn-text').textContent = t.signupBtnText;
+
+            // Update terms note
+            document.getElementById('terms-text').textContent = t.termsText;
+            document.getElementById('terms-link').textContent = t.termsLink;
+            document.getElementById('terms-and').textContent = t.termsAnd;
+            document.getElementById('privacy-link').textContent = t.privacyLink;
+
+            // Update placeholders
+            document.getElementById('login-email').placeholder = t.emailPlaceholder;
+            document.getElementById('login-password').placeholder = t.passwordPlaceholder;
+            document.getElementById('signup-shop').placeholder = t.shopNamePlaceholder;
+            document.getElementById('signup-firstname').placeholder = t.firstNamePlaceholder;
+            document.getElementById('signup-lastname').placeholder = t.lastNamePlaceholder;
+            document.getElementById('signup-email').placeholder = t.emailPlaceholder;
+            document.getElementById('signup-password').placeholder = t.passwordMinPlaceholder;
+            document.getElementById('signup-confirm').placeholder = t.confirmPasswordPlaceholder;
+        }
+
         // Check if already logged in
         async function checkAuth() {
             try {
@@ -379,14 +562,16 @@
             const button = document.getElementById('login-btn');
 
             // Show loading
+            const t = isZh ? translations.zh : translations.en;
             button.disabled = true;
-            button.innerHTML = 'Logging in<span class="loading"></span>';
+            button.innerHTML = t.loggingIn + '<span class="loading"></span>';
 
             try {
                 const result = await SharedData.signIn(email, password);
 
                 if (result.success) {
-                    showSuccess('Login successful! Redirecting...');
+                    const t = isZh ? translations.zh : translations.en;
+                    showSuccess(t.loginSuccess);
 
                     // Check if setup is complete
                     const setupComplete = localStorage.getItem('setupComplete') === 'true';
@@ -411,15 +596,18 @@
                             <br><br>
                             <strong>For Production:</strong> Check your email for the confirmation link.`);
                     } else {
-                        showError(result.error?.message || 'Login failed. Please check your credentials.');
+                        const t = isZh ? translations.zh : translations.en;
+                        showError(result.error?.message || t.loginFailed);
                     }
+                    const t = isZh ? translations.zh : translations.en;
                     button.disabled = false;
-                    button.innerHTML = 'Log In';
+                    button.innerHTML = t.loginBtnText;
                 }
             } catch (error) {
-                showError('An error occurred. Please try again.');
+                const t = isZh ? translations.zh : translations.en;
+                showError(t.errorOccurred);
                 button.disabled = false;
-                button.innerHTML = 'Log In';
+                button.innerHTML = t.loginBtnText;
             }
         }
 
@@ -438,19 +626,22 @@
 
             // Validate passwords match
             if (password !== confirm) {
-                showError('Passwords do not match');
+                const t = isZh ? translations.zh : translations.en;
+                showError(t.passwordMismatch);
                 return;
             }
 
             // Validate password length
             if (password.length < 6) {
-                showError('Password must be at least 6 characters');
+                const t = isZh ? translations.zh : translations.en;
+                showError(t.passwordTooShort);
                 return;
             }
 
             // Show loading
+            const t = isZh ? translations.zh : translations.en;
             button.disabled = true;
-            button.innerHTML = 'Creating Account<span class="loading"></span>';
+            button.innerHTML = t.creatingAccount + '<span class="loading"></span>';
 
             try {
                 const ownerName = `${firstName} ${lastName}`;
@@ -480,7 +671,8 @@
                             document.getElementById('login-email').value = email;
                         }, 5000);
                     } else {
-                        showSuccess('Account created successfully! Redirecting to setup...');
+                        const t = isZh ? translations.zh : translations.en;
+                        showSuccess(t.accountCreated + ' Redirecting to setup...');
 
                         // No need to save to localStorage - data is in Supabase now
 
@@ -490,38 +682,60 @@
                     }
                 } else {
                     // Handle specific error messages
-                    let errorMessage = 'Signup failed. Please try again.';
+                    const t = isZh ? translations.zh : translations.en;
+                    let errorMessage = t.signupFailed;
                     if (result.error?.message) {
                         if (result.error.message.includes('not authorized')) {
                             errorMessage = 'Email confirmation is required. Please check your email.';
                         } else if (result.error.message.includes('already registered')) {
-                            errorMessage = 'This email is already registered. Please login instead.';
+                            errorMessage = t.emailAlreadyRegistered;
                         } else {
                             errorMessage = result.error.message;
                         }
                     }
                     showError(errorMessage);
                     button.disabled = false;
-                    button.innerHTML = 'Create Account';
+                    button.innerHTML = t.signupBtnText;
                 }
             } catch (error) {
                 console.error('Signup error:', error);
-                showError(`An error occurred: ${error.message || 'Please try again.'}`);
+                const t = isZh ? translations.zh : translations.en;
+                showError(`${t.errorOccurred}: ${error.message || 'Please try again.'}`);
                 button.disabled = false;
-                button.innerHTML = 'Create Account';
+                button.innerHTML = t.signupBtnText;
             }
         }
 
         // Handle forgot password
-        function handleForgotPassword() {
+        async function handleForgotPassword() {
             const email = document.getElementById('login-email').value;
+            const t = isZh ? translations.zh : translations.en;
             if (!email) {
-                showError('Please enter your email address first');
+                showError(t.emailRequired);
                 return;
             }
 
-            // TODO: Implement password reset with Supabase
-            showSuccess('Password reset instructions sent to ' + email);
+            // Show loading state
+            hideMessages();
+            showSuccess('Sending password reset email...');
+
+            try {
+                const result = await SharedData.resetPasswordForEmail(email);
+
+                if (result.success) {
+                    showSuccess(`${t.passwordResetSent} ${email}<br><br>Please check your email for the password reset link.`);
+                } else {
+                    // Handle specific error messages
+                    let errorMessage = 'Failed to send password reset email.';
+                    if (result.error?.message) {
+                        errorMessage = result.error.message;
+                    }
+                    showError(errorMessage);
+                }
+            } catch (error) {
+                console.error('Password reset error:', error);
+                showError('An error occurred. Please try again later.');
+            }
         }
 
         // Show error message
@@ -545,6 +759,7 @@
         }
 
         // Initialize
+        updateLanguage();
         checkAuth();
     </script>
 </body>

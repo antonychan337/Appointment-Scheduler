@@ -272,12 +272,100 @@ const SharedData = {
         localStorage.removeItem('supabase_shop_id');
     },
 
+    async resetPasswordForEmail(email) {
+        console.log('resetPasswordForEmail called for:', email);
+        try {
+            const { data, error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+                redirectTo: `${window.location.origin}/password-reset.html`
+            });
+
+            if (error) throw error;
+
+            console.log('Password reset email sent successfully to:', email);
+            return { success: true, data };
+        } catch (error) {
+            console.error('Password reset error:', error);
+            return { success: false, error };
+        }
+    },
+
+    async updatePassword(newPassword) {
+        console.log('updatePassword called');
+        try {
+            const { data, error } = await supabaseClient.auth.updateUser({
+                password: newPassword
+            });
+
+            if (error) throw error;
+
+            console.log('Password updated successfully');
+            return { success: true, data };
+        } catch (error) {
+            console.error('Update password error:', error);
+            return { success: false, error };
+        }
+    },
+
     // Manual shop ID setter for debugging
     setCurrentShopId(shopId) {
         console.log('Manually setting shop ID to:', shopId);
         currentShopId = shopId;
         localStorage.setItem('supabase_shop_id', shopId);
         return shopId;
+    },
+
+    // Get shop ID from slug (for customer app)
+    async getShopIdFromSlug(slug) {
+        console.log('Getting shop ID from slug:', slug);
+
+        if (!slug) return null;
+
+        try {
+            // Query shops table by slug
+            const { data: shop, error } = await supabaseClient
+                .from('shops')
+                .select('id')
+                .eq('slug', slug)
+                .single();
+
+            if (error) {
+                console.error('Error fetching shop by slug:', error);
+
+                // If slug column doesn't exist, try by name
+                if (error.code === '42703' || error.message?.includes('column')) {
+                    console.log('Slug column not found, trying by name...');
+
+                    // Convert slug to name format (replace underscores with spaces, capitalize)
+                    const shopName = slug.replace(/_/g, ' ')
+                        .split(' ')
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                        .join(' ');
+
+                    const { data: shopByName, error: nameError } = await supabaseClient
+                        .from('shops')
+                        .select('id')
+                        .ilike('name', shopName)
+                        .single();
+
+                    if (!nameError && shopByName) {
+                        console.log('Found shop by name:', shopByName.id);
+                        return shopByName.id;
+                    }
+                }
+
+                return null;
+            }
+
+            if (shop) {
+                console.log('Found shop by slug:', shop.id);
+                return shop.id;
+            }
+
+            return null;
+        } catch (error) {
+            console.error('Exception getting shop ID from slug:', error);
+            return null;
+        }
     },
 
     getCurrentShopId() {
@@ -323,22 +411,34 @@ const SharedData = {
             if (error) throw error;
 
             // Transform to match existing format
-            return (data || []).map(barber => ({
-                id: barber.id,
-                name: barber.name,
-                title: barber.title,
-                isOwner: barber.is_owner,
-                // Transform service_ids array to services object with boolean values
-                services: Array.isArray(barber.service_ids)
-                    ? barber.service_ids.reduce((acc, id) => { acc[id] = true; return acc; }, {})
-                    : (barber.service_ids || {}),
-                hours: barber.working_hours || this.getStoreHours(),
-                usesStoreHours: barber.uses_store_hours || barber.is_owner // Owner uses store hours by default
-            }));
+            return (data || []).map(barber => {
+                console.log(`🔍 Barber "${barber.name}" service_ids from DB:`, barber.service_ids);
+
+                const transformedBarber = {
+                    id: barber.id,
+                    name: barber.name,
+                    title: barber.title,
+                    isOwner: barber.is_owner,
+                    // Transform service_ids array to services object with boolean values
+                    services: Array.isArray(barber.service_ids)
+                        ? barber.service_ids.reduce((acc, id) => { acc[id] = true; return acc; }, {})
+                        : (barber.service_ids || {}),
+                    hours: barber.working_hours || this.getStoreHours(),
+                    usesStoreHours: barber.uses_store_hours || barber.is_owner // Owner uses store hours by default
+                };
+
+                console.log(`🔍 Barber "${barber.name}" transformed services:`, transformedBarber.services);
+                return transformedBarber;
+            });
         } catch (error) {
             console.error('Error fetching barbers:', error);
             return [];
         }
+    },
+
+    getBarbersSync() {
+        // Synchronous version - returns cached barbers or empty array
+        return this.barbersCache || [];
     },
 
     getBarberById(barberId) {
@@ -622,6 +722,14 @@ const SharedData = {
 
             if (error) throw error;
 
+            console.log('🔍 RAW SERVICES FROM DATABASE:', data);
+            console.log('🔍 Number of services loaded:', data ? data.length : 0);
+            if (data && data.length > 0) {
+                data.forEach(service => {
+                    console.log(`🔍 Service "${service.name}": name_en="${service.name_en}", name_zh="${service.name_zh}"`);
+                });
+            }
+
             // Transform to match existing format (object instead of array)
             const services = {};
 
@@ -664,6 +772,7 @@ const SharedData = {
 
                 services[service.id] = {
                     name: service.name,
+                    name_en: service.name_en,
                     name_zh: service.name_zh,
                     duration: service.duration,
                     price: service.price,
@@ -677,6 +786,7 @@ const SharedData = {
 
             // Cache services for synchronous access
             this.servicesCache = services;
+            console.log('🔍 SERVICES CACHE STORED:', this.servicesCache);
             return services;
         } catch (error) {
             console.error('Error fetching services:', error);
@@ -713,6 +823,7 @@ const SharedData = {
     },
 
     async saveServices(services) {
+        console.log('💾 SUPABASE saveServices called with:', services);
         if (!currentShopId) return;
 
         try {
@@ -795,6 +906,7 @@ const SharedData = {
 
                 const serviceData = {
                     name: service.name,
+                    name_en: service.name_en,
                     name_zh: service.name_zh,
                     duration: service.duration,
                     price: service.price,
@@ -804,7 +916,8 @@ const SharedData = {
                     color: assignedColor
                 };
 
-                console.log(`Saving service "${service.name}" with color: ${assignedColor}`);
+                console.log(`💾 Preparing service "${service.name}" for database:`);
+                console.log(`💾   name_en: "${serviceData.name_en}", name_zh: "${serviceData.name_zh}"`);
 
                 // Check if a service with this name already exists
                 if (existingByName[service.name]) {
@@ -911,6 +1024,15 @@ const SharedData = {
         }
     },
 
+    getAppointmentsSync() {
+        // Synchronous version that returns cached appointments
+        if (!this.appointmentsCache) {
+            console.log('Warning: Appointments cache not loaded, returning empty array');
+            return [];
+        }
+        return this.appointmentsCache;
+    },
+
     getAppointmentsByDate(date) {
         // Synchronous version using cache
         if (!this.appointmentsCache || this.appointmentsCache === null) {
@@ -977,11 +1099,89 @@ const SharedData = {
 
             if (error) throw error;
 
+            // Update the appointments cache
+            if (this.appointmentsCache) {
+                const newAppointment = {
+                    id: data.id,
+                    barberId: data.barber_id,
+                    customerName: data.customer_name,
+                    customerPhone: data.customer_phone,
+                    customerEmail: data.customer_email,
+                    services: data.service_ids,
+                    date: data.appointment_date,
+                    time: data.start_time,
+                    endTime: data.end_time,
+                    status: data.status,
+                    notes: data.customer_notes,
+                    createdAt: data.created_at
+                };
+                this.appointmentsCache.push(newAppointment);
+            }
+
             return data;
         } catch (error) {
             console.error('Error adding appointment:', error);
             return null;
         }
+    },
+
+    // Async wrapper for appointment saving with proper error handling
+    async saveAppointmentAsync(appointment) {
+        console.log('saveAppointmentAsync called with appointment:', appointment);
+
+        // Check if shop context is set
+        if (!currentShopId) {
+            console.error('Cannot save appointment: No shop ID set');
+            throw new Error('Shop context not initialized');
+        }
+
+        try {
+            const data = await this.addAppointment(appointment);
+            if (data) {
+                console.log('Appointment saved successfully:', data.id);
+                // Refresh appointments cache after successful save
+                await this.getAppointments();
+                return data.id;
+            } else {
+                throw new Error('Failed to save appointment - no data returned');
+            }
+        } catch (error) {
+            console.error('Error saving appointment:', error);
+            throw error;
+        }
+    },
+
+    // Synchronous wrapper for compatibility with old code
+    saveAppointment(appointment) {
+        console.log('saveAppointment called - using async addAppointment');
+        console.log('Current shop ID:', currentShopId);
+
+        // Check if shop context is set
+        if (!currentShopId) {
+            console.error('Cannot save appointment: No shop ID set');
+            alert('Unable to save appointment. Please refresh the page and try again.');
+            return null;
+        }
+
+        // Call the async function but return a temporary ID immediately
+        this.addAppointment(appointment).then(data => {
+            if (data) {
+                console.log('Appointment saved successfully:', data.id);
+                // Refresh appointments cache after successful save
+                this.getAppointments();
+            } else {
+                console.error('Failed to save appointment');
+                alert('Failed to save appointment. Please try again.');
+            }
+        }).catch(error => {
+            console.error('Error saving appointment:', error);
+            alert('Error saving appointment. Please check your connection and try again.');
+        });
+
+        // Return a temporary ID for immediate use
+        const tempId = 'TEMP_' + Date.now();
+        appointment.id = tempId;
+        return tempId;
     },
 
     async cancelAppointment(appointmentId) {
@@ -1211,6 +1411,13 @@ const SharedData = {
 
     // AVAILABILITY CHECKING
     getAvailableSlots(date, serviceDuration = 30, barberId = null) {
+        // Ensure appointments cache is loaded
+        if (!this.appointmentsCache) {
+            console.log('[Bridge] Appointments cache not loaded, loading now...');
+            // Try to load appointments synchronously from cache
+            this.getAppointments();
+        }
+
         // Force refresh store hours if cache is potentially stale
         if (!this.storeHoursCache || !this.storeHoursCache.thursday ||
             (this.storeHoursCache.thursday && this.storeHoursCache.thursday.closed === undefined)) {
@@ -1221,7 +1428,8 @@ const SharedData = {
             date: date,
             dateString: date ? date.toString() : 'null',
             serviceDuration: serviceDuration,
-            barberId: barberId
+            barberId: barberId,
+            appointmentsLoaded: this.appointmentsCache ? this.appointmentsCache.length : 'not loaded'
         });
         const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
         console.log('[Bridge] Day name extracted:', dayName);
@@ -1265,15 +1473,43 @@ const SharedData = {
     },
 
     isSlotConflicting(date, time, duration, barberId = null) {
-        // For now, no conflicts - all slots are available
-        // TODO: Check against appointments and blocked times
+        // Check if this time slot conflicts with existing appointments
+        const dateStr = typeof date === 'string' ? date : date.toISOString().split('T')[0];
+
+        // Get appointments for this date
+        const appointments = this.getAppointmentsByDate(dateStr);
+
+        // Convert time to minutes for easier comparison
+        const slotStart = this.timeToMinutes(time);
+        const slotEnd = slotStart + duration;
+
+        // Check each appointment for conflicts
+        for (const apt of appointments) {
+            // If barberId is specified, only check appointments for that barber
+            if (barberId && apt.barberId !== barberId) {
+                continue;
+            }
+
+            // Convert appointment times to minutes
+            const aptStart = this.timeToMinutes(apt.time);
+            const aptEnd = this.timeToMinutes(apt.endTime);
+
+            // Check for overlap
+            // Slots conflict if they overlap at any point
+            if ((slotStart < aptEnd && slotEnd > aptStart)) {
+                console.log(`Slot conflict detected: ${time} conflicts with appointment at ${apt.time}-${apt.endTime}`);
+                return true;
+            }
+        }
+
+        // TODO: Also check blocked times when implemented
+
         return false;
     },
 
     isTimeSlotBooked(date, time, duration, barberId) {
-        // This needs to be async in real implementation
-        // For now, return false to allow all bookings
-        return false;
+        // Use the same conflict checking logic
+        return this.isSlotConflicting(date, time, duration, barberId);
     },
 
     // OWNER PROFILE
@@ -1542,6 +1778,7 @@ const SharedData = {
     defaultServices: {
         'mens-cut': {
             name: "Men's Cut",
+            name_en: "Men's Cut",
             name_zh: "男士理发",
             duration: 30,
             price: 25,
@@ -1551,6 +1788,7 @@ const SharedData = {
         },
         'womens-cut': {
             name: "Women's Cut",
+            name_en: "Women's Cut",
             name_zh: "女士理发",
             duration: 45,
             price: 35,
@@ -1560,6 +1798,7 @@ const SharedData = {
         },
         'kids-cut': {
             name: "Children's Cut",
+            name_en: "Children's Cut",
             name_zh: "儿童理发",
             duration: 15,
             price: 15,
@@ -1586,6 +1825,13 @@ const SharedData = {
     },
 
     // Utility functions
+    formatTime(timeStr) {
+        // Format time in 24-hour format
+        if (!timeStr) return '';
+        const [hour, minute] = timeStr.split(':').map(Number);
+        return `${hour.toString().padStart(2, '0')}:${(minute || 0).toString().padStart(2, '0')}`;
+    },
+
     timeToMinutes(time) {
         if (!time) return 0;
         const [hours, minutes] = time.split(':').map(Number);
@@ -1596,6 +1842,289 @@ const SharedData = {
         const hours = Math.floor(minutes / 60);
         const mins = minutes % 60;
         return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+    },
+
+    // Helper: Format time for display (12-hour format)
+    formatTimeDisplay(time) {
+        if (!time) return '';
+        const [hours, minutes] = time.split(':').map(Number);
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+        return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
+    },
+
+    // Email Functions (with real email support for different types)
+    sendEmail(type, appointment, oldAppointment = null) {
+        // type can be: 'confirmation', 'rescheduled', 'cancelled'
+
+        // Check owner's email preferences
+        const emailPrefs = JSON.parse(localStorage.getItem('emailPreferences') || '{}');
+
+        // Check if emails are enabled at all
+        if (emailPrefs.enabled === false) {
+            console.log('Email notifications disabled by owner');
+            return;
+        }
+
+        // Check specific email type preference
+        if (type === 'confirmation' && emailPrefs.confirmations === false) {
+            console.log('Confirmation emails disabled by owner');
+            return;
+        }
+        if (type === 'rescheduled' && emailPrefs.reschedules === false) {
+            console.log('Reschedule emails disabled by owner');
+            return;
+        }
+        if (type === 'cancelled' && emailPrefs.cancellations === false) {
+            console.log('Cancellation emails disabled by owner');
+            return;
+        }
+
+        // Check if EmailJS is configured
+        const emailConfig = JSON.parse(localStorage.getItem('emailConfig') || '{}');
+        if (!emailConfig.serviceId || !emailConfig.publicKey || !emailConfig.templateId) {
+            console.warn('EmailJS not configured - skipping email send');
+            return;
+        }
+
+        let baseUrl;
+
+        // Check if we're running locally (file:// protocol)
+        const isLocalTesting = window.location.protocol === 'file:';
+
+        if (isLocalTesting) {
+            // For local testing, always use the local file path
+            const currentPath = window.location.pathname;
+
+            // Clean up the path (remove any double slashes, etc.)
+            let cleanPath = currentPath.replace(/\/+/g, '/');
+
+            // Check if we're in customer-app or another page
+            if (cleanPath.includes('customer-app.html')) {
+                // Already in customer app, use current location
+                baseUrl = 'file://' + cleanPath;
+            } else {
+                // In another page (owner app, test page, etc.)
+                // Build path to customer-app.html
+                const dirPath = cleanPath.substring(0, cleanPath.lastIndexOf('/'));
+                baseUrl = 'file://' + dirPath + '/customer-app.html';
+            }
+        } else {
+            // Production environment - use configured URL
+            const bookingUrl = localStorage.getItem('bookingUrl');
+            if (bookingUrl) {
+                const urlData = JSON.parse(bookingUrl);
+                baseUrl = `https://mycompany.com/${urlData.slug}`;
+            } else {
+                // Fallback to current location
+                baseUrl = window.location.origin + '/customer-app.html';
+            }
+        }
+
+        // Format date for display
+        const appointmentDate = new Date(appointment.date + 'T00:00:00');
+        const dateStr = appointmentDate.toLocaleDateString('en', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        // Get owner profile and cancellation policy (emailConfig already retrieved above)
+        const ownerProfile = JSON.parse(localStorage.getItem('ownerProfile') || '{}');
+        const cancellationPolicy = JSON.parse(localStorage.getItem('cancellationPolicy') || '{}');
+
+        // Get customer's language preference (stored when they last used the app)
+        const customerLang = localStorage.getItem(`customerLang_${appointment.customerEmail}`) || 'en';
+        const isCustomerZh = customerLang === 'zh';
+
+        // Format cancellation policy text
+        let policyText = '';
+        if (cancellationPolicy.minNoticeHours && cancellationPolicy.minNoticeHours > 0) {
+            const hours = cancellationPolicy.minNoticeHours;
+            if (hours === 1) {
+                policyText = isCustomerZh ?
+                    '取消政策：需要提前1小时通知' :
+                    'Cancellation Policy: 1 hour notice required';
+            } else if (hours < 24) {
+                policyText = isCustomerZh ?
+                    `取消政策：需要提前${hours}小时通知` :
+                    `Cancellation Policy: ${hours} hours notice required`;
+            } else {
+                const days = Math.floor(hours / 24);
+                policyText = isCustomerZh ?
+                    `取消政策：需要提前${days}天通知` :
+                    `Cancellation Policy: ${days} day${days > 1 ? 's' : ''} notice required`;
+            }
+        }
+
+        // Try to send real email if EmailJS is configured
+        if (typeof emailjs !== 'undefined' && emailConfig.serviceId) {
+            // Get the appropriate template ID based on email type
+            // Note: confirmation and rescheduled use the same template (EmailJS free tier limit)
+            let templateId;
+            if (type === 'confirmation' || type === 'rescheduled') {
+                // Use the same template for both confirmation and rescheduled
+                templateId = emailConfig.templateId || emailConfig.confirmationTemplateId;
+            } else if (type === 'cancelled') {
+                // Use the cancellation template (hardcoded for now)
+                templateId = emailConfig.cancelledTemplateId || 'template_ppbr3sc';
+            }
+
+            if (!templateId) {
+                console.warn(`No template ID configured for ${type} emails`);
+                return;
+            }
+
+            // Prepare bilingual template parameters
+            const templateParams = {
+                to_email: appointment.customerEmail,
+                customer_name: appointment.customerName,
+                from_name: 'Book a Snip', // Platform name for sender
+                business_name: ownerProfile.storeName || emailConfig.businessName || 'Premium Cuts Barbershop', // Actual barber shop name
+                reply_to: emailConfig.replyTo || 'noreply@example.com',
+                booking_id: appointment.id,
+                barber_name: appointment.barberName || 'Staff',  // Add barber name
+                services: appointment.serviceNames ? appointment.serviceNames.join(', ') : appointment.services.join(', '),
+                date: dateStr,
+                time: this.formatTimeDisplay(appointment.time),
+                duration: appointment.totalDuration + (isCustomerZh ? ' 分钟' : ' minutes'),
+                price: '$' + appointment.totalPrice,
+                cancellation_policy: policyText,
+                // Bilingual headers
+                email_subject: type === 'confirmation' ?
+                    (isCustomerZh ? '预约确认' : 'Appointment Confirmation') :
+                    type === 'rescheduled' ?
+                    (isCustomerZh ? '预约已重新安排' : 'Appointment Rescheduled') :
+                    (isCustomerZh ? '预约已取消' : 'Appointment Cancelled'),
+                greeting: isCustomerZh ? `尊敬的${appointment.customerName}` : `Dear ${appointment.customerName}`,
+                confirmation_message: isCustomerZh ?
+                    '您的预约已确认。以下是您的预约详情：' :
+                    'Your appointment has been confirmed. Here are your booking details:',
+                label_booking_id: isCustomerZh ? '预约编号：' : 'Booking ID:',
+                label_barber: isCustomerZh ? '理发师：' : 'Barber:',  // Add barber label
+                label_services: isCustomerZh ? '服务项目：' : 'Services:',
+                label_date: isCustomerZh ? '日期：' : 'Date:',
+                label_time: isCustomerZh ? '时间：' : 'Time:',
+                label_duration: isCustomerZh ? '时长：' : 'Duration:',
+                label_price: isCustomerZh ? '价格：' : 'Total Price:',
+                label_location: isCustomerZh ? '地址：' : 'Location:',
+                label_contact: isCustomerZh ? '联系方式：' : 'Contact:',
+                button_modify: isCustomerZh ? '修改预约' : 'Modify Appointment',
+                button_cancel: isCustomerZh ? '取消预约' : 'Cancel Appointment',
+                footer_message: isCustomerZh ?
+                    '如需更改，请点击上面的按钮。' :
+                    'If you need to make any changes, click the buttons above.',
+                powered_by_text: isCustomerZh ? '预约服务由 Book a Snip 提供支持' : 'Booking powered by Book a Snip'
+            };
+
+            // For rescheduled appointments, modify the subject/content
+            if (type === 'rescheduled' && oldAppointment) {
+                const oldDate = new Date(oldAppointment.date + 'T00:00:00');
+                const oldDateStr = oldDate.toLocaleDateString('en', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+
+                // Add a note about the rescheduling in the services field
+                templateParams.services = `RESCHEDULED - ${templateParams.services}\n(Previously: ${oldDateStr} at ${this.formatTimeDisplay(oldAppointment.time)})`;
+            }
+
+            // Add type-specific parameters
+            if (type === 'confirmation' || type === 'rescheduled') {
+                templateParams.modify_link = `${baseUrl}?action=modify&bookingId=${appointment.id}`;
+                templateParams.cancel_link = `${baseUrl}?action=cancel&bookingId=${appointment.id}`;
+            }
+
+            if (type === 'rescheduled' && oldAppointment) {
+                // Add old appointment details for rescheduled email
+                const oldDate = new Date(oldAppointment.date + 'T00:00:00');
+                templateParams.old_date = oldDate.toLocaleDateString('en', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                templateParams.old_time = this.formatTimeDisplay(oldAppointment.time);
+                templateParams.old_services = oldAppointment.serviceNames ?
+                    oldAppointment.serviceNames.join(', ') :
+                    oldAppointment.services.join(', ');
+            }
+
+            if (type === 'cancelled') {
+                templateParams.booking_link = baseUrl;
+            }
+
+            // Send email using EmailJS with the appropriate template
+            emailjs.send(emailConfig.serviceId, templateId, templateParams)
+                .then(function(response) {
+                    console.log('✅ Email sent successfully!', response.status, response.text);
+
+                    // Store sent email record
+                    const sentEmails = JSON.parse(localStorage.getItem('sentEmails') || '[]');
+                    const subjects = {
+                        confirmation: 'Appointment Confirmation',
+                        rescheduled: 'Appointment Rescheduled',
+                        cancelled: 'Appointment Cancelled'
+                    };
+                    sentEmails.push({
+                        to: appointment.customerEmail,
+                        subject: subjects[type],
+                        type: type,
+                        sentAt: new Date().toISOString(),
+                        appointmentId: appointment.id,
+                        status: 'sent',
+                        method: 'emailjs'
+                    });
+                    localStorage.setItem('sentEmails', JSON.stringify(sentEmails));
+                })
+                .catch(function(error) {
+                    console.error('❌ Failed to send email:', error);
+                    alert('Email could not be sent. Please check your email configuration.');
+                });
+
+            return true;
+        } else {
+            // Fallback: Show in console and store locally
+            console.log('=== EMAIL CONFIRMATION (Demo Mode) ===');
+            console.log('ℹ️ To send real emails, configure EmailJS in Settings');
+            console.log('To:', appointment.customerEmail);
+            console.log('Subject: Appointment Confirmation');
+
+            // Store sent emails
+            const sentEmails = JSON.parse(localStorage.getItem('sentEmails') || '[]');
+            sentEmails.push({
+                to: appointment.customerEmail,
+                subject: 'Appointment Confirmation',
+                sentAt: new Date().toISOString(),
+                appointmentId: appointment.id,
+                status: 'demo',
+                method: 'console'
+            });
+            localStorage.setItem('sentEmails', JSON.stringify(sentEmails));
+
+            // Show demo notification
+            if (typeof alert !== 'undefined') {
+                alert('Demo Mode: Email confirmation logged to console.\nTo send real emails, configure EmailJS in owner settings.');
+            }
+
+            return true;
+        }
+    },
+
+    // Convenience methods for specific email types
+    sendConfirmationEmail(appointment) {
+        this.sendEmail('confirmation', appointment);
+    },
+
+    sendRescheduledEmail(newAppointment, oldAppointment) {
+        this.sendEmail('rescheduled', newAppointment, oldAppointment);
+    },
+
+    sendCancellationEmail(appointment) {
+        this.sendEmail('cancelled', appointment);
     }
 };
 

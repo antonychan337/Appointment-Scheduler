@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Barber Service Assignments</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Configuration -->
+    <script src="supabase-config.js"></script>
+    <!-- Supabase Bridge -->
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2C3E50;
+            margin-bottom: 20px;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            background: #e3f2fd;
+            border-radius: 5px;
+            border-left: 4px solid #2196f3;
+        }
+        .success {
+            background: #e8f5e9;
+            border-left-color: #4caf50;
+        }
+        .error {
+            background: #ffebee;
+            border-left-color: #f44336;
+        }
+        .info {
+            background: #fff3e0;
+            border-left-color: #ff9800;
+        }
+        button {
+            background: #2C3E50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #34495e;
+        }
+        .log {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            background: white;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fix Barber Service Assignments</h1>
+
+        <div class="status info">
+            This utility will fix barbers with empty service_ids by assigning them all enabled services from the shop.
+        </div>
+
+        <button onclick="checkCurrentState()">Check Current State</button>
+        <button onclick="fixBarberServices()">Fix Service Assignments</button>
+        <button onclick="clearLog()">Clear Log</button>
+
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        let shopId = null;
+
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.style.color = type === 'error' ? '#f44336' :
+                               type === 'success' ? '#4caf50' :
+                               type === 'warning' ? '#ff9800' : '#333';
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        async function checkCurrentState() {
+            clearLog();
+            addLog('Checking current state...');
+
+            try {
+                // Initialize SharedData
+                await SharedData.initialize();
+
+                // Get current shop
+                shopId = SharedData.getCurrentShopId() || localStorage.getItem('supabase_shop_id');
+
+                if (!shopId) {
+                    addLog('No shop ID found. Please login first.', 'error');
+                    return;
+                }
+
+                addLog(`Shop ID: ${shopId}`, 'success');
+
+                // Get shop name from profile
+                const profile = await SharedData.getProfile();
+                addLog(`Shop Name: ${profile?.storeName || 'Unknown'}`);
+
+                // Get all services
+                const services = SharedData.getServices();
+                const enabledServices = Object.entries(services)
+                    .filter(([_, service]) => service.enabled);
+
+                addLog(`Total services: ${Object.keys(services).length}`);
+                addLog(`Enabled services: ${enabledServices.length}`);
+
+                enabledServices.forEach(([id, service]) => {
+                    addLog(`  - ${service.name} (${id}): ${service.enabled ? 'Enabled' : 'Disabled'}`);
+                });
+
+                // Get all barbers
+                const barbers = await SharedData.getBarbers();
+                addLog(`\nTotal barbers: ${barbers.length}`);
+
+                barbers.forEach(barber => {
+                    const serviceCount = Object.keys(barber.services || {}).filter(id => barber.services[id]).length;
+                    const status = serviceCount === 0 ? '⚠️ NEEDS FIX' : '✅ OK';
+                    addLog(`  - ${barber.name} (${barber.id}): ${serviceCount} services ${status}`,
+                           serviceCount === 0 ? 'warning' : 'success');
+
+                    if (serviceCount === 0) {
+                        addLog(`    Raw service_ids: ${JSON.stringify(barber.services)}`, 'warning');
+                    }
+                });
+
+            } catch (error) {
+                addLog(`Error: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+
+        async function fixBarberServices() {
+            clearLog();
+            addLog('Starting fix process...');
+
+            try {
+                // Initialize SharedData
+                await SharedData.initialize();
+
+                // Get current shop
+                shopId = SharedData.getCurrentShopId() || localStorage.getItem('supabase_shop_id');
+
+                if (!shopId) {
+                    addLog('No shop ID found. Please login first.', 'error');
+                    return;
+                }
+
+                // Get all services
+                const services = SharedData.getServices();
+                const enabledServiceIds = Object.entries(services)
+                    .filter(([_, service]) => service.enabled)
+                    .map(([id, _]) => id);
+
+                if (enabledServiceIds.length === 0) {
+                    addLog('No enabled services found!', 'error');
+                    return;
+                }
+
+                addLog(`Found ${enabledServiceIds.length} enabled services to assign`);
+
+                // Create service assignment object
+                const serviceAssignment = {};
+                enabledServiceIds.forEach(id => {
+                    serviceAssignment[id] = true;
+                });
+
+                // Get all barbers
+                const barbers = await SharedData.getBarbers();
+                let fixedCount = 0;
+                let errors = 0;
+
+                for (const barber of barbers) {
+                    const currentServiceCount = Object.keys(barber.services || {})
+                        .filter(id => barber.services[id]).length;
+
+                    if (currentServiceCount === 0) {
+                        addLog(`Fixing ${barber.name} (${barber.id})...`);
+
+                        try {
+                            // Update barber with all enabled services
+                            const success = await SharedData.updateBarber(barber.id, {
+                                services: serviceAssignment
+                            });
+
+                            if (success) {
+                                addLog(`  ✅ Fixed ${barber.name} - assigned ${enabledServiceIds.length} services`, 'success');
+                                fixedCount++;
+                            } else {
+                                addLog(`  ❌ Failed to update ${barber.name}`, 'error');
+                                errors++;
+                            }
+                        } catch (error) {
+                            addLog(`  ❌ Error updating ${barber.name}: ${error.message}`, 'error');
+                            errors++;
+                        }
+                    } else {
+                        addLog(`  ⏭️ ${barber.name} already has ${currentServiceCount} services - skipping`);
+                    }
+                }
+
+                addLog('\n=== Summary ===', 'info');
+                addLog(`Fixed: ${fixedCount} barbers`, fixedCount > 0 ? 'success' : 'info');
+                if (errors > 0) {
+                    addLog(`Errors: ${errors}`, 'error');
+                }
+
+                // Verify the fix
+                addLog('\nVerifying fix...');
+                const updatedBarbers = await SharedData.getBarbers();
+                let stillBroken = 0;
+
+                updatedBarbers.forEach(barber => {
+                    const serviceCount = Object.keys(barber.services || {})
+                        .filter(id => barber.services[id]).length;
+
+                    if (serviceCount === 0) {
+                        addLog(`  ⚠️ ${barber.name} still has no services!`, 'warning');
+                        stillBroken++;
+                    }
+                });
+
+                if (stillBroken === 0 && fixedCount > 0) {
+                    addLog('\n✅ All barbers now have service assignments!', 'success');
+                } else if (stillBroken > 0) {
+                    addLog(`\n⚠️ ${stillBroken} barbers still need attention`, 'warning');
+                }
+
+            } catch (error) {
+                addLog(`Critical error: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+
+        // Auto-check on load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(checkCurrentState, 1000);
+        });
+    </script>
+</body>
+</html>

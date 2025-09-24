@@ -1,0 +1,136 @@
+// Quick debug script to check why services aren't showing
+console.log('Debugging services issue in customer app...');
+
+// Create the HTML file
+const fs = require('fs');
+
+const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Services</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .error { color: red; font-weight: bold; }
+        .success { color: green; font-weight: bold; }
+        .info { color: blue; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Debug: Why No Services Are Showing</h1>
+    <div id="results"></div>
+
+    <script>
+        async function debugServices() {
+            const results = document.getElementById('results');
+
+            // Wait for initialization
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            results.innerHTML = '<h2>Checking Services...</h2>';
+
+            // Check shop context
+            const shopId = SharedData.getCurrentShopId();
+            results.innerHTML += '<p><strong>Current Shop ID:</strong> ' + (shopId || 'NOT SET') + '</p>';
+
+            if (!shopId) {
+                results.innerHTML += '<p class="error">❌ No shop ID set! This is likely the problem.</p>';
+            }
+
+            // Check barbers
+            try {
+                const barbers = await SharedData.getBarbers();
+                results.innerHTML += '<h3>Barbers:</h3>';
+                results.innerHTML += '<p>Number of barbers: ' + barbers.length + '</p>';
+
+                if (barbers.length === 0) {
+                    results.innerHTML += '<p class="error">❌ No barbers found!</p>';
+                } else {
+                    barbers.forEach(b => {
+                        results.innerHTML += '<p>- ' + b.name + ' (ID: ' + b.id + ')</p>';
+                    });
+                }
+            } catch (error) {
+                results.innerHTML += '<p class="error">Error loading barbers: ' + error.message + '</p>';
+            }
+
+            // Check services
+            try {
+                const services = SharedData.getServices();
+                results.innerHTML += '<h3>Services:</h3>';
+
+                if (!services || Object.keys(services).length === 0) {
+                    results.innerHTML += '<p class="error">❌ No services in cache!</p>';
+
+                    // Try to load services
+                    results.innerHTML += '<p>Attempting to load services from database...</p>';
+                    await SharedData.loadServices();
+
+                    const servicesAfterLoad = SharedData.getServices();
+                    if (servicesAfterLoad && Object.keys(servicesAfterLoad).length > 0) {
+                        results.innerHTML += '<p class="success">✅ Services loaded!</p>';
+                        Object.entries(servicesAfterLoad).forEach(([id, service]) => {
+                            results.innerHTML += '<p>- ' + service.name + ' ($' + service.price + ', ' + service.duration + ' min)</p>';
+                        });
+                    } else {
+                        results.innerHTML += '<p class="error">Still no services after loading.</p>';
+                        results.innerHTML += '<p>Will use default services as fallback:</p>';
+                        Object.entries(SharedData.defaultServices).forEach(([id, service]) => {
+                            results.innerHTML += '<p>- ' + service.name + ' ($' + service.price + ', ' + service.duration + ' min)</p>';
+                        });
+                    }
+                } else {
+                    results.innerHTML += '<p class="success">✅ Services found in cache!</p>';
+                    Object.entries(services).forEach(([id, service]) => {
+                        results.innerHTML += '<p>- ' + service.name + ' ($' + service.price + ', ' + service.duration + ' min, enabled: ' + service.enabled + ')</p>';
+                    });
+                }
+            } catch (error) {
+                results.innerHTML += '<p class="error">Error with services: ' + error.message + '</p>';
+            }
+
+            // Check localStorage
+            results.innerHTML += '<h3>LocalStorage Check:</h3>';
+            const shopIdInStorage = localStorage.getItem('supabase_shop_id');
+            const customerShopId = localStorage.getItem('customer_shop_id');
+
+            results.innerHTML += '<p>supabase_shop_id: ' + (shopIdInStorage || 'NOT SET') + '</p>';
+            results.innerHTML += '<p>customer_shop_id: ' + (customerShopId || 'NOT SET') + '</p>';
+
+            // Provide solution
+            results.innerHTML += '<h2>Solution:</h2>';
+            if (!shopId) {
+                results.innerHTML += '<p>To fix this, you need to set a shop ID. Options:</p>';
+                results.innerHTML += '<ol>';
+                results.innerHTML += '<li>Open the owner app and make sure you are logged in</li>';
+                results.innerHTML += '<li>Or run this in console: <code>SharedData.setCurrentShopId("YOUR_SHOP_ID")</code></li>';
+                results.innerHTML += '</ol>';
+            } else if (Object.keys(SharedData.getServices()).length === 0) {
+                results.innerHTML += '<p>The shop has no services configured. Open the owner app and add services.</p>';
+            }
+
+            // Check if barber has services assigned
+            const barbersWithServices = await SharedData.getBarbers();
+            if (barbersWithServices.length > 0) {
+                const firstBarber = barbersWithServices[0];
+                results.innerHTML += '<h3>Barber Service Assignment:</h3>';
+                results.innerHTML += '<p>' + firstBarber.name + ' services: ' + JSON.stringify(firstBarber.services) + '</p>';
+
+                if (!firstBarber.services || Object.keys(firstBarber.services).length === 0) {
+                    results.innerHTML += '<p class="error">❌ Barber has no services assigned!</p>';
+                    results.innerHTML += '<p>Go to owner app > Staff Management and assign services to the barber.</p>';
+                }
+            }
+        }
+
+        debugServices();
+    </script>
+</body>
+</html>`;
+
+fs.writeFileSync('debug-services.html', htmlContent);
+console.log('Created debug-services.html');
+console.log('Open this file in your browser to diagnose the issue.');

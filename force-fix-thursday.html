@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Force Fix Thursday Hours</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .error { color: red; font-weight: bold; }
+        .success { color: green; font-weight: bold; }
+        .warning { color: orange; font-weight: bold; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 10px; background: #2196F3; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .step { border: 2px solid #ddd; padding: 15px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <h1>Force Fix Thursday Hours (September 25th Issue)</h1>
+    <div id="results"></div>
+
+    <script>
+        async function forceFixThursday() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h2>Fixing Thursday Hours...</h2>';
+
+            // Wait for initialization
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            // Step 1: Show current state
+            results.innerHTML += '<div class="step"><h3>Step 1: Current State</h3>';
+
+            // Check all sources of Thursday data
+            const sources = {
+                'localStorage storeHours': localStorage.getItem('storeHours') ? JSON.parse(localStorage.getItem('storeHours')) : null,
+                'SharedData.storeHoursCache': SharedData.storeHoursCache,
+                'SharedData.defaultStoreHours': SharedData.defaultStoreHours,
+                'SharedData.getStoreHours()': SharedData.getStoreHours()
+            };
+
+            for (const [name, data] of Object.entries(sources)) {
+                if (data && data.thursday) {
+                    results.innerHTML += `<p>${name} Thursday: closed=${data.thursday.closed}, open=${data.thursday.open}, close=${data.thursday.close}</p>`;
+                    if (data.thursday.closed === true) {
+                        results.innerHTML += `<p class="error">❌ ${name} has Thursday as CLOSED!</p>`;
+                    }
+                } else {
+                    results.innerHTML += `<p>${name}: No Thursday data</p>`;
+                }
+            }
+
+            results.innerHTML += '</div>';
+
+            // Step 2: Force fix all sources
+            results.innerHTML += '<div class="step"><h3>Step 2: Applying Fix</h3>';
+
+            const correctThursday = {
+                open: '09:00',
+                close: '18:00',
+                closed: false
+            };
+
+            // Fix 1: Clear localStorage
+            results.innerHTML += '<p>Clearing localStorage storeHours...</p>';
+            localStorage.removeItem('storeHours');
+
+            // Fix 2: Update storeHoursCache
+            results.innerHTML += '<p>Updating storeHoursCache...</p>';
+            if (!SharedData.storeHoursCache) {
+                SharedData.storeHoursCache = JSON.parse(JSON.stringify(SharedData.defaultStoreHours));
+            }
+            SharedData.storeHoursCache.thursday = correctThursday;
+
+            // Fix 3: Update defaultStoreHours (just in case)
+            results.innerHTML += '<p>Updating defaultStoreHours...</p>';
+            SharedData.defaultStoreHours.thursday = correctThursday;
+
+            // Fix 4: Force reload from database and then update
+            results.innerHTML += '<p>Loading from database and updating...</p>';
+            await SharedData.loadStoreHours();
+
+            // Get current hours and force update Thursday
+            const currentHours = SharedData.getStoreHours();
+            currentHours.thursday = correctThursday;
+
+            // Save back to database
+            results.innerHTML += '<p>Saving to database...</p>';
+            await SharedData.saveStoreHours(currentHours);
+
+            // Reload to verify
+            await SharedData.loadStoreHours();
+
+            results.innerHTML += '<p class="success">✅ All sources updated!</p>';
+            results.innerHTML += '</div>';
+
+            // Step 3: Test the fix
+            results.innerHTML += '<div class="step"><h3>Step 3: Testing</h3>';
+
+            // Test with Sep 25
+            const sep25 = new Date(2025, 8, 25);
+            const dayName = sep25.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+
+            results.innerHTML += `<p>Testing date: ${sep25.toString()}</p>`;
+            results.innerHTML += `<p>Day: ${dayName}</p>`;
+
+            // Get hours again
+            const testHours = SharedData.getStoreHours();
+            const thursdayHours = testHours[dayName];
+
+            results.innerHTML += `<p>Thursday hours after fix: closed=${thursdayHours.closed}, open=${thursdayHours.open}, close=${thursdayHours.close}</p>`;
+
+            // Test slot generation
+            console.log('Testing getAvailableSlots with Sep 25...');
+            const slots = SharedData.getAvailableSlots(sep25, 30);
+            console.log('Slots returned:', slots);
+
+            if (slots.length > 0) {
+                results.innerHTML += `<p class="success">✅ SUCCESS! ${slots.length} slots now available on Sep 25!</p>`;
+                results.innerHTML += `<p>First slot: ${slots[0]}, Last slot: ${slots[slots.length - 1]}</p>`;
+            } else {
+                results.innerHTML += '<p class="error">❌ Still no slots. Check console for errors.</p>';
+            }
+
+            results.innerHTML += '</div>';
+
+            // Step 4: Final verification
+            results.innerHTML += '<div class="step"><h3>Step 4: Final Verification</h3>';
+
+            // Check all sources again
+            const finalSources = {
+                'SharedData.storeHoursCache': SharedData.storeHoursCache,
+                'SharedData.getStoreHours()': SharedData.getStoreHours()
+            };
+
+            for (const [name, data] of Object.entries(finalSources)) {
+                if (data && data.thursday) {
+                    const thu = data.thursday;
+                    if (thu.closed === false && thu.open === '09:00' && thu.close === '18:00') {
+                        results.innerHTML += `<p class="success">✅ ${name} Thursday is CORRECT</p>`;
+                    } else {
+                        results.innerHTML += `<p class="error">❌ ${name} Thursday still wrong: ${JSON.stringify(thu)}</p>`;
+                    }
+                }
+            }
+
+            results.innerHTML += '<button onclick="openCustomerApp()">Open Customer App to Test</button>';
+            results.innerHTML += '<button onclick="location.reload()">Reload This Page</button>';
+
+            results.innerHTML += '</div>';
+        }
+
+        function openCustomerApp() {
+            window.open('customer-app.html', '_blank');
+        }
+
+        // Run on load
+        forceFixThursday();
+    </script>
+</body>
+</html>

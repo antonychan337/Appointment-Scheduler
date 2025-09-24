@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Re-save Services</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+</head>
+<body>
+    <h1>Re-saving Services to Update Database</h1>
+    <pre id="output"></pre>
+
+    <script>
+        async function resaveServices() {
+            const output = document.getElementById('output');
+
+            try {
+                // Initialize
+                await SharedData.initialize();
+                output.textContent = 'Initialized SharedData\n';
+
+                // Get current services
+                const services = SharedData.getServices();
+                output.textContent += 'Current services:\n' + JSON.stringify(services, null, 2) + '\n\n';
+
+                // Re-save them to trigger the updated save logic
+                output.textContent += 'Re-saving services with updated logic...\n';
+                await SharedData.saveServices(services);
+
+                output.textContent += 'Done! Services have been re-saved with name_en and name_zh fields.\n';
+                output.textContent += 'Now refresh the owner-app to see the translations.';
+
+            } catch (error) {
+                output.textContent += 'Error: ' + error.message + '\n' + error.stack;
+            }
+        }
+
+        resaveServices();
+    </script>
+</body>
+</html>

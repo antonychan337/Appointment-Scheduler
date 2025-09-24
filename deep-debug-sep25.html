@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Deep Debug Sep 25 Issue</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .error { color: red; font-weight: bold; }
+        .success { color: green; font-weight: bold; }
+        .warning { color: orange; font-weight: bold; }
+        .info { color: blue; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        .section { border: 2px solid #ddd; padding: 15px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <h1>Deep Debug: Why Sep 25, 2025 (Thursday) Shows No Slots</h1>
+    <div id="results"></div>
+
+    <script>
+        async function deepDebug() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h2>Running Deep Diagnosis...</h2>';
+
+            // Wait for initialization
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            // Step 1: Check raw store hours
+            results.innerHTML += '<div class="section"><h3>Step 1: Raw Store Hours Data</h3>';
+
+            const storeHours = SharedData.getStoreHours();
+            results.innerHTML += '<pre>' + JSON.stringify(storeHours, null, 2) + '</pre>';
+
+            const thursdayHours = storeHours.thursday;
+            if (!thursdayHours) {
+                results.innerHTML += '<p class="error">❌ Thursday key is missing!</p>';
+            } else if (thursdayHours.closed === true) {
+                results.innerHTML += '<p class="error">❌ Thursday.closed is TRUE!</p>';
+            } else if (!thursdayHours.open || !thursdayHours.close) {
+                results.innerHTML += '<p class="error">❌ Thursday hours missing open/close times!</p>';
+            } else {
+                results.innerHTML += '<p class="success">✅ Thursday is configured: ' + thursdayHours.open + ' - ' + thursdayHours.close + '</p>';
+            }
+            results.innerHTML += '</div>';
+
+            // Step 2: Test date creation
+            results.innerHTML += '<div class="section"><h3>Step 2: Date Creation Test</h3>';
+
+            const sep25 = new Date(2025, 8, 25); // Month is 0-indexed, so 8 = September
+            results.innerHTML += '<p>Created date: ' + sep25.toString() + '</p>';
+            results.innerHTML += '<p>Day of week: ' + sep25.toLocaleDateString('en-US', { weekday: 'long' }) + '</p>';
+
+            const dayName = sep25.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+            results.innerHTML += '<p>Day name for lookup: "' + dayName + '"</p>';
+
+            if (dayName !== 'thursday') {
+                results.innerHTML += '<p class="error">❌ Date is not Thursday! Something is wrong with date.</p>';
+            } else {
+                results.innerHTML += '<p class="success">✅ Date correctly identified as Thursday</p>';
+            }
+            results.innerHTML += '</div>';
+
+            // Step 3: Manual slot generation test
+            results.innerHTML += '<div class="section"><h3>Step 3: Manual Slot Generation Test</h3>';
+
+            if (thursdayHours && !thursdayHours.closed && thursdayHours.open && thursdayHours.close) {
+                const openMinutes = SharedData.timeToMinutes(thursdayHours.open);
+                const closeMinutes = SharedData.timeToMinutes(thursdayHours.close);
+                const serviceDuration = 30;
+                const lastValidSlot = closeMinutes - serviceDuration;
+
+                results.innerHTML += '<p>Open time in minutes: ' + openMinutes + ' (' + thursdayHours.open + ')</p>';
+                results.innerHTML += '<p>Close time in minutes: ' + closeMinutes + ' (' + thursdayHours.close + ')</p>';
+                results.innerHTML += '<p>Service duration: ' + serviceDuration + ' minutes</p>';
+                results.innerHTML += '<p>Last valid slot time: ' + lastValidSlot + ' minutes</p>';
+
+                const manualSlots = [];
+                for (let minutes = openMinutes; minutes <= lastValidSlot; minutes += 15) {
+                    manualSlots.push(SharedData.minutesToTime(minutes));
+                }
+
+                results.innerHTML += '<p>Manually generated ' + manualSlots.length + ' slots</p>';
+                if (manualSlots.length > 0) {
+                    results.innerHTML += '<p>First few slots: ' + manualSlots.slice(0, 5).join(', ') + '</p>';
+                }
+            }
+            results.innerHTML += '</div>';
+
+            // Step 4: Call getAvailableSlots with debugging
+            results.innerHTML += '<div class="section"><h3>Step 4: getAvailableSlots Function Test</h3>';
+
+            console.log('About to call getAvailableSlots with:', sep25);
+            const slots = SharedData.getAvailableSlots(sep25, 30);
+            console.log('getAvailableSlots returned:', slots);
+
+            results.innerHTML += '<p>Returned slots: ' + slots.length + '</p>';
+
+            if (slots.length === 0) {
+                results.innerHTML += '<p class="error">❌ No slots returned!</p>';
+
+                // Check what getAvailableSlots is doing
+                results.innerHTML += '<p>Debugging getAvailableSlots logic...</p>';
+
+                // Try to trace through the function
+                const testDayName = sep25.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+                const testHours = SharedData.getStoreHours();
+                const testDayHours = testHours[testDayName];
+
+                results.innerHTML += '<p>Inside function would use:</p>';
+                results.innerHTML += '<p>- dayName: "' + testDayName + '"</p>';
+                results.innerHTML += '<p>- dayHours: ' + JSON.stringify(testDayHours) + '</p>';
+
+                if (!testDayHours) {
+                    results.innerHTML += '<p class="error">dayHours is undefined/null!</p>';
+                } else if (testDayHours.closed) {
+                    results.innerHTML += '<p class="error">dayHours.closed is true!</p>';
+                }
+            } else {
+                results.innerHTML += '<p class="success">✅ ' + slots.length + ' slots available!</p>';
+                results.innerHTML += '<p>First slot: ' + slots[0] + ', Last slot: ' + slots[slots.length - 1] + '</p>';
+            }
+            results.innerHTML += '</div>';
+
+            // Step 5: Check if it's a caching issue
+            results.innerHTML += '<div class="section"><h3>Step 5: Cache Check</h3>';
+
+            results.innerHTML += '<p>Checking if storeHoursCache is stale...</p>';
+            results.innerHTML += '<p>storeHoursCache: ' + (SharedData.storeHoursCache ? 'EXISTS' : 'NULL') + '</p>';
+
+            if (SharedData.storeHoursCache) {
+                results.innerHTML += '<p>Cache Thursday: ' + JSON.stringify(SharedData.storeHoursCache.thursday) + '</p>';
+            }
+
+            // Force reload from database
+            results.innerHTML += '<p>Force reloading store hours from database...</p>';
+            await SharedData.loadStoreHours();
+            const freshHours = SharedData.getStoreHours();
+            results.innerHTML += '<p>Fresh Thursday hours: ' + JSON.stringify(freshHours.thursday) + '</p>';
+
+            // Test again with fresh data
+            const freshSlots = SharedData.getAvailableSlots(sep25, 30);
+            results.innerHTML += '<p>Slots after fresh load: ' + freshSlots.length + '</p>';
+
+            results.innerHTML += '</div>';
+
+            // Final diagnosis
+            results.innerHTML += '<div class="section" style="background: #ffffcc;"><h3>Final Diagnosis</h3>';
+
+            if (freshSlots.length > 0) {
+                results.innerHTML += '<p class="success">✅ Fixed! It was a caching issue. September 25 now has ' + freshSlots.length + ' slots.</p>';
+                results.innerHTML += '<p>The customer app should now show these slots.</p>';
+            } else if (!thursdayHours || thursdayHours.closed) {
+                results.innerHTML += '<p class="error">The issue is that Thursday is still marked as closed in the database.</p>';
+                results.innerHTML += '<p>You need to update Thursday hours in the owner app.</p>';
+            } else {
+                results.innerHTML += '<p class="warning">Unknown issue. Thursday appears open but no slots are generating.</p>';
+                results.innerHTML += '<p>Check the browser console for error messages.</p>';
+            }
+
+            results.innerHTML += '</div>';
+        }
+
+        deepDebug();
+    </script>
+</body>
+</html>

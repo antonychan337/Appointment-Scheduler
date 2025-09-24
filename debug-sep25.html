@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Sep 25th Issue</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .section { border: 2px solid #333; padding: 15px; margin: 15px 0; }
+        .error { color: red; font-weight: bold; }
+        .success { color: green; font-weight: bold; }
+        .warning { color: orange; }
+        pre { background: #f4f4f4; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Debug: Why Sep 25, 2025 Shows No Available Slots</h1>
+    <div id="results"></div>
+
+    <script>
+        async function debugSep25() {
+            const results = document.getElementById('results');
+
+            // Wait for SharedData to initialize
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            const testDate = new Date(2025, 8, 25); // Sep 25, 2025
+            const dayName = testDate.toLocaleDateString('en-US', { weekday: 'long' });
+
+            results.innerHTML = `
+                <div class="section">
+                    <h2>Test Date Information</h2>
+                    <p>Date: September 25, 2025</p>
+                    <p>Day of Week: ${dayName}</p>
+                </div>
+            `;
+
+            // Check store hours
+            const storeHours = SharedData.getStoreHours();
+            const thursdayHours = storeHours.thursday;
+
+            results.innerHTML += `
+                <div class="section">
+                    <h2>Store Hours for Thursday</h2>
+                    <pre>${JSON.stringify(thursdayHours, null, 2)}</pre>
+                    <p>Is Closed? ${thursdayHours.closed ? '<span class="error">YES - STORE IS CLOSED</span>' : '<span class="success">No - Store is open</span>'}</p>
+                </div>
+            `;
+
+            // Try to get available slots for different service durations
+            const serviceDurations = [15, 30, 45];
+
+            for (const duration of serviceDurations) {
+                results.innerHTML += `
+                    <div class="section">
+                        <h3>Testing with ${duration}-minute service</h3>
+                `;
+
+                try {
+                    const slots = SharedData.getAvailableSlots(testDate, duration);
+
+                    if (slots.length === 0) {
+                        results.innerHTML += `<p class="error">❌ No slots returned!</p>`;
+
+                        // Let's manually check what should happen
+                        if (thursdayHours.closed) {
+                            results.innerHTML += `<p>This is expected - store is closed on Thursdays</p>`;
+                        } else {
+                            results.innerHTML += `<p class="error">This is unexpected - store should be open!</p>`;
+
+                            // Check the math
+                            const openMinutes = SharedData.timeToMinutes(thursdayHours.open);
+                            const closeMinutes = SharedData.timeToMinutes(thursdayHours.close);
+                            const lastValidSlot = closeMinutes - duration;
+
+                            results.innerHTML += `
+                                <p>Debug Info:</p>
+                                <ul>
+                                    <li>Open time: ${thursdayHours.open} (${openMinutes} minutes)</li>
+                                    <li>Close time: ${thursdayHours.close} (${closeMinutes} minutes)</li>
+                                    <li>Last valid slot: ${SharedData.minutesToTime(lastValidSlot)}</li>
+                                    <li>Should generate slots: ${openMinutes <= lastValidSlot ? 'YES' : 'NO'}</li>
+                                </ul>
+                            `;
+                        }
+                    } else {
+                        results.innerHTML += `<p class="success">✅ ${slots.length} slots available</p>`;
+                        results.innerHTML += `<p>First slot: ${slots[0]}, Last slot: ${slots[slots.length - 1]}</p>`;
+                    }
+                } catch (error) {
+                    results.innerHTML += `<p class="error">Error: ${error.message}</p>`;
+                }
+
+                results.innerHTML += `</div>`;
+            }
+
+            // Also check if there's any blocking or time off
+            results.innerHTML += `
+                <div class="section">
+                    <h2>Other Factors</h2>
+            `;
+
+            // Check booking policies
+            const policies = SharedData.getBookingPolicies();
+            const today = new Date();
+            const daysUntilSep25 = Math.floor((testDate - today) / (1000 * 60 * 60 * 24));
+
+            results.innerHTML += `
+                <p>Booking Policies:</p>
+                <pre>${JSON.stringify(policies, null, 2)}</pre>
+                <p>Days until Sep 25: ${daysUntilSep25}</p>
+                <p>Max advance booking days: ${policies.maxBookingDays}</p>
+                <p>Can book this far ahead? ${daysUntilSep25 <= policies.maxBookingDays ? '<span class="success">YES</span>' : '<span class="error">NO - Too far in advance</span>'}</p>
+            `;
+
+            // Check if there's a time off period
+            const timeOff = localStorage.getItem('timeOff');
+            if (timeOff) {
+                results.innerHTML += `<p>Time Off Data: <pre>${timeOff}</pre></p>`;
+            } else {
+                results.innerHTML += `<p>No time off scheduled</p>`;
+            }
+
+            results.innerHTML += `</div>`;
+
+            // Final diagnosis
+            results.innerHTML += `
+                <div class="section" style="background: #ffffcc;">
+                    <h2>Diagnosis</h2>
+            `;
+
+            if (thursdayHours.closed) {
+                results.innerHTML += `<p class="error">The store is marked as CLOSED on Thursdays. That's why no slots are available.</p>`;
+            } else if (daysUntilSep25 > policies.maxBookingDays) {
+                results.innerHTML += `<p class="error">September 25th is ${daysUntilSep25} days away, but max booking is ${policies.maxBookingDays} days in advance.</p>`;
+            } else {
+                results.innerHTML += `<p class="warning">Need to investigate further - store should be showing slots.</p>`;
+            }
+
+            results.innerHTML += `</div>`;
+        }
+
+        debugSep25();
+    </script>
+</body>
+</html>

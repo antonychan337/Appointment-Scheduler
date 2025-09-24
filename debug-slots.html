@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Slot Generation</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .section { border: 1px solid #ddd; padding: 15px; margin: 10px 0; }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        pre { background: #f4f4f4; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Debug Slot Generation for Sep 24 (Wednesday)</h1>
+    <div id="results"></div>
+
+    <script>
+        async function debugSlots() {
+            const results = document.getElementById('results');
+
+            // Wait for SharedData to initialize
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            const testDate = new Date(2025, 8, 24); // Sep 24, 2025 (Wednesday)
+            const serviceDuration = 30; // Men's Cut
+
+            // Get store hours
+            const storeHours = SharedData.getStoreHours();
+            const dayHours = storeHours.wednesday;
+
+            results.innerHTML = `
+                <div class="section">
+                    <h2>Store Hours for Wednesday</h2>
+                    <pre>${JSON.stringify(dayHours, null, 2)}</pre>
+                </div>
+            `;
+
+            // Calculate expected values
+            const openMinutes = SharedData.timeToMinutes(dayHours.open);
+            const closeMinutes = SharedData.timeToMinutes(dayHours.close);
+            const lastValidSlot = closeMinutes - serviceDuration;
+
+            results.innerHTML += `
+                <div class="section">
+                    <h2>Calculations</h2>
+                    <p>Open time: ${dayHours.open} = ${openMinutes} minutes</p>
+                    <p>Close time: ${dayHours.close} = ${closeMinutes} minutes</p>
+                    <p>Service duration: ${serviceDuration} minutes</p>
+                    <p>Last valid slot: ${closeMinutes} - ${serviceDuration} = ${lastValidSlot} minutes = ${SharedData.minutesToTime(lastValidSlot)}</p>
+                </div>
+            `;
+
+            // Get actual slots from SharedData
+            const slots = SharedData.getAvailableSlots(testDate, serviceDuration);
+
+            results.innerHTML += `
+                <div class="section">
+                    <h2>Generated Slots</h2>
+                    <p>Total slots: ${slots.length}</p>
+                    <p>First 3 slots: ${slots.slice(0, 3).join(', ')}</p>
+                    <p>Last 5 slots: ${slots.slice(-5).join(', ')}</p>
+                </div>
+            `;
+
+            // Check each of the last few slots
+            results.innerHTML += '<div class="section"><h2>Checking Last Slots</h2>';
+            const lastSlots = slots.slice(-5);
+            lastSlots.forEach(slot => {
+                const slotMinutes = SharedData.timeToMinutes(slot);
+                const endMinutes = slotMinutes + serviceDuration;
+                const status = endMinutes <= closeMinutes ? 'success' : 'error';
+                const statusText = endMinutes <= closeMinutes ? '✓ Valid' : '✗ INVALID - goes past closing';
+
+                results.innerHTML += `
+                    <p class="${status}">
+                        ${slot} (${slotMinutes} min) + ${serviceDuration} min service = ends at ${SharedData.minutesToTime(endMinutes)} - ${statusText}
+                    </p>
+                `;
+            });
+            results.innerHTML += '</div>';
+
+            // Manual check: what slots SHOULD be generated
+            results.innerHTML += '<div class="section"><h2>Manual Verification</h2>';
+            let manualSlots = [];
+            for (let minutes = openMinutes; minutes <= lastValidSlot; minutes += 15) {
+                manualSlots.push(SharedData.minutesToTime(minutes));
+            }
+
+            results.innerHTML += `
+                <p>Manual calculation generated ${manualSlots.length} slots</p>
+                <p>Last 5 manual slots: ${manualSlots.slice(-5).join(', ')}</p>
+            `;
+
+            // Compare
+            if (slots.length !== manualSlots.length) {
+                results.innerHTML += `<p class="error">❌ Mismatch! SharedData returned ${slots.length} slots but should be ${manualSlots.length}</p>`;
+            }
+
+            // Find extra slots
+            const extraSlots = slots.filter(slot => {
+                const slotMin = SharedData.timeToMinutes(slot);
+                return slotMin > lastValidSlot;
+            });
+
+            if (extraSlots.length > 0) {
+                results.innerHTML += `<p class="error">❌ Found ${extraSlots.length} invalid slots past ${SharedData.minutesToTime(lastValidSlot)}: ${extraSlots.join(', ')}</p>`;
+            } else {
+                results.innerHTML += `<p class="success">✓ No invalid slots found</p>`;
+            }
+
+            results.innerHTML += '</div>';
+        }
+
+        // Run debug
+        debugSlots();
+    </script>
+</body>
+</html>
