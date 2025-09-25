@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Owner Custom Hours</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Configuration -->
+    <script src="supabase-config.js"></script>
+    <!-- Supabase Bridge -->
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2C3E50;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+        }
+        .property {
+            margin: 8px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+        }
+        .property-label {
+            font-weight: 600;
+            color: #666;
+        }
+        .true { color: #4caf50; font-weight: bold; }
+        .false { color: #f44336; font-weight: bold; }
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        button {
+            background: #2C3E50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #34495e;
+        }
+        .hours-display {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e3f2fd;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Owner Custom Hours</h1>
+
+        <button onclick="checkOwner()">Check Owner Status</button>
+        <button onclick="testOwnerCustomHours()">Test Save Custom Hours for Owner</button>
+        <button onclick="testOwnerStoreHours()">Test Owner Using Store Hours</button>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        let ownerId = null;
+
+        async function initialize() {
+            await SharedData.initialize();
+            console.log('SharedData initialized');
+            checkOwner();
+        }
+
+        async function checkOwner() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="test-section"><h3>Checking owner...</h3></div>';
+
+            try {
+                const barbers = await SharedData.getBarbers();
+                const owner = barbers.find(b => b.isOwner === true);
+
+                if (!owner) {
+                    results.innerHTML = '<div class="error">No owner found in the system!</div>';
+                    return;
+                }
+
+                ownerId = owner.id;
+
+                let html = '<div class="test-section">';
+                html += '<h2>Owner Information</h2>';
+                html += `<div class="property"><span class="property-label">Name:</span> ${owner.name}</div>`;
+                html += `<div class="property"><span class="property-label">ID:</span> ${owner.id}</div>`;
+                html += `<div class="property"><span class="property-label">Is Owner:</span> <span class="${owner.isOwner}">${owner.isOwner}</span></div>`;
+                html += `<div class="property"><span class="property-label">Uses Store Hours:</span> <span class="${owner.usesStoreHours}">${owner.usesStoreHours}</span></div>`;
+
+                if (owner.hours) {
+                    html += '<div class="property"><span class="property-label">Current Hours:</span></div>';
+                    html += '<div class="hours-display">' + JSON.stringify(owner.hours, null, 2) + '</div>';
+                }
+
+                // Check database directly
+                const currentShopId = SharedData.getCurrentShopId();
+                const { data, error } = await supabaseClient
+                    .from('barbers')
+                    .select('uses_store_hours, working_hours')
+                    .eq('id', owner.id)
+                    .eq('shop_id', currentShopId)
+                    .single();
+
+                if (!error && data) {
+                    html += '<h3>Database Values:</h3>';
+                    html += `<div class="property"><span class="property-label">uses_store_hours:</span> <span class="${data.uses_store_hours}">${data.uses_store_hours}</span></div>`;
+                    if (data.working_hours) {
+                        html += '<div class="property"><span class="property-label">working_hours:</span></div>';
+                        html += '<div class="hours-display">' + JSON.stringify(data.working_hours, null, 2) + '</div>';
+                    }
+                }
+
+                html += '</div>';
+                results.innerHTML = html;
+
+            } catch (error) {
+                results.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function testOwnerCustomHours() {
+            if (!ownerId) {
+                alert('Please check owner status first');
+                return;
+            }
+
+            const results = document.getElementById('results');
+
+            // Custom hours for owner
+            const customHours = {
+                monday: { open: '07:00', close: '19:00', closed: false },
+                tuesday: { open: '07:00', close: '19:00', closed: false },
+                wednesday: { open: '07:00', close: '19:00', closed: false },
+                thursday: { open: '07:00', close: '19:00', closed: false },
+                friday: { open: '07:00', close: '19:00', closed: false },
+                saturday: { open: '09:00', close: '21:00', closed: false },
+                sunday: { open: '10:00', close: '16:00', closed: false }
+            };
+
+            results.innerHTML += '<div class="test-section">Saving custom hours for owner with usesStoreHours: false...</div>';
+
+            try {
+                const success = await SharedData.updateBarber(ownerId, {
+                    hours: customHours,
+                    usesStoreHours: false
+                });
+
+                if (success) {
+                    results.innerHTML += '<div class="success">✅ Custom hours saved successfully!</div>';
+
+                    // Verify the update
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    const barbers = await SharedData.getBarbers();
+                    const updatedOwner = barbers.find(b => b.id === ownerId);
+
+                    if (updatedOwner) {
+                        results.innerHTML += `<div class="${updatedOwner.usesStoreHours ? 'error' : 'success'}">`;
+                        results.innerHTML += `After update - usesStoreHours: ${updatedOwner.usesStoreHours}`;
+                        results.innerHTML += '</div>';
+
+                        if (updatedOwner.usesStoreHours === false) {
+                            results.innerHTML += '<div class="success">✅ Owner can now have custom hours!</div>';
+                        } else {
+                            results.innerHTML += '<div class="error">❌ Owner is still forced to use store hours</div>';
+                        }
+                    }
+                } else {
+                    results.innerHTML += '<div class="error">Update failed!</div>';
+                }
+
+            } catch (error) {
+                results.innerHTML += `<div class="error">Error: ${error.message}</div>`;
+            }
+
+            // Refresh display
+            setTimeout(checkOwner, 1500);
+        }
+
+        async function testOwnerStoreHours() {
+            if (!ownerId) {
+                alert('Please check owner status first');
+                return;
+            }
+
+            const results = document.getElementById('results');
+            results.innerHTML += '<div class="test-section">Setting owner to use store hours...</div>';
+
+            try {
+                const success = await SharedData.updateBarber(ownerId, {
+                    usesStoreHours: true
+                });
+
+                if (success) {
+                    results.innerHTML += '<div class="success">✅ Owner set to use store hours!</div>';
+                } else {
+                    results.innerHTML += '<div class="error">Update failed!</div>';
+                }
+
+            } catch (error) {
+                results.innerHTML += `<div class="error">Error: ${error.message}</div>`;
+            }
+
+            // Refresh display
+            setTimeout(checkOwner, 1500);
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(initialize, 500);
+        });
+    </script>
+</body>
+</html>

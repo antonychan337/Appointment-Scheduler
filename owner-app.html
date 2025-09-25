@@ -500,7 +500,7 @@
         }
         .hours-header {
             display: grid;
-            grid-template-columns: 70px 85px 12px 85px 40px;
+            grid-template-columns: 70px 80px 15px 80px 40px;
             gap: 3px;
             align-items: center;
             padding: 8px 0;
@@ -519,7 +519,7 @@
         }
         .hours-row {
             display: grid;
-            grid-template-columns: 70px 85px 12px 85px 40px;
+            grid-template-columns: 70px 80px 15px 80px 40px;
             gap: 3px;
             align-items: center;
             padding: 8px 0;
@@ -912,8 +912,8 @@
                            step="1"
                            placeholder="e.g., 0"
                            style="width: 100%; padding: 10px; border: 1px solid #e0e0e0; border-radius: 5px;">
-                    <small style="color: #666; display: block; margin-top: 5px;">
-                        Minimum booking notice
+                    <small id="min-booking-hint" style="color: #666; display: block; margin-top: 5px;">
+                        Enter 0 to allow immediate bookings
                     </small>
                 </div>
 
@@ -944,7 +944,7 @@
                            step="1"
                            placeholder="e.g., 60"
                            style="width: 100%; padding: 10px; border: 1px solid #e0e0e0; border-radius: 5px;">
-                    <small style="color: #666; display: block; margin-top: 5px;">
+                    <small id="max-advance-hint" style="color: #666; display: block; margin-top: 5px;">
                         How far into the future can customers book? (1-365 days)
                     </small>
                 </div>
@@ -1050,87 +1050,87 @@
                     <h4 id="store-hours-heading" style="margin-bottom: 10px;">Store Hours</h4>
                     <p id="store-hours-hint" style="font-size: 12px; color: #666; margin: -5px 0 10px 0;">Use 24-hour format (e.g., 20:00 for 8 PM)</p>
 
-                    <div style="background: #f9f9f9; padding: 10px; border-radius: 5px;">
-                        <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 5px; font-size: 12px; font-weight: 600; color: #666;">
+                    <div style="background: #f9f9f9; padding: 15px; border-radius: 5px;">
+                        <div style="display: grid; grid-template-columns: 80px 70px 20px 70px 50px; gap: 8px; align-items: center; margin-bottom: 10px; font-size: 12px; font-weight: 600; color: #666;">
                             <div id="store-hours-label-day">Day</div>
-                            <div id="store-hours-label-opens" style="text-align: center;">Opens</div>
+                            <div id="store-hours-label-opens" style="text-align: center;">Start</div>
                             <div></div>
-                            <div id="store-hours-label-closes" style="text-align: center;">Closes</div>
+                            <div id="store-hours-label-closes" style="text-align: center;">End</div>
                             <div id="store-hours-label-closed" style="text-align: center;">Closed</div>
                         </div>
 
                         <!-- Sunday -->
-                        <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
+                        <div style="display: grid; grid-template-columns: 80px 70px 20px 70px 50px; gap: 8px; align-items: center; margin-bottom: 8px;">
                             <div id="store-day-sunday" style="font-size: 14px;">Sunday</div>
-                            <input type="text" id="store-sunday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
-                            <span style="text-align: center;">–</span>
-                            <input type="text" id="store-sunday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
+                            <input type="text" id="store-sunday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 100%; box-sizing: border-box; text-align: center;" onblur="validateTimeFormat(this)">
+                            <span style="text-align: center; display: flex; justify-content: center; align-items: center;">–</span>
+                            <input type="text" id="store-sunday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 100%; box-sizing: border-box; text-align: center;" onblur="validateTimeFormat(this)">
                             <div style="text-align: center;">
                                 <input type="checkbox" id="store-sunday-closed" onchange="toggleStoreDayClosed('sunday')">
                             </div>
                         </div>
 
                         <!-- Monday -->
-                        <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
+                        <div style="display: grid; grid-template-columns: 80px 70px 20px 70px 50px; gap: 8px; align-items: center; margin-bottom: 8px;">
                             <div id="store-day-monday" style="font-size: 14px;">Monday</div>
-                            <input type="text" id="store-monday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
-                            <span style="text-align: center;">–</span>
-                            <input type="text" id="store-monday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
+                            <input type="text" id="store-monday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 100%; box-sizing: border-box; text-align: center;" onblur="validateTimeFormat(this)">
+                            <span style="text-align: center; display: flex; justify-content: center; align-items: center;">–</span>
+                            <input type="text" id="store-monday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 100%; box-sizing: border-box; text-align: center;" onblur="validateTimeFormat(this)">
                             <div style="text-align: center;">
                                 <input type="checkbox" id="store-monday-closed" onchange="toggleStoreDayClosed('monday')">
                             </div>
                         </div>
 
                         <!-- Tuesday -->
-                        <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
+                        <div style="display: grid; grid-template-columns: 80px 70px 20px 70px 50px; gap: 8px; align-items: center; margin-bottom: 8px;">
                             <div id="store-day-tuesday" style="font-size: 14px;">Tuesday</div>
-                            <input type="text" id="store-tuesday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
-                            <span style="text-align: center;">–</span>
-                            <input type="text" id="store-tuesday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
+                            <input type="text" id="store-tuesday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 100%; box-sizing: border-box; text-align: center;" onblur="validateTimeFormat(this)">
+                            <span style="text-align: center; display: flex; justify-content: center; align-items: center;">–</span>
+                            <input type="text" id="store-tuesday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 100%; box-sizing: border-box; text-align: center;" onblur="validateTimeFormat(this)">
                             <div style="text-align: center;">
                                 <input type="checkbox" id="store-tuesday-closed" onchange="toggleStoreDayClosed('tuesday')">
                             </div>
                         </div>
 
                         <!-- Wednesday -->
-                        <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
+                        <div style="display: grid; grid-template-columns: 80px 70px 20px 70px 50px; gap: 8px; align-items: center; margin-bottom: 8px;">
                             <div id="store-day-wednesday" style="font-size: 14px;">Wednesday</div>
-                            <input type="text" id="store-wednesday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
-                            <span style="text-align: center;">–</span>
-                            <input type="text" id="store-wednesday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
+                            <input type="text" id="store-wednesday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 100%; box-sizing: border-box; text-align: center;" onblur="validateTimeFormat(this)">
+                            <span style="text-align: center; display: flex; justify-content: center; align-items: center;">–</span>
+                            <input type="text" id="store-wednesday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 100%; box-sizing: border-box; text-align: center;" onblur="validateTimeFormat(this)">
                             <div style="text-align: center;">
                                 <input type="checkbox" id="store-wednesday-closed" onchange="toggleStoreDayClosed('wednesday')">
                             </div>
                         </div>
 
                         <!-- Thursday -->
-                        <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
+                        <div style="display: grid; grid-template-columns: 80px 70px 20px 70px 50px; gap: 8px; align-items: center; margin-bottom: 8px;">
                             <div id="store-day-thursday" style="font-size: 14px;">Thursday</div>
-                            <input type="text" id="store-thursday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
-                            <span style="text-align: center;">–</span>
-                            <input type="text" id="store-thursday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
+                            <input type="text" id="store-thursday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 100%; box-sizing: border-box; text-align: center;" onblur="validateTimeFormat(this)">
+                            <span style="text-align: center; display: flex; justify-content: center; align-items: center;">–</span>
+                            <input type="text" id="store-thursday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 100%; box-sizing: border-box; text-align: center;" onblur="validateTimeFormat(this)">
                             <div style="text-align: center;">
                                 <input type="checkbox" id="store-thursday-closed" onchange="toggleStoreDayClosed('thursday')">
                             </div>
                         </div>
 
                         <!-- Friday -->
-                        <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
+                        <div style="display: grid; grid-template-columns: 80px 70px 20px 70px 50px; gap: 8px; align-items: center; margin-bottom: 8px;">
                             <div id="store-day-friday" style="font-size: 14px;">Friday</div>
-                            <input type="text" id="store-friday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
-                            <span style="text-align: center;">–</span>
-                            <input type="text" id="store-friday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
+                            <input type="text" id="store-friday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 100%; box-sizing: border-box; text-align: center;" onblur="validateTimeFormat(this)">
+                            <span style="text-align: center; display: flex; justify-content: center; align-items: center;">–</span>
+                            <input type="text" id="store-friday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 100%; box-sizing: border-box; text-align: center;" onblur="validateTimeFormat(this)">
                             <div style="text-align: center;">
                                 <input type="checkbox" id="store-friday-closed" onchange="toggleStoreDayClosed('friday')">
                             </div>
                         </div>
 
                         <!-- Saturday -->
-                        <div style="display: grid; grid-template-columns: 100px 120px auto 120px 60px; gap: 10px; align-items: center; margin-bottom: 8px;">
+                        <div style="display: grid; grid-template-columns: 80px 70px 20px 70px 50px; gap: 8px; align-items: center; margin-bottom: 8px;">
                             <div id="store-day-saturday" style="font-size: 14px;">Saturday</div>
-                            <input type="text" id="store-saturday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
-                            <span style="text-align: center;">–</span>
-                            <input type="text" id="store-saturday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
+                            <input type="text" id="store-saturday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 100%; box-sizing: border-box; text-align: center;" onblur="validateTimeFormat(this)">
+                            <span style="text-align: center; display: flex; justify-content: center; align-items: center;">–</span>
+                            <input type="text" id="store-saturday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 100%; box-sizing: border-box; text-align: center;" onblur="validateTimeFormat(this)">
                             <div style="text-align: center;">
                                 <input type="checkbox" id="store-saturday-closed" onchange="toggleStoreDayClosed('saturday')">
                             </div>
@@ -1409,12 +1409,12 @@
                         <div class="metric-label" id="next-week-revenue-label">Next Week's Revenue</div>
                     </div>
                     <div class="dashboard-card">
-                        <div class="metric-value" id="today-appointments">0</div>
-                        <div class="metric-label" id="today-appointments-label">Today's Appointments</div>
+                        <div class="metric-value" id="week-utilization">0%</div>
+                        <div class="metric-label" id="week-utilization-label">This Week's Utilization Rate</div>
                     </div>
                     <div class="dashboard-card">
-                        <div class="metric-value" id="utilization-rate">0%</div>
-                        <div class="metric-label" id="utilization-rate-label">Utilization Rate</div>
+                        <div class="metric-value" id="next-week-utilization">0%</div>
+                        <div class="metric-label" id="next-week-utilization-label">Next Week's Utilization Rate</div>
                     </div>
                 </div>
 
@@ -1425,9 +1425,9 @@
                     </div>
                 </div>
 
-                <!-- Service Time Breakdown Pie Chart -->
+                <!-- Weekly Service Breakdown Pie Chart -->
                 <div class="revenue-chart" style="margin-top: 20px;">
-                    <h3 id="service-breakdown-title">Service Time Breakdown</h3>
+                    <h3 id="service-breakdown-title">Weekly Service Breakdown</h3>
                     <div style="display: flex; align-items: center; justify-content: center; min-height: 200px;">
                         <canvas id="service-pie-chart" width="200" height="200" style="max-width: 200px;"></canvas>
                         <div id="service-legend-pie" style="margin-left: 20px;">
@@ -1767,7 +1767,7 @@
                                 <div class="hours-row">
                                     <div class="day-label" id="monday2">Monday</div>
                                     <input type="text" class="time-input" id="monday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
-                                    <span style="text-align: center; font-size: 12px;">–</span>
+                                    <span style="width: 100%; text-align: center; display: block; font-size: 12px; margin-left: -0.1cm;">–</span>
                                     <input type="text" class="time-input" id="monday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <div class="closed-toggle">
                                         <input type="checkbox" class="closed-checkbox" id="monday-closed" onchange="toggleDayClosed('monday')">
@@ -1776,7 +1776,7 @@
                                 <div class="hours-row">
                                     <div class="day-label" id="tuesday2">Tuesday</div>
                                     <input type="text" class="time-input" id="tuesday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
-                                    <span style="text-align: center; font-size: 12px;">–</span>
+                                    <span style="width: 100%; text-align: center; display: block; font-size: 12px; margin-left: -0.1cm;">–</span>
                                     <input type="text" class="time-input" id="tuesday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <div class="closed-toggle">
                                         <input type="checkbox" class="closed-checkbox" id="tuesday-closed" onchange="toggleDayClosed('tuesday')">
@@ -1785,7 +1785,7 @@
                                 <div class="hours-row">
                                     <div class="day-label" id="wednesday2">Wednesday</div>
                                     <input type="text" class="time-input" id="wednesday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
-                                    <span style="text-align: center; font-size: 12px;">–</span>
+                                    <span style="width: 100%; text-align: center; display: block; font-size: 12px; margin-left: -0.1cm;">–</span>
                                     <input type="text" class="time-input" id="wednesday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <div class="closed-toggle">
                                         <input type="checkbox" class="closed-checkbox" id="wednesday-closed" onchange="toggleDayClosed('wednesday')">
@@ -1794,7 +1794,7 @@
                                 <div class="hours-row">
                                     <div class="day-label" id="thursday2">Thursday</div>
                                     <input type="text" class="time-input" id="thursday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
-                                    <span style="text-align: center; font-size: 12px;">–</span>
+                                    <span style="width: 100%; text-align: center; display: block; font-size: 12px; margin-left: -0.1cm;">–</span>
                                     <input type="text" class="time-input" id="thursday-close" value="18:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <div class="closed-toggle">
                                         <input type="checkbox" class="closed-checkbox" id="thursday-closed" onchange="toggleDayClosed('thursday')">
@@ -1803,7 +1803,7 @@
                                 <div class="hours-row">
                                     <div class="day-label" id="friday2">Friday</div>
                                     <input type="text" class="time-input" id="friday-open" value="09:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
-                                    <span style="text-align: center; font-size: 12px;">–</span>
+                                    <span style="width: 100%; text-align: center; display: block; font-size: 12px; margin-left: -0.1cm;">–</span>
                                     <input type="text" class="time-input" id="friday-close" value="20:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <div class="closed-toggle">
                                         <input type="checkbox" class="closed-checkbox" id="friday-closed" onchange="toggleDayClosed('friday')">
@@ -1812,7 +1812,7 @@
                                 <div class="hours-row">
                                     <div class="day-label" id="saturday2">Saturday</div>
                                     <input type="text" class="time-input" id="saturday-open" value="10:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
-                                    <span style="text-align: center; font-size: 12px;">–</span>
+                                    <span style="width: 100%; text-align: center; display: block; font-size: 12px; margin-left: -0.1cm;">–</span>
                                     <input type="text" class="time-input" id="saturday-close" value="17:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <div class="closed-toggle">
                                         <input type="checkbox" class="closed-checkbox" id="saturday-closed" onchange="toggleDayClosed('saturday')">
@@ -1821,7 +1821,7 @@
                                 <div class="hours-row">
                                     <div class="day-label" id="sunday2">Sunday</div>
                                     <input type="text" class="time-input" id="sunday-open" value="" disabled pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
-                                    <span style="text-align: center; font-size: 12px;">–</span>
+                                    <span style="width: 100%; text-align: center; display: block; font-size: 12px; margin-left: -0.1cm;">–</span>
                                     <input type="text" class="time-input" id="sunday-close" value="" disabled pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM" maxlength="5" style="width: 70px; text-align: center;" onblur="validateTimeFormat(this)">
                                     <div class="closed-toggle">
                                         <input type="checkbox" class="closed-checkbox" id="sunday-closed" checked onchange="toggleDayClosed('sunday')">
@@ -1969,19 +1969,19 @@
         </div>
 
         <div class="bottom-nav">
-            <div class="nav-item active" onclick="showSection('dashboard')">
+            <div class="nav-item active" onclick="showSection('dashboard', event)">
                 <span>📊</span>
                 <div id="nav-dashboard">Dashboard</div>
             </div>
-            <div class="nav-item" onclick="showSection('calendar')">
+            <div class="nav-item" onclick="showSection('calendar', event)">
                 <span>📅</span>
                 <div id="nav-calendar">Calendar</div>
             </div>
-            <div class="nav-item" onclick="showSection('staff')">
+            <div class="nav-item" onclick="showSection('staff', event)">
                 <span>👥</span>
                 <div id="nav-services">Staff</div>
             </div>
-            <div class="nav-item" onclick="showSection('settings')">
+            <div class="nav-item" onclick="showSection('settings', event)">
                 <span>⚙️</span>
                 <div id="nav-settings">Settings</div>
             </div>
@@ -2004,11 +2004,14 @@
         let selectionEnd = null;
         let selectionOverlay = null;
 
-        // Set current week to start on Sunday (matching the calendar display)
+        // Set current week to start on Monday
         function getWeekStart(date) {
             const d = new Date(date);
             const day = d.getDay();
-            const diff = d.getDate() - day;
+            // If Sunday (0), treat as day 7 for calculation
+            const adjustedDay = day === 0 ? 7 : day;
+            // Calculate days to subtract to get to Monday (day 1)
+            const diff = d.getDate() - adjustedDay + 1;
             const result = new Date(d.setDate(diff));
             result.setHours(0, 0, 0, 0);
             return result;
@@ -2020,13 +2023,12 @@
             zh: {
                 appTitle: '商家管理',
                 dashboardTitle: '仪表盘',
-                todayAppointments: '今日预约',
                 weekRevenue: '本周收入',
+                weekUtilization: '本周利用率',
                 nextWeekRevenue: '下周预计收入',
-                utilizationRate: '利用率',
-                upcomingAppointments: '即将到来的预约',
+                nextWeekUtilization: '下周利用率',
                 weeklyRevenue: '每周收入',
-                serviceBreakdown: '服务时间分布',
+                weeklyServiceBreakdown: '每周服务分析',
                 allStaff: '所有员工',
                 calendarTitle: '日历',
                 selectedDateAppointments: '今日日程',
@@ -2134,6 +2136,8 @@
                 minNoticeLabel: '最短取消通知时间（小时）：',
                 maxAdvanceLabel: '最长提前预订时间（天）：',
                 policyHint: '输入0允许随时取消，或最多168小时（1周）',
+                minBookingHint: '输入0允许立即预订',
+                maxAdvanceHint: '客户可以提前多久预订？（1-365天）',
                 // Email Settings translations
                 emailSettingsTitle: '邮件通知',
                 emailSettingsDesc: '管理客户邮件通知',
@@ -2185,13 +2189,12 @@
             en: {
                 appTitle: 'Shop Management',
                 dashboardTitle: 'Dashboard',
-                todayAppointments: "Today's Appointments",
                 weekRevenue: "This Week's Revenue",
+                weekUtilization: "This Week's Utilization Rate",
                 nextWeekRevenue: "Next Week's Revenue",
-                utilizationRate: 'Utilization Rate',
-                upcomingAppointments: 'Upcoming Appointments',
+                nextWeekUtilization: "Next Week's Utilization Rate",
                 weeklyRevenue: 'Weekly Revenue',
-                serviceBreakdown: 'Service Time Breakdown',
+                weeklyServiceBreakdown: 'Weekly Service Breakdown',
                 allStaff: 'All Staff',
                 calendarTitle: 'Calendar',
                 selectedDateAppointments: "Today's Schedule",
@@ -2293,6 +2296,8 @@
                 minNoticeLabel: 'Minimum Cancellation Notice (hours):',
                 maxAdvanceLabel: 'Maximum Advance Booking (days):',
                 policyHint: 'Enter 0 to allow cancellations anytime, or up to 168 hours (1 week)',
+                minBookingHint: 'Enter 0 to allow immediate bookings',
+                maxAdvanceHint: 'How far into the future can customers book? (1-365 days)',
                 // Email Settings translations
                 emailSettingsTitle: 'Email Notifications',
                 emailSettingsDesc: 'Manage customer email notifications',
@@ -2412,15 +2417,14 @@
 
             // Dashboard
             updateElement('dashboard-title', t.dashboardTitle);
-            updateElement('today-appointments-label', t.todayAppointments);
             updateElement('week-revenue-label', t.weekRevenue);
-            updateElement('utilization-rate-label', t.utilizationRate);
+            updateElement('week-utilization-label', t.weekUtilization);
             updateElement('next-week-revenue-label', t.nextWeekRevenue);
-            updateElement('upcoming-appointments', t.upcomingAppointments);
+            updateElement('next-week-utilization-label', t.nextWeekUtilization);
             updateElement('weekly-revenue', t.weeklyRevenue);
             const serviceBreakdownEl = document.getElementById('service-breakdown-title');
             if (serviceBreakdownEl) {
-                serviceBreakdownEl.textContent = t.serviceBreakdown;
+                serviceBreakdownEl.textContent = t.weeklyServiceBreakdown;
             }
 
             // Update customer names
@@ -2589,6 +2593,8 @@
             updateElement('min-notice-label', t.minNoticeLabel);
             updateElement('max-advance-label', t.maxAdvanceLabel);
             updateElement('policy-hint', t.policyHint);
+            updateElement('min-booking-hint', t.minBookingHint);
+            updateElement('max-advance-hint', t.maxAdvanceHint);
             updateElement('policy-preview-title', t.policyPreviewTitle);
             updateElement('policy-important', t.policyImportant);
             updateElement('policy-note1', t.policyNote1);
@@ -2637,6 +2643,7 @@
             updateElement('your-booking-link', t.yourBookingLink);
             updateElement('copy-btn-text', t.copyBtn);
             updateElement('qr-code-title', t.qrCodeTitle);
+            updateElement('download-booking-qr-btn', t.downloadQRBtn);
             updateElement('save-url-btn', t.saveUrl);
             updateElement('payment-title', isZh ? '支付方式' : 'Payment Methods');
             updateElement('payment-desc', isZh ? '管理接受的支付选项' : 'Manage accepted payment options');
@@ -2770,7 +2777,8 @@
             });
         }
 
-        function showSection(section) {
+        // Make showSection globally accessible
+        window.showSection = function(section, event) {
             // Hide all sections
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
 
@@ -2779,7 +2787,12 @@
 
             // Update nav
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            event.target.closest('.nav-item').classList.add('active');
+            if (event && event.target) {
+                event.target.closest('.nav-item').classList.add('active');
+            } else {
+                // If no event, find and activate the nav item by section name
+                document.querySelector(`.nav-item[onclick*="${section}"]`)?.classList.add('active');
+            }
 
             // If showing staff section, ensure we show the staff list, not service configuration
             if (section === 'staff') {
@@ -3038,7 +3051,7 @@
             const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
             if (checkbox.checked) {
-                // Get store hours from SharedData (Supabase)
+                // Get CURRENT store hours from SharedData (Supabase) - not from the form
                 const storeHours = await SharedData.getStoreHours();
 
                 if (storeHours && Object.keys(storeHours).length > 0) {
@@ -3109,13 +3122,21 @@
                 // No barber selected or no barbers exist, use store hours
                 hours = await SharedData.getStoreHours();
             } else {
-                // Get hours for current barber
+                // Get hours for current barber (including owner)
                 const barber = barbers.find(b => b.id === window.currentBarberId);
-                if (barber && barber.isOwner) {
-                    // Owner always uses store hours
+                if (window.currentBarberHours) {
+                    // Use the custom hours set by loadHoursForBarber (for any barber including owner)
+                    hours = window.currentBarberHours;
+                } else if (barber && barber.usesStoreHours) {
+                    // Any barber (including owner) that uses store hours
                     hours = await SharedData.getStoreHours();
-                } else if (barber && barber.hours) {
-                    // Staff barber with custom hours
+                    // Make sure checkbox is checked and inputs are disabled
+                    const checkbox = document.getElementById('same-as-store-hours');
+                    if (checkbox) {
+                        checkbox.checked = true;
+                    }
+                } else if (barber && barber.hours && !barber.usesStoreHours) {
+                    // Any barber (including owner) with custom hours
                     hours = barber.hours;
                 } else {
                     // Fallback to store hours
@@ -3137,6 +3158,10 @@
                 toggleTimeOff();
             }
 
+            // Check if using store hours
+            const sameAsStoreCheckbox = document.getElementById('same-as-store-hours');
+            const isUsingStoreHours = sameAsStoreCheckbox && sameAsStoreCheckbox.checked;
+
             days.forEach(day => {
                 const dayHours = hours[day];
                 const openInput = document.getElementById(`${day}-open`);
@@ -3151,10 +3176,16 @@
                     closeInput.value = '';
                 } else {
                     closedCheckbox.checked = false;
-                    openInput.disabled = false;
-                    closeInput.disabled = false;
+                    // Disable inputs if using store hours
+                    openInput.disabled = isUsingStoreHours;
+                    closeInput.disabled = isUsingStoreHours;
                     openInput.value = dayHours.open || '09:00';
                     closeInput.value = dayHours.close || '18:00';
+                }
+
+                // Also disable the closed checkbox if using store hours
+                if (isUsingStoreHours) {
+                    closedCheckbox.disabled = true;
                 }
             });
         }
@@ -3397,10 +3428,26 @@
                 // Check if using store hours (only for non-owner staff)
                 const sameAsStoreCheckbox = document.getElementById('same-as-store-hours');
                 const usesStoreHours = sameAsStoreCheckbox ? sameAsStoreCheckbox.checked : false;
-                SharedData.updateBarber(window.currentBarberId, { hours, usesStoreHours });
 
-                // If this is the owner, also save as store hours
-                if (window.currentBarberId === 'owner') {
+                // Get current barber to check if they're the owner
+                const currentBarber = barbers.find(b => b.id === window.currentBarberId);
+
+                // If using store hours, don't save custom hours - just set the flag
+                if (usesStoreHours) {
+                    // When using store hours, we should NOT save custom hours
+                    // The barber should use whatever the current store hours are
+                    console.log(`💾 Saving barber ${window.currentBarberId} with usesStoreHours: true`);
+                    SharedData.updateBarber(window.currentBarberId, { usesStoreHours: true });
+                } else {
+                    // Save custom hours when not using store hours
+                    console.log(`💾 Saving barber ${window.currentBarberId} with custom hours and usesStoreHours: false`, hours);
+                    SharedData.updateBarber(window.currentBarberId, { hours, usesStoreHours: false });
+                }
+
+                // If this is the owner AND they're using store hours, also update the global store hours
+                // This allows the owner to update store hours from their own hours page
+                if (currentBarber && currentBarber.isOwner && usesStoreHours) {
+                    console.log('📝 Owner is using store hours, updating global store hours');
                     SharedData.saveStoreHours(hours);
                 }
             }
@@ -5389,6 +5436,12 @@
             weekHeader.innerHTML = '';
             timeSlotsContainer.innerHTML = '';
 
+            // Ensure barbers are loaded for the daily view
+            if (!barbers || barbers.length === 0) {
+                barbers = SharedData.getBarbersSync() || [];
+                console.log('Loaded barbers for daily view:', barbers.length);
+            }
+
             // Generate service color legend first
             generateServiceLegend();
 
@@ -5657,24 +5710,106 @@
             const todayAppointments = SharedData.getAppointmentsByDate(dateStr);
             const heightPerHour = 50;
 
+            // Get services and ensure barbers are loaded for enriching appointment data
+            const allServices = SharedData.getServices();
+            if (!barbers || barbers.length === 0) {
+                barbers = SharedData.getBarbersSync() || [];
+            }
+
+            // Group overlapping appointments for each barber
+            const appointmentsByBarber = {};
+
             todayAppointments.forEach(apt => {
-                // Find the barber
-                const barberIndex = barbers.findIndex(b => b.id === (apt.barberId || 'owner'));
-                if (barberIndex === -1) return;
+                // Enrich appointment with additional data for display
+                apt.barberName = barbers.find(b => b.id === apt.barberId)?.name || 'Staff';
+                apt.serviceNames = apt.services ? apt.services.map(id => {
+                    const service = allServices[id];
+                    return service ? (isZh ? (service.name_zh || service.name_en || service.name) : (service.name_en || service.name_zh || service.name)) : 'Service';
+                }) : [];
+                apt.totalDuration = apt.services ? apt.services.reduce((sum, id) => {
+                    const service = allServices[id];
+                    return sum + (service ? service.duration : 0);
+                }, 0) : 30;
+                apt.totalPrice = apt.services ? apt.services.reduce((sum, id) => {
+                    const service = allServices[id];
+                    return sum + (service ? service.price : 0);
+                }, 0) : 0;
+
+                // Group by barber
+                const barberId = apt.barberId || 'default';
+                if (!appointmentsByBarber[barberId]) {
+                    appointmentsByBarber[barberId] = [];
+                }
+                appointmentsByBarber[barberId].push(apt);
+            });
+
+            // Process each barber's appointments
+            Object.keys(appointmentsByBarber).forEach(barberId => {
+                const barberApts = appointmentsByBarber[barberId];
+
+                // Find overlapping groups
+                const overlapGroups = [];
+
+                barberApts.forEach(apt => {
+                    const [aptHour, aptMin] = apt.time.split(':').map(Number);
+                    const aptStartMinutes = aptHour * 60 + aptMin;
+                    const aptEndMinutes = aptStartMinutes + apt.totalDuration;
+
+                    // Find existing group this appointment overlaps with
+                    let foundGroup = null;
+                    for (const group of overlapGroups) {
+                        // Check if this appointment overlaps with any in the group
+                        const overlaps = group.some(existing => {
+                            const [existingHour, existingMin] = existing.time.split(':').map(Number);
+                            const existingStart = existingHour * 60 + existingMin;
+                            const existingEnd = existingStart + existing.totalDuration;
+
+                            // Check for any overlap
+                            return (aptStartMinutes < existingEnd && aptEndMinutes > existingStart);
+                        });
+
+                        if (overlaps) {
+                            foundGroup = group;
+                            break;
+                        }
+                    }
+
+                    if (foundGroup) {
+                        foundGroup.push(apt);
+                    } else {
+                        overlapGroups.push([apt]);
+                    }
+                });
+
+                // Render each group
+                overlapGroups.forEach(group => {
+                    const numOverlaps = group.length;
+
+                    group.forEach((apt, overlapIndex) => {
+                        // Find the barber
+                        const barberIndex = barbers.findIndex(b => b.id === apt.barberId);
+                        if (barberIndex === -1) {
+                            console.log('Barber not found for appointment:', apt.barberId, 'Available barbers:', barbers.map(b => b.id));
+                            return;
+                        }
 
                 // Parse appointment start time
                 const [startHour, startMinutes] = apt.time.split(':').map(Number);
 
                 // Get service color
-                const services = SharedData.getServicesWithColors();
+                const servicesWithColors = SharedData.getServicesWithColors();
                 const firstServiceId = apt.services ? apt.services[0] : null;
                 let serviceColor = '#4A90E2'; // Default color
-                if (firstServiceId && services[firstServiceId]) {
-                    serviceColor = services[firstServiceId].color || '#4A90E2';
+                if (firstServiceId && servicesWithColors[firstServiceId]) {
+                    serviceColor = servicesWithColors[firstServiceId].color || '#4A90E2';
                 }
 
-                // Helper function to render a block that may span multiple hours
-                const renderPeriod = (periodStart, periodEnd, isActive, showText) => {
+                        // Calculate width and position for overlapping appointments
+                        const widthPercentage = 100 / numOverlaps;
+                        const leftPercentage = widthPercentage * overlapIndex;
+
+                        // Helper function to render a block that may span multiple hours
+                        const renderPeriod = (periodStart, periodEnd, isActive, showText) => {
                     let currentMin = periodStart;
                     let isFirstBlock = true;
 
@@ -5695,8 +5830,15 @@
                         // Check if block extends to hour boundary
                         const extendsToHourBoundary = (blockDuration === remainingInHour && !isLastBlock);
 
-                        // Find the target slot
-                        const targetSlot = document.querySelector(`.time-slot[data-hour="${currentHour}"][data-barber-id="${apt.barberId || 'owner'}"]`);
+                        // Find the target slot (use data-barber-id attribute that's set in generateDayViewCalendar)
+                        const targetSlot = document.querySelector(`.time-slot[data-hour="${currentHour}"][data-barber-id="${apt.barberId}"]`);
+                        if (!targetSlot) {
+                            console.log(`Target slot not found for hour=${currentHour}, barberId=${apt.barberId}`);
+                            // Check what slots exist
+                            const allSlots = document.querySelectorAll('.time-slot');
+                            console.log('Available slots:', allSlots.length, 'First few:',
+                                Array.from(allSlots).slice(0, 3).map(s => `hour=${s.dataset.hour}, barberId=${s.dataset.barberId}`));
+                        }
                         if (targetSlot) {
                             const block = document.createElement('div');
                             block.className = isActive ? 'appointment-period active appointment-clickable' : 'appointment-period inactive';
@@ -5740,19 +5882,20 @@
 
                                 block.style.cssText = `
                                     position: absolute;
-                                    left: 2px;
-                                    right: 2px;
+                                    left: ${leftPercentage}%;
+                                    width: ${widthPercentage}%;
                                     height: ${adjustedHeight}px;
                                     top: ${adjustedTop}px;
                                     background: ${serviceColor};
                                     color: white;
                                     border-radius: ${borderRadius};
-                                    padding: 2px 5px;
+                                    padding: 2px 3px;
                                     font-size: 11px;
                                     overflow: ${overflowStyle};
                                     cursor: pointer;
                                     z-index: ${zIndex};
                                     pointer-events: auto;
+                                    box-sizing: border-box;
                                 `;
 
                                 // Remove customer names from calendar blocks for consistency
@@ -5806,8 +5949,8 @@
 
                                 block.style.cssText = `
                                     position: absolute;
-                                    left: 2px;
-                                    right: 2px;
+                                    left: ${leftPercentage}%;
+                                    width: ${widthPercentage}%;
                                     height: ${adjustedHeight}px;
                                     top: ${adjustedTop}px;
                                     background: repeating-linear-gradient(45deg, ${serviceColor}33, ${serviceColor}33 10px, transparent 10px, transparent 20px);
@@ -5819,6 +5962,7 @@
                                     opacity: 0.7;
                                     z-index: 4;
                                     pointer-events: none;
+                                    box-sizing: border-box;
                                 `;
                             }
 
@@ -5858,6 +6002,8 @@
                     // No active periods - render as a single continuous appointment
                     renderPeriod(0, apt.totalDuration, true, true);
                 }
+                    });
+                });
             });
         }
 
@@ -5984,8 +6130,77 @@
             // Clear existing appointments
             document.querySelectorAll('.appointment-block').forEach(block => block.remove());
 
-            // Process each appointment
+            // Get services and barbers for enriching appointment data
+            const services = SharedData.getServices();
+            const allBarbers = SharedData.getBarbersSync() || [];
+
+            // Group appointments by barber and time to detect overlaps
+            const appointmentsByBarberTime = {};
+
+            // First pass: group appointments that overlap
             appointments.forEach(apt => {
+                const barberId = apt.barberId || 'default';
+                if (!appointmentsByBarberTime[barberId]) {
+                    appointmentsByBarberTime[barberId] = [];
+                }
+                appointmentsByBarberTime[barberId].push(apt);
+            });
+
+            // Process overlapping groups for each barber
+            Object.keys(appointmentsByBarberTime).forEach(barberId => {
+                const barberApts = appointmentsByBarberTime[barberId];
+
+                // Find overlapping appointment groups
+                const overlapGroups = [];
+                barberApts.forEach(apt => {
+                    // Parse appointment time
+                    const [aptHour, aptMin] = apt.time.split(':').map(Number);
+                    const aptStartMinutes = aptHour * 60 + aptMin;
+                    const aptEndMinutes = aptStartMinutes + (apt.totalDuration || 30);
+
+                    // Find existing group this appointment overlaps with
+                    let foundGroup = null;
+                    for (const group of overlapGroups) {
+                        for (const existingApt of group) {
+                            const [existingHour, existingMin] = existingApt.time.split(':').map(Number);
+                            const existingStart = existingHour * 60 + existingMin;
+                            const existingEnd = existingStart + (existingApt.totalDuration || 30);
+
+                            // Check for overlap
+                            if ((aptStartMinutes < existingEnd && aptEndMinutes > existingStart)) {
+                                foundGroup = group;
+                                break;
+                            }
+                        }
+                        if (foundGroup) break;
+                    }
+
+                    if (foundGroup) {
+                        foundGroup.push(apt);
+                    } else {
+                        overlapGroups.push([apt]);
+                    }
+                });
+
+                // Now render each group with proper positioning
+                overlapGroups.forEach(group => {
+                    const numOverlaps = group.length;
+
+                    group.forEach((apt, overlapIndex) => {
+                // Enrich appointment with additional data for display
+                apt.barberName = allBarbers.find(b => b.id === apt.barberId)?.name || 'Staff';
+                apt.serviceNames = apt.services ? apt.services.map(id => {
+                    const service = services[id];
+                    return service ? (isZh ? (service.name_zh || service.name_en || service.name) : (service.name_en || service.name_zh || service.name)) : 'Service';
+                }) : [];
+                apt.totalDuration = apt.services ? apt.services.reduce((sum, id) => {
+                    const service = services[id];
+                    return sum + (service ? service.duration : 0);
+                }, 0) : 30;
+                apt.totalPrice = apt.services ? apt.services.reduce((sum, id) => {
+                    const service = services[id];
+                    return sum + (service ? service.price : 0);
+                }, 0) : 0;
                 // Parse date from YYYY-MM-DD format without timezone shift
                 const [year, month, day] = apt.date.split('-').map(Number);
                 const aptDate = new Date(year, month - 1, day);
@@ -6063,13 +6278,36 @@
                         const block = document.createElement('div');
                         block.className = 'appointment-block';
                         const blockHeight = (apt.totalDuration / 60) * heightPerHour;
-                        block.style.height = `${blockHeight - 4}px`;
-                        block.style.top = `${baseTopOffset + 2}px`;
+
+                        // Calculate width and position for overlapping appointments
+                        const widthPercentage = 100 / numOverlaps;
+                        const leftPercentage = widthPercentage * overlapIndex;
+
+                        block.style.cssText = `
+                            position: absolute;
+                            height: ${blockHeight - 4}px;
+                            top: ${baseTopOffset + 2}px;
+                            left: ${leftPercentage}%;
+                            width: ${widthPercentage}%;
+                            padding: 2px 4px;
+                            box-sizing: border-box;
+                            border-radius: 4px;
+                            overflow: hidden;
+                            cursor: pointer;
+                            font-size: 11px;
+                            color: white;
+                        `;
 
                         // Fix: Ensure Men's Cut and other non-active period appointments have solid background
                         const hasActivePeriods = apt.activePeriods && apt.activePeriods.length > 0;
                         block.style.background = hasActivePeriods ? 'transparent' : serviceColor;
                         block.style.color = hasActivePeriods ? serviceColor : 'white';
+
+                        // Add border for overlapping appointments
+                        if (numOverlaps > 1) {
+                            block.style.border = `1px solid ${serviceColor}`;
+                            block.style.background = `${serviceColor}ee`; // Slightly transparent for overlaps
+                        }
 
                         // Set specific z-index for regular appointments to be above multi-period ones
                         if (!apt.activePeriods || apt.activePeriods.length === 0) {
@@ -6101,6 +6339,8 @@
                         targetSlot.appendChild(block);
                     }
                 }
+                    });
+                });
             });
 
             // Render blocked times
@@ -6190,8 +6430,10 @@
                 currentWeekStart.setDate(currentWeekStart.getDate() - 1);
                 generateDayViewCalendar();
             } else {
-                // Navigate by week in week view
-                currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+                // Navigate by full week in week view
+                const prevDate = new Date(currentWeekStart);
+                prevDate.setDate(prevDate.getDate() - 7);
+                currentWeekStart = getWeekStart(prevDate);
                 generateWeeklyCalendar();
             }
         }
@@ -6202,8 +6444,10 @@
                 currentWeekStart.setDate(currentWeekStart.getDate() + 1);
                 generateDayViewCalendar();
             } else {
-                // Navigate by week in week view
-                currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+                // Navigate by full week in week view
+                const nextDate = new Date(currentWeekStart);
+                nextDate.setDate(nextDate.getDate() + 7);
+                currentWeekStart = getWeekStart(nextDate);
                 generateWeeklyCalendar();
             }
         }
@@ -6908,18 +7152,6 @@
                 console.log('Total appointments:', appointments.length);
                 console.log('Today:', today.toDateString());
 
-                // Update Today's Appointments
-                let todayAppointments = SharedData.getAppointmentsByDate(today);
-                // Filter by selected barber if needed
-                if (dashboardBarberId) {
-                    todayAppointments = todayAppointments.filter(apt => apt.barberId === dashboardBarberId);
-                }
-                const todayAppointmentsEl = document.getElementById('today-appointments');
-                if (todayAppointmentsEl) {
-                    todayAppointmentsEl.textContent = todayAppointments.length;
-                }
-                console.log("Today's appointments:", todayAppointments.length);
-
                 // Calculate This Week's Revenue
                 const weekStart = getWeekStart(today);
                 const weekEnd = getWeekEnd(today);
@@ -6933,10 +7165,17 @@
                 }
                 console.log('This week revenue:', weekRevenue);
 
+                // Calculate This Week's Utilization Rate
+                const weekUtilization = await calculateWeekUtilizationRate(weekStart, weekEnd);
+                const weekUtilizationEl = document.getElementById('week-utilization');
+                if (weekUtilizationEl) {
+                    weekUtilizationEl.textContent = weekUtilization.toFixed(0) + '%';
+                }
+                console.log('This week utilization:', weekUtilization);
+
                 // Calculate Next Week's Revenue
-                const nextWeekStart = new Date(today);
-                nextWeekStart.setDate(today.getDate() - today.getDay() + 7); // Go to next Sunday
-                nextWeekStart.setHours(0, 0, 0, 0);
+                const nextWeekStart = new Date(weekStart);
+                nextWeekStart.setDate(weekStart.getDate() + 7); // Go to next Monday
                 const nextWeekEnd = new Date(nextWeekStart);
                 nextWeekEnd.setDate(nextWeekStart.getDate() + 6);
                 nextWeekEnd.setHours(23, 59, 59, 999);
@@ -6945,13 +7184,15 @@
                 if (nextWeekRevenueEl) {
                     nextWeekRevenueEl.textContent = '$' + nextWeekRevenue.toFixed(0);
                 }
+                console.log('Next week revenue:', nextWeekRevenue);
 
-                // Calculate Utilization Rate
-                const utilizationRate = await calculateUtilizationRate();
-                const utilizationRateEl = document.getElementById('utilization-rate');
-                if (utilizationRateEl) {
-                    utilizationRateEl.textContent = utilizationRate.toFixed(0) + '%';
+                // Calculate Next Week's Utilization Rate
+                const nextWeekUtilization = await calculateWeekUtilizationRate(nextWeekStart, nextWeekEnd);
+                const nextWeekUtilizationEl = document.getElementById('next-week-utilization');
+                if (nextWeekUtilizationEl) {
+                    nextWeekUtilizationEl.textContent = nextWeekUtilization.toFixed(0) + '%';
                 }
+                console.log('Next week utilization:', nextWeekUtilization);
 
                 // Update Weekly Revenue Chart
                 updateWeeklyRevenueChart();
@@ -6966,7 +7207,10 @@
         function getWeekEnd(date) {
             const d = new Date(date);
             const day = d.getDay();
-            const diff = d.getDate() - day + 6;
+            // If Sunday (0), treat as day 7 for calculation
+            const adjustedDay = day === 0 ? 7 : day;
+            // Calculate days to add to get to Sunday (day 7)
+            const diff = d.getDate() - adjustedDay + 7;
             const result = new Date(d.setDate(diff));
             result.setHours(23, 59, 59, 999);
             return result;
@@ -7006,10 +7250,7 @@
             return totalRevenue;
         }
 
-        async function calculateUtilizationRate() {
-            const today = new Date();
-            const startOfWeek = getWeekStart(today);
-            const endOfWeek = getWeekEnd(today);
+        async function calculateWeekUtilizationRate(startOfWeek, endOfWeek) {
             let appointments = await SharedData.getAppointments();
             appointments = appointments || [];
 
@@ -7071,12 +7312,23 @@
             const dailyRevenues = [];
             let maxRevenue = 0;
 
+            // Debug: Log all appointments in cache
+            console.log('All appointments in cache:', SharedData.appointmentsCache);
+
             // Calculate revenue for each day
+            console.log('Weekly Revenue Chart - Checking each day:');
             for (let i = 0; i < 7; i++) {
                 const currentDay = new Date(startOfWeek);
                 currentDay.setDate(startOfWeek.getDate() + i);
 
-                let dayAppointments = SharedData.getAppointmentsByDate(currentDay);
+                // Format date properly for comparison (YYYY-MM-DD in local time)
+                const year = currentDay.getFullYear();
+                const month = String(currentDay.getMonth() + 1).padStart(2, '0');
+                const day = String(currentDay.getDate()).padStart(2, '0');
+                const dateStr = `${year}-${month}-${day}`;
+                console.log(`Day ${i}: ${dateStr} (${currentDay.toDateString()})`);
+
+                let dayAppointments = SharedData.getAppointmentsByDate(dateStr);
 
                 // Filter by selected barber if one is selected
                 if (dashboardBarberId) {
@@ -7084,6 +7336,16 @@
                 }
 
                 const dayRevenue = dayAppointments.reduce((sum, apt) => sum + (apt.totalPrice || 0), 0);
+                console.log(`  Found ${dayAppointments.length} appointments, revenue: $${dayRevenue}`);
+                if (dayAppointments.length > 0) {
+                    console.log('  Appointments details:', dayAppointments);
+                    console.log('  Appointments summary:', dayAppointments.map(a => ({
+                        date: a.date,
+                        totalPrice: a.totalPrice,
+                        services: a.services,
+                        customerName: a.customerName
+                    })));
+                }
                 dailyRevenues.push(dayRevenue);
                 maxRevenue = Math.max(maxRevenue, dayRevenue);
             }
@@ -7091,8 +7353,8 @@
             // Generate bars
             container.innerHTML = '';
             const dayNames = isZh
-                ? ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
-                : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                ? ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+                : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
             dailyRevenues.forEach((revenue, index) => {
                 const height = maxRevenue > 0 ? (revenue / maxRevenue * 100) : 0;
@@ -8118,6 +8380,166 @@
             updateDashboardMetrics().catch(console.error);
         }
 
+        // Simple notification function
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 12px 20px;
+                background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
+                color: white;
+                border-radius: 4px;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                font-size: 14px;
+                z-index: 10000;
+                animation: slideIn 0.3s ease;
+            `;
+            notification.textContent = message;
+
+            // Add animation style
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(400px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+            `;
+            document.head.appendChild(style);
+
+            document.body.appendChild(notification);
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => {
+                    notification.remove();
+                    style.remove();
+                }, 300);
+            }, 3000);
+        }
+
+        // Staff name editing functions
+        let currentEditingBarberId = null;
+
+        function startEditingName(barberId) {
+            // Save any currently editing barber
+            if (currentEditingBarberId && currentEditingBarberId !== barberId) {
+                saveBarberNameOnBlur(currentEditingBarberId);
+            }
+
+            currentEditingBarberId = barberId;
+
+            // Hide display text
+            document.getElementById(`name-display-${barberId}`).style.display = 'none';
+
+            // Show input field
+            const input = document.getElementById(`name-input-${barberId}`);
+            input.style.display = 'inline-block';
+
+            // Store original value
+            input.setAttribute('data-original-value', input.value);
+
+            // Focus and select the input
+            input.focus();
+            input.select();
+        }
+
+        async function saveBarberName(barberId, showMessage = true) {
+            const input = document.getElementById(`name-input-${barberId}`);
+            const newName = input.value.trim();
+
+            if (!newName) {
+                alert(isZh ? '名称不能为空' : 'Name cannot be empty');
+                input.focus();
+                return false;
+            }
+
+            try {
+                // Update the barber's name in the database
+                await SharedData.updateBarber(barberId, { name: newName });
+
+                // Update the local barbers array
+                const barber = barbers.find(b => b.id === barberId);
+                if (barber) {
+                    barber.name = newName;
+                }
+
+                // Update the display
+                document.getElementById(`name-display-${barberId}`).textContent = newName;
+
+                // Hide input field and show display
+                input.style.display = 'none';
+                document.getElementById(`name-display-${barberId}`).style.display = 'inline-block';
+
+                // Clear current editing
+                currentEditingBarberId = null;
+
+                // Show success message
+                if (showMessage) {
+                    const message = isZh ? '名称已更新' : 'Name updated successfully';
+                    showNotification(message, 'success');
+                }
+
+                return true;
+            } catch (error) {
+                console.error('Error saving barber name:', error);
+                alert(isZh ? '保存失败，请重试' : 'Failed to save. Please try again.');
+                return false;
+            }
+        }
+
+        async function saveBarberNameOnBlur(barberId) {
+            // Don't save if we're not currently editing this barber
+            if (currentEditingBarberId !== barberId) return;
+
+            const input = document.getElementById(`name-input-${barberId}`);
+            const newName = input.value.trim();
+            const originalValue = input.getAttribute('data-original-value');
+
+            // Only save if the value has changed
+            if (newName !== originalValue && newName) {
+                await saveBarberName(barberId, false);
+            } else {
+                // Just exit edit mode without saving
+                cancelEditingName(barberId);
+            }
+        }
+
+        function cancelEditingName(barberId) {
+            const input = document.getElementById(`name-input-${barberId}`);
+            const originalValue = input.getAttribute('data-original-value');
+
+            // Restore original value
+            if (originalValue) {
+                input.value = originalValue;
+            }
+
+            // Show display text
+            document.getElementById(`name-display-${barberId}`).style.display = 'inline-block';
+
+            // Hide input field
+            input.style.display = 'none';
+
+            // Clear current editing
+            if (currentEditingBarberId === barberId) {
+                currentEditingBarberId = null;
+            }
+        }
+
+        function handleNameEditKeydown(event, barberId) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                event.target.blur(); // This will trigger the onblur which saves
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                cancelEditingName(barberId);
+                // Remove focus to prevent onblur from saving
+                event.target.blur();
+            }
+        }
+
         // Render staff list
         window.renderStaffTabs = function renderStaffTabs() {
             console.log('renderStaffTabs called, barbers:', barbers);
@@ -8160,8 +8582,11 @@
                             <div style="width: 40px; height: 40px; background: #E3F2FD; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 12px;">
                                 <span style="font-size: 20px;">👤</span>
                             </div>
-                            <div>
-                                <div style="font-weight: bold; font-size: 16px;">${barber.name}</div>
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div id="name-display-${barber.id}" onclick="startEditingName('${barber.id}'); event.stopPropagation();" style="font-weight: bold; font-size: 16px; cursor: pointer; padding: 2px 4px; border-radius: 4px;" onmouseover="this.style.backgroundColor='#f0f0f0'" onmouseout="this.style.backgroundColor='transparent'" title="Click to edit">${barber.name}</div>
+                                    <input id="name-input-${barber.id}" type="text" value="${barber.name}" style="display: none; font-weight: bold; font-size: 16px; border: 1px solid #2196F3; border-radius: 4px; padding: 2px 8px; width: 200px;" onclick="event.stopPropagation();" onkeydown="handleNameEditKeydown(event, '${barber.id}')" onblur="saveBarberNameOnBlur('${barber.id}')" data-original-value="${barber.name}" />
+                                </div>
                             </div>
                         </div>
                         <div style="display: flex; align-items: center; gap: 10px;">
@@ -8273,18 +8698,13 @@
                 const sameAsStoreContainer = document.getElementById('same-as-store-hours-container');
                 if (sameAsStoreContainer) {
                     sameAsStoreContainer.style.display = 'block';
-                    // Check if this barber uses store hours
-                    const checkbox = document.getElementById('same-as-store-hours');
-                    if (checkbox && barber.usesStoreHours) {
-                        checkbox.checked = true;
-                    } else if (checkbox) {
-                        checkbox.checked = false;
-                    }
+                    // Don't set checkbox here - let loadHoursForBarber handle it
+                    // to avoid conflicts and ensure proper state management
                 }
 
                 // Load this barber's services and hours
                 loadServicesForBarber(barberId);
-                loadHoursForBarber(barberId);
+                loadHoursForBarber(barberId);  // This will set the checkbox correctly
             }
 
             // Add new staff
@@ -8362,19 +8782,32 @@
             // Load hours for specific barber
             function loadHoursForBarber(barberId) {
                 const barber = SharedData.getBarberById(barberId);
-                if (!barber) return;
+                if (!barber) {
+                    console.error('Barber not found:', barberId);
+                    return;
+                }
+
+                console.log(`📂 Loading hours for barber: ${barber.name}, usesStoreHours: ${barber.usesStoreHours}, has custom hours: ${!!barber.hours}`);
 
                 // Check if barber uses store hours
                 const checkbox = document.getElementById('same-as-store-hours');
-                if (checkbox && barber.usesStoreHours) {
-                    checkbox.checked = true;
-                    // Don't trigger toggleSameAsStoreHours here - let loadStoreHours handle it
-                    // The store hours will be loaded by loadStoreHours() which is called after this
-                } else {
-                    // Update the existing loadStoreHours function to use barber's hours
-                    window.currentBarberHours = barber.hours || {};
-                    loadStoreHours();
+                if (checkbox) {
+                    // IMPORTANT: Always set the checkbox state based on barber's setting
+                    checkbox.checked = barber.usesStoreHours === true;
+                    console.log(`✅ Set checkbox to: ${checkbox.checked}`);
+
+                    if (!barber.usesStoreHours && barber.hours) {
+                        // If barber has custom hours, store them for loading
+                        window.currentBarberHours = barber.hours;
+                        console.log(`📝 Using custom hours:`, barber.hours);
+                    } else {
+                        // Clear custom hours
+                        window.currentBarberHours = null;
+                        console.log(`🏪 Using store hours`);
+                    }
                 }
+                // Let loadStoreHours handle the actual loading
+                loadStoreHours();
             }
 
             // Override saveServices to save to current barber

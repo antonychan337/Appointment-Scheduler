@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Test Results</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2C3E50;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 5px;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .test-card {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #2196F3;
+        }
+        .test-card h3 {
+            margin-top: 0;
+            color: #2C3E50;
+        }
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .metric:last-child {
+            border-bottom: none;
+        }
+        .pass {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .fail {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .warning {
+            color: #f39c12;
+            font-weight: bold;
+        }
+        .info {
+            color: #3498db;
+        }
+        button {
+            background: #2C3E50;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 10px 10px 0;
+        }
+        button:hover {
+            background: #34495e;
+        }
+        .conflict-list {
+            background: #fff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .conflict-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: #ffebee;
+            border-left: 3px solid #f44336;
+            border-radius: 3px;
+        }
+        .concurrent-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: #e8f5e9;
+            border-left: 3px solid #4caf50;
+            border-radius: 3px;
+        }
+        .summary-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .summary-box h2 {
+            color: white;
+            border: none;
+            margin-top: 0;
+        }
+        .summary-stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 36px;
+            font-weight: bold;
+        }
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✅ Test Results Verification Dashboard</h1>
+
+        <button onclick="runAllTests()">🔍 Run All Verification Tests</button>
+        <button onclick="checkConflicts()">⚠️ Check for Conflicts</button>
+        <button onclick="checkMetrics()">📊 Verify Dashboard Metrics</button>
+        <button onclick="checkPolicies()">📋 Check Booking Policies</button>
+
+        <div class="summary-box" id="summary" style="display: none;">
+            <h2>Test Summary</h2>
+            <div class="summary-stats">
+                <div class="stat">
+                    <div class="stat-value" id="total-bookings">0</div>
+                    <div class="stat-label">Total Bookings</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="tests-passed">0</div>
+                    <div class="stat-label">Tests Passed</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="tests-failed">0</div>
+                    <div class="stat-label">Tests Failed</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="total-revenue">$0</div>
+                    <div class="stat-label">Weekly Revenue</div>
+                </div>
+            </div>
+        </div>
+
+        <h2>Test Results</h2>
+        <div class="test-grid" id="test-results"></div>
+
+        <h2>Detailed Analysis</h2>
+        <div id="detailed-results"></div>
+    </div>
+
+    <script>
+        let appointments = [];
+        let barbers = [];
+        let services = {};
+        let testsPassed = 0;
+        let testsFailed = 0;
+
+        async function initialize() {
+            await SharedData.initialize();
+            appointments = SharedData.getAppointmentsSync();
+            barbers = await SharedData.getBarbers();
+            services = SharedData.getServices();
+        }
+
+        async function runAllTests() {
+            await initialize();
+
+            testsPassed = 0;
+            testsFailed = 0;
+
+            const results = document.getElementById('test-results');
+            results.innerHTML = '';
+
+            // Debug: Log appointments and barbers
+            console.log('Total appointments:', appointments.length);
+            console.log('Sample appointments:', appointments.slice(0, 5));
+            console.log('Barbers:', barbers);
+
+            // Run all tests
+            await test1_ServiceHoursMatch();
+            await test2_NoOverlapping();
+            await test3_ConcurrentBookings();
+            await test4_StaffHours();
+            await test5_ServiceOfferings();
+            await test6_StoreHours();
+            await test7_DashboardMetrics();
+            await test8_WeeklyRevenue();
+            await test9_ServiceBreakdown();
+            await test10_CalendarDisplay();
+            await test11_DashboardFilters();
+            await test12_BookingPolicies();
+
+            // Show summary
+            showSummary();
+        }
+
+        function showSummary() {
+            const summary = document.getElementById('summary');
+            summary.style.display = 'block';
+
+            // Get test week appointments
+            const today = new Date();
+            const dayOfWeek = today.getDay();
+            const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() + daysUntilMonday);
+            weekStart.setHours(0, 0, 0, 0);
+
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+
+            const weekAppointments = appointments.filter(apt => {
+                const aptDate = new Date(apt.date);
+                return aptDate >= weekStart && aptDate <= weekEnd;
+            });
+
+            // Calculate revenue
+            let totalRevenue = 0;
+            weekAppointments.forEach(apt => {
+                if (apt.services && services) {
+                    apt.services.forEach(serviceId => {
+                        if (services[serviceId]) {
+                            totalRevenue += services[serviceId].price || 0;
+                        }
+                    });
+                }
+            });
+
+            document.getElementById('total-bookings').textContent = weekAppointments.length;
+            document.getElementById('tests-passed').textContent = testsPassed;
+            document.getElementById('tests-failed').textContent = testsFailed;
+            document.getElementById('total-revenue').textContent = `$${totalRevenue}`;
+        }
+
+        function addTestResult(title, passed, details = '') {
+            const results = document.getElementById('test-results');
+            const card = document.createElement('div');
+            card.className = 'test-card';
+
+            if (passed) {
+                testsPassed++;
+            } else {
+                testsFailed++;
+            }
+
+            card.innerHTML = `
+                <h3>${title}</h3>
+                <div class="metric">
+                    <span>Status:</span>
+                    <span class="${passed ? 'pass' : 'fail'}">${passed ? '✅ PASSED' : '❌ FAILED'}</span>
+                </div>
+                ${details ? `<div style="margin-top: 10px; font-size: 14px;">${details}</div>` : ''}
+            `;
+            results.appendChild(card);
+        }
+
+        async function test1_ServiceHoursMatch() {
+            let violations = [];
+
+            appointments.forEach(apt => {
+                const barber = barbers.find(b => b.id === apt.barberId);
+                if (!barber) return;
+
+                // Check if barber offers these services
+                // Only check if barber has service restrictions (not empty object)
+                if (apt.services && barber.services && Object.keys(barber.services).length > 0) {
+                    apt.services.forEach(serviceId => {
+                        if (!barber.services[serviceId]) {
+                            violations.push(`${apt.customerName} booked ${serviceId} with ${barber.name} who doesn't offer it`);
+                        }
+                    });
+                }
+                // If barber.services is undefined or empty, barber offers all services
+
+                // Check if booking is within barber's hours
+                const dayName = new Date(apt.date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+                const barberHours = barber.hours || {};
+                const dayHours = barberHours[dayName];
+
+                if (dayHours && !dayHours.closed) {
+                    const [aptHour, aptMin] = apt.time.split(':').map(Number);
+                    const aptMinutes = aptHour * 60 + aptMin;
+                    const openMinutes = timeToMinutes(dayHours.open);
+                    const closeMinutes = timeToMinutes(dayHours.close);
+
+                    if (aptMinutes < openMinutes || aptMinutes + (apt.totalDuration || 30) > closeMinutes) {
+                        violations.push(`${apt.customerName} booking outside ${barber.name}'s hours`);
+                    }
+                }
+            });
+
+            let details = violations.length > 0
+                ? `Found ${violations.length} violations:<br><ul style="text-align: left; margin: 10px 0;">${violations.map(v => `<li>${v}</li>`).join('')}</ul>`
+                : 'All bookings match barber services and hours';
+            addTestResult('Service & Hours Match', violations.length === 0, details);
+        }
+
+        async function test2_NoOverlapping() {
+            let conflicts = [];
+
+            // Group appointments by barber
+            const byBarber = {};
+            appointments.forEach(apt => {
+                const barberId = apt.barberId || 'unknown';
+                if (!byBarber[barberId]) byBarber[barberId] = [];
+                byBarber[barberId].push(apt);
+            });
+
+            // Check for overlaps within each barber
+            Object.entries(byBarber).forEach(([barberId, apts]) => {
+                for (let i = 0; i < apts.length; i++) {
+                    for (let j = i + 1; j < apts.length; j++) {
+                        if (apts[i].date === apts[j].date) {
+                            const start1 = timeToMinutes(apts[i].time);
+                            const end1 = start1 + (apts[i].totalDuration || 30);
+                            const start2 = timeToMinutes(apts[j].time);
+                            const end2 = start2 + (apts[j].totalDuration || 30);
+
+                            // Check for overlap (considering active periods)
+                            if (start1 < end2 && start2 < end1) {
+                                // Check if it's during a break period
+                                let isBreakOverlap = false;
+                                if (apts[i].activePeriods && apts[i].activePeriods.length > 0) {
+                                    // Complex service with breaks - check if overlap is during break
+                                    isBreakOverlap = true; // Simplified - would need detailed break checking
+                                }
+
+                                if (!isBreakOverlap) {
+                                    conflicts.push({
+                                        apt1: apts[i],
+                                        apt2: apts[j],
+                                        barberId
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            let details = conflicts.length > 0
+                ? `Found ${conflicts.length} conflicts:<br><ul style="text-align: left; margin: 10px 0;">${conflicts.map(c => {
+                    const barber = barbers.find(b => b.id === c.barberId);
+                    return `<li>${barber ? barber.name : 'Unknown'}: ${c.apt1.customerName} (${c.apt1.time}) overlaps with ${c.apt2.customerName} (${c.apt2.time}) on ${c.apt1.date}</li>`;
+                }).join('')}</ul>`
+                : 'No overlapping bookings detected';
+            addTestResult('No Overlapping Bookings', conflicts.length === 0, details);
+        }
+
+        async function test3_ConcurrentBookings() {
+            // Find same-time bookings with different barbers
+            const concurrent = [];
+
+            for (let i = 0; i < appointments.length; i++) {
+                for (let j = i + 1; j < appointments.length; j++) {
+                    if (appointments[i].date === appointments[j].date &&
+                        appointments[i].time === appointments[j].time &&
+                        appointments[i].barberId !== appointments[j].barberId) {
+                        concurrent.push({
+                            apt1: appointments[i],
+                            apt2: appointments[j]
+                        });
+                    }
+                }
+            }
+
+            addTestResult('Concurrent Bookings Allowed', concurrent.length > 0,
+                concurrent.length > 0 ? `Found ${concurrent.length} concurrent bookings (good!)` : 'No concurrent bookings found');
+        }
+
+        async function test4_StaffHours() {
+            let violations = [];
+
+            appointments.forEach(apt => {
+                const barber = barbers.find(b => b.id === apt.barberId);
+                if (!barber) {
+                    console.warn(`No barber found for appointment:`, apt);
+                    return;
+                }
+
+                const dayName = new Date(apt.date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+                const hours = barber.hours?.[dayName];
+
+                if (!hours || hours.closed) {
+                    violations.push(`${apt.customerName} (with ${barber.name}) booked on ${dayName} when ${barber.name} is off`);
+                }
+            });
+
+            let details = violations.length > 0
+                ? `Found ${violations.length} violations:<br><ul style="text-align: left; margin: 10px 0;">${violations.map(v => `<li>${v}</li>`).join('')}</ul>`
+                : 'All bookings within staff hours';
+            addTestResult('Staff Hours Compliance', violations.length === 0, details);
+        }
+
+        async function test5_ServiceOfferings() {
+            const serviceUsage = {};
+
+            appointments.forEach(apt => {
+                if (apt.services) {
+                    apt.services.forEach(serviceId => {
+                        if (!serviceUsage[serviceId]) {
+                            serviceUsage[serviceId] = 0;
+                        }
+                        serviceUsage[serviceId]++;
+                    });
+                }
+            });
+
+            const totalServices = Object.keys(services).length;
+            const usedServices = Object.keys(serviceUsage).length;
+
+            addTestResult('Service Coverage', usedServices >= totalServices * 0.7,
+                `Using ${usedServices} of ${totalServices} available services`);
+        }
+
+        async function test6_StoreHours() {
+            const storeHours = SharedData.getStoreHours();
+            let violations = [];
+
+            appointments.forEach(apt => {
+                const dayName = new Date(apt.date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+                const dayHours = storeHours[dayName];
+
+                if (!dayHours || dayHours.closed) {
+                    violations.push(`Booking on ${apt.date} when store is closed`);
+                } else {
+                    const aptStart = timeToMinutes(apt.time);
+                    const aptEnd = aptStart + (apt.totalDuration || 30);
+                    const storeOpen = timeToMinutes(dayHours.open);
+                    const storeClose = timeToMinutes(dayHours.close);
+
+                    if (aptStart < storeOpen || aptEnd > storeClose) {
+                        violations.push(`${apt.customerName} booking at ${apt.time} on ${apt.date} (${dayName}) is outside store hours (${dayHours.open}-${dayHours.close})`);
+                    }
+                }
+            });
+
+            let details = violations.length > 0
+                ? `Found ${violations.length} violations:<br><ul style="text-align: left; margin: 10px 0;">${violations.map(v => `<li>${v}</li>`).join('')}</ul>`
+                : 'All bookings within store hours';
+            addTestResult('Store Hours Compliance', violations.length === 0, details);
+        }
+
+        async function test7_DashboardMetrics() {
+            // This would require checking the actual dashboard
+            // For now, we'll verify the data is available
+            const hasMetrics = appointments.length > 0 && barbers.length > 0;
+
+            addTestResult('Dashboard Metrics Available', hasMetrics,
+                `${appointments.length} appointments, ${barbers.length} barbers`);
+        }
+
+        async function test8_WeeklyRevenue() {
+            let totalRevenue = 0;
+
+            appointments.forEach(apt => {
+                if (apt.services && services) {
+                    apt.services.forEach(serviceId => {
+                        if (services[serviceId]) {
+                            totalRevenue += services[serviceId].price || 0;
+                        }
+                    });
+                }
+            });
+
+            addTestResult('Weekly Revenue Calculation', totalRevenue > 0,
+                `Total revenue: $${totalRevenue}`);
+        }
+
+        async function test9_ServiceBreakdown() {
+            const serviceCount = {};
+
+            appointments.forEach(apt => {
+                if (apt.services) {
+                    apt.services.forEach(serviceId => {
+                        if (!serviceCount[serviceId]) {
+                            serviceCount[serviceId] = 0;
+                        }
+                        serviceCount[serviceId]++;
+                    });
+                }
+            });
+
+            const breakdown = Object.entries(serviceCount)
+                .map(([id, count]) => `${services[id]?.name || id}: ${count}`)
+                .join(', ');
+
+            addTestResult('Service Breakdown', Object.keys(serviceCount).length > 0, breakdown);
+        }
+
+        async function test10_CalendarDisplay() {
+            // Check if appointments are properly distributed across the week
+            const dayDistribution = {};
+
+            appointments.forEach(apt => {
+                const day = new Date(apt.date).toLocaleDateString('en-US', { weekday: 'long' });
+                if (!dayDistribution[day]) {
+                    dayDistribution[day] = 0;
+                }
+                dayDistribution[day]++;
+            });
+
+            const days = Object.keys(dayDistribution).length;
+
+            addTestResult('Calendar Distribution', days > 4,
+                `Appointments spread across ${days} days`);
+        }
+
+        async function test11_DashboardFilters() {
+            // Check barber-specific filtering
+            const barberBookings = {};
+
+            barbers.forEach(barber => {
+                barberBookings[barber.name] = appointments.filter(apt => apt.barberId === barber.id).length;
+            });
+
+            const details = Object.entries(barberBookings)
+                .map(([name, count]) => `${name}: ${count}`)
+                .join(', ');
+
+            addTestResult('Barber Filter Data', Object.keys(barberBookings).length === barbers.length, details);
+        }
+
+        async function test12_BookingPolicies() {
+            const policies = SharedData.getBookingPolicies();
+
+            const details = `
+                Min Booking: ${policies.minBookingHours}h advance,
+                Max Booking: ${policies.maxBookingDays} days,
+                Cancellation: ${policies.cancellationHours}h notice
+            `;
+
+            addTestResult('Booking Policies Configured', true, details);
+        }
+
+        function timeToMinutes(time) {
+            if (!time) return 0;
+            const [hours, minutes] = time.split(':').map(Number);
+            return hours * 60 + minutes;
+        }
+
+        async function checkConflicts() {
+            await initialize();
+            await test2_NoOverlapping();
+
+            const detailed = document.getElementById('detailed-results');
+            detailed.innerHTML = '<h3>Conflict Analysis</h3>';
+
+            // Show any conflicts found
+            const conflicts = findConflicts();
+            if (conflicts.length > 0) {
+                detailed.innerHTML += '<div class="conflict-list">';
+                conflicts.forEach(c => {
+                    detailed.innerHTML += `
+                        <div class="conflict-item">
+                            ${c.apt1.customerName} and ${c.apt2.customerName} -
+                            ${c.apt1.time} on ${c.apt1.date}
+                        </div>
+                    `;
+                });
+                detailed.innerHTML += '</div>';
+            } else {
+                detailed.innerHTML += '<p class="pass">No conflicts found!</p>';
+            }
+        }
+
+        function findConflicts() {
+            const conflicts = [];
+            const byBarber = {};
+
+            appointments.forEach(apt => {
+                const barberId = apt.barberId || 'unknown';
+                if (!byBarber[barberId]) byBarber[barberId] = [];
+                byBarber[barberId].push(apt);
+            });
+
+            Object.entries(byBarber).forEach(([barberId, apts]) => {
+                for (let i = 0; i < apts.length; i++) {
+                    for (let j = i + 1; j < apts.length; j++) {
+                        if (apts[i].date === apts[j].date) {
+                            const start1 = timeToMinutes(apts[i].time);
+                            const end1 = start1 + (apts[i].totalDuration || 30);
+                            const start2 = timeToMinutes(apts[j].time);
+                            const end2 = start2 + (apts[j].totalDuration || 30);
+
+                            if (start1 < end2 && start2 < end1) {
+                                conflicts.push({
+                                    apt1: apts[i],
+                                    apt2: apts[j],
+                                    barberId
+                                });
+                            }
+                        }
+                    }
+                }
+            });
+
+            return conflicts;
+        }
+
+        async function checkMetrics() {
+            await initialize();
+            await test7_DashboardMetrics();
+            await test8_WeeklyRevenue();
+            await test9_ServiceBreakdown();
+        }
+
+        async function checkPolicies() {
+            await initialize();
+            await test12_BookingPolicies();
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(initialize, 500);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Active Periods</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Configuration -->
+    <script src="supabase-config.js"></script>
+    <!-- Supabase Bridge -->
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2C3E50;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+        }
+        .service-info {
+            margin: 10px 0;
+            padding: 15px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+        }
+        .service-name {
+            font-weight: bold;
+            color: #2C3E50;
+            margin-bottom: 10px;
+        }
+        .property {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        .property-label {
+            font-weight: 600;
+            color: #666;
+        }
+        .active-period {
+            display: inline-block;
+            padding: 3px 8px;
+            background: #e3f2fd;
+            border-radius: 3px;
+            margin: 2px;
+        }
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .warning {
+            background: #fff3e0;
+            color: #e65100;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .slot {
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 3px;
+            background: #f0f0f0;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .slot.available {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .slot.blocked {
+            background: #ffebee;
+            color: #c62828;
+            text-decoration: line-through;
+        }
+        button {
+            background: #2C3E50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #34495e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Active Periods Booking</h1>
+
+        <button onclick="loadServices()">Load Services with Active Periods</button>
+        <button onclick="testColoringSlots()">Test Coloring Service Slots</button>
+        <button onclick="testHighlightsSlots()">Test Highlights Service Slots</button>
+        <button onclick="testCombinedServices()">Test Combined Services</button>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        async function initialize() {
+            await SharedData.initialize();
+            console.log('SharedData initialized');
+            loadServices();
+        }
+
+        function loadServices() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="test-section"><h3>Services with Active Periods</h3></div>';
+
+            const services = SharedData.getServices();
+            const section = results.querySelector('.test-section');
+
+            Object.keys(services).forEach(serviceId => {
+                const service = services[serviceId];
+                if (service.hasActiveTime && service.activePeriods) {
+                    const serviceDiv = document.createElement('div');
+                    serviceDiv.className = 'service-info';
+
+                    let html = `<div class="service-name">${service.name}</div>`;
+                    html += `<div class="property"><span class="property-label">Duration:</span> ${service.duration} minutes</div>`;
+                    html += `<div class="property"><span class="property-label">Has Active Time:</span> ${service.hasActiveTime}</div>`;
+
+                    if (service.activePeriods && service.activePeriods.length > 0) {
+                        html += `<div class="property"><span class="property-label">Active Periods:</span></div>`;
+                        service.activePeriods.forEach(period => {
+                            html += `<span class="active-period">${period.start}-${period.end} min</span>`;
+                        });
+                    }
+
+                    serviceDiv.innerHTML = html;
+                    section.appendChild(serviceDiv);
+                }
+            });
+        }
+
+        async function testColoringSlots() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="test-section"><h3>Testing Coloring Service Slots</h3></div>';
+
+            const services = SharedData.getServices();
+            const coloringId = Object.keys(services).find(id => services[id].name.toLowerCase().includes('color'));
+
+            if (!coloringId) {
+                results.innerHTML += '<div class="warning">Coloring service not found</div>';
+                return;
+            }
+
+            const coloring = services[coloringId];
+            results.innerHTML += `<div class="success">Found: ${coloring.name} (${coloring.duration} min)</div>`;
+
+            if (coloring.hasActiveTime && coloring.activePeriods) {
+                results.innerHTML += '<div class="service-info">';
+                results.innerHTML += '<strong>Active Periods:</strong><br>';
+                coloring.activePeriods.forEach(period => {
+                    results.innerHTML += `Minutes ${period.start}-${period.end}<br>`;
+                });
+                results.innerHTML += '</div>';
+            }
+
+            // Test slot generation
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
+            const barbers = await SharedData.getBarbers();
+            const barberId = barbers[0]?.id;
+
+            results.innerHTML += '<div class="test-section"><h4>Available Slots</h4></div>';
+
+            // Test with just coloring service
+            const slots = SharedData.getAvailableSlots(tomorrow, coloring.duration, barberId, [coloringId]);
+
+            if (slots.length > 0) {
+                results.innerHTML += `<div class="success">✅ Found ${slots.length} available slots with active periods!</div>`;
+
+                const slotsDiv = document.createElement('div');
+                slotsDiv.style.marginTop = '10px';
+
+                slots.slice(0, 20).forEach(slot => {
+                    const slotEl = document.createElement('span');
+                    slotEl.className = 'slot available';
+                    slotEl.textContent = slot;
+                    slotsDiv.appendChild(slotEl);
+                });
+
+                results.appendChild(slotsDiv);
+            } else {
+                results.innerHTML += '<div class="warning">⚠️ No slots available - this might indicate active periods are blocking all slots</div>';
+            }
+        }
+
+        async function testHighlightsSlots() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="test-section"><h3>Testing Highlights Service Slots</h3></div>';
+
+            const services = SharedData.getServices();
+            const highlightsId = Object.keys(services).find(id => services[id].name.toLowerCase().includes('highlight'));
+
+            if (!highlightsId) {
+                results.innerHTML += '<div class="warning">Highlights service not found</div>';
+                return;
+            }
+
+            const highlights = services[highlightsId];
+            results.innerHTML += `<div class="success">Found: ${highlights.name} (${highlights.duration} min)</div>`;
+
+            if (highlights.hasActiveTime && highlights.activePeriods) {
+                results.innerHTML += '<div class="service-info">';
+                results.innerHTML += '<strong>Active Periods:</strong><br>';
+                highlights.activePeriods.forEach(period => {
+                    results.innerHTML += `Minutes ${period.start}-${period.end}<br>`;
+                });
+                results.innerHTML += '</div>';
+            }
+
+            // Test slot generation
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
+            const barbers = await SharedData.getBarbers();
+            const barberId = barbers[0]?.id;
+
+            results.innerHTML += '<div class="test-section"><h4>Available Slots</h4></div>';
+
+            const slots = SharedData.getAvailableSlots(tomorrow, highlights.duration, barberId, [highlightsId]);
+
+            if (slots.length > 0) {
+                results.innerHTML += `<div class="success">✅ Found ${slots.length} available slots!</div>`;
+
+                const slotsDiv = document.createElement('div');
+                slotsDiv.style.marginTop = '10px';
+
+                slots.slice(0, 20).forEach(slot => {
+                    const slotEl = document.createElement('span');
+                    slotEl.className = 'slot available';
+                    slotEl.textContent = slot;
+                    slotsDiv.appendChild(slotEl);
+                });
+
+                results.appendChild(slotsDiv);
+            } else {
+                results.innerHTML += '<div class="warning">⚠️ No slots available</div>';
+            }
+        }
+
+        async function testCombinedServices() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="test-section"><h3>Testing Combined Services</h3></div>';
+
+            const services = SharedData.getServices();
+            const coloringId = Object.keys(services).find(id => services[id].name.toLowerCase().includes('color'));
+            const mensCutId = Object.keys(services).find(id => services[id].name.toLowerCase().includes('men'));
+
+            if (!coloringId || !mensCutId) {
+                results.innerHTML += '<div class="warning">Services not found</div>';
+                return;
+            }
+
+            const coloring = services[coloringId];
+            const mensCut = services[mensCutId];
+            const totalDuration = coloring.duration + mensCut.duration;
+
+            results.innerHTML += `<div class="success">Testing: ${mensCut.name} + ${coloring.name} (${totalDuration} min total)</div>`;
+
+            // Test slot generation
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
+            const barbers = await SharedData.getBarbers();
+            const barberId = barbers[0]?.id;
+
+            results.innerHTML += '<div class="test-section"><h4>Available Slots for Combined Services</h4></div>';
+
+            const slots = SharedData.getAvailableSlots(tomorrow, totalDuration, barberId, [mensCutId, coloringId]);
+
+            if (slots.length > 0) {
+                results.innerHTML += `<div class="success">✅ Found ${slots.length} available slots for combined services!</div>`;
+
+                const slotsDiv = document.createElement('div');
+                slotsDiv.style.marginTop = '10px';
+
+                slots.slice(0, 20).forEach(slot => {
+                    const slotEl = document.createElement('span');
+                    slotEl.className = 'slot available';
+                    slotEl.textContent = slot;
+                    slotsDiv.appendChild(slotEl);
+                });
+
+                results.appendChild(slotsDiv);
+            } else {
+                results.innerHTML += '<div class="warning">⚠️ No slots available for combined services</div>';
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(initialize, 500);
+        });
+    </script>
+</body>
+</html>

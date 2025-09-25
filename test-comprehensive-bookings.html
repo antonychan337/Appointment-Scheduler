@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Booking Test Suite</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2C3E50;
+            border-bottom: 3px solid #2196F3;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #2196F3;
+        }
+        .booking-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .booking-card {
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        .booking-card h4 {
+            margin: 0 0 10px 0;
+            color: #2C3E50;
+        }
+        .booking-detail {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        .status {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        button {
+            background: #2C3E50;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 10px 10px 0;
+        }
+        button:hover {
+            background: #34495e;
+        }
+        button.danger {
+            background: #e74c3c;
+        }
+        button.danger:hover {
+            background: #c0392b;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2196F3, #4CAF50);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Comprehensive Booking Test Suite</h1>
+
+        <div class="test-section">
+            <h3>Test Configuration</h3>
+            <p><strong>Total Bookings:</strong> 30 (10 per barber)</p>
+            <p><strong>Test Week:</strong> <span id="test-week">Loading...</span></p>
+            <p><strong>Barbers:</strong> Antony Chan (Owner), Bobby, Sal</p>
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress" style="width: 0%">0%</div>
+        </div>
+
+        <div>
+            <button onclick="clearExistingBookings()">🗑️ Clear Existing Test Bookings</button>
+            <button onclick="createAllBookings()">▶️ Create All Test Bookings</button>
+            <button onclick="verifyBookings()">✅ Verify All Tests</button>
+            <button class="danger" onclick="clearAllBookings()">⚠️ Clear ALL Bookings</button>
+        </div>
+
+        <div id="results"></div>
+
+        <h2>Planned Test Bookings</h2>
+        <div id="booking-preview" class="booking-grid"></div>
+    </div>
+
+    <script>
+        let barbers = [];
+        let services = {};
+        let testBookings = [];
+        let currentWeekStart;
+
+        // Initialize
+        async function initialize() {
+            await SharedData.initialize();
+            barbers = await SharedData.getBarbers();
+            services = SharedData.getServices();
+
+            // Get next Monday as start of test week
+            const today = new Date();
+            const dayOfWeek = today.getDay();
+            const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
+            currentWeekStart = new Date(today);
+            currentWeekStart.setDate(today.getDate() + daysUntilMonday);
+            currentWeekStart.setHours(0, 0, 0, 0);
+
+            const weekEnd = new Date(currentWeekStart);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+
+            document.getElementById('test-week').textContent =
+                `${currentWeekStart.toLocaleDateString()} - ${weekEnd.toLocaleDateString()}`;
+
+            generateTestBookings();
+            displayBookingPreview();
+        }
+
+        function generateTestBookings() {
+            testBookings = [];
+            let customerCounter = 1;
+
+            // Get barber IDs
+            const antony = barbers.find(b => b.name.includes('Antony'));
+            const bobby = barbers.find(b => b.name.toLowerCase().includes('bobby'));
+            const sal = barbers.find(b => b.name.toLowerCase().includes('sal'));
+
+            // Get service IDs
+            const serviceList = Object.entries(services);
+            const mensCut = serviceList.find(([id, s]) => s.name.includes('男士') || s.name.toLowerCase().includes('men'))?.[0];
+            const womensCut = serviceList.find(([id, s]) => s.name.includes('女士') || s.name.toLowerCase().includes('women'))?.[0];
+            const kidsCut = serviceList.find(([id, s]) => s.name.includes('儿童') || s.name.toLowerCase().includes('child'))?.[0];
+            const coloring = serviceList.find(([id, s]) => s.name.includes('染发') || s.name.toLowerCase().includes('color'))?.[0];
+            const highlights = serviceList.find(([id, s]) => s.name.includes('挑染') || s.name.toLowerCase().includes('highlight'))?.[0];
+            const beijing = serviceList.find(([id, s]) => s.name.includes('陕西') || s.name.includes('Beijing'))?.[0];
+
+            // Helper function to get date
+            const getTestDate = (dayOffset) => {
+                const date = new Date(currentWeekStart);
+                date.setDate(date.getDate() + dayOffset);
+                return date.toISOString().split('T')[0];
+            };
+
+            // Antony's bookings (Owner - 10 bookings)
+            if (antony) {
+                testBookings.push(
+                    // Monday
+                    {
+                        barberId: antony.id,
+                        barberName: antony.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(0),
+                        time: '09:00',
+                        services: [mensCut],
+                        serviceNames: ['Men\'s Cut'],
+                        duration: 30,
+                        phone: '555-0001',
+                        email: 'test1@example.com'
+                    },
+                    {
+                        barberId: antony.id,
+                        barberName: antony.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(0),
+                        time: '10:00',
+                        services: [coloring],
+                        serviceNames: ['Hair Coloring'],
+                        duration: 90,
+                        phone: '555-0002',
+                        email: 'test2@example.com'
+                    },
+                    // Tuesday
+                    {
+                        barberId: antony.id,
+                        barberName: antony.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(1),
+                        time: '14:00',
+                        services: [womensCut],
+                        serviceNames: ['Women\'s Cut'],
+                        duration: 45,
+                        phone: '555-0003',
+                        email: 'test3@example.com'
+                    },
+                    // Wednesday
+                    {
+                        barberId: antony.id,
+                        barberName: antony.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(2),
+                        time: '11:00',
+                        services: [highlights],
+                        serviceNames: ['Highlights'],
+                        duration: 120,
+                        phone: '555-0004',
+                        email: 'test4@example.com'
+                    },
+                    {
+                        barberId: antony.id,
+                        barberName: antony.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(2),
+                        time: '15:30',
+                        services: [kidsCut],
+                        serviceNames: ['Children\'s Cut'],
+                        duration: 15,
+                        phone: '555-0005',
+                        email: 'test5@example.com'
+                    },
+                    // Thursday
+                    {
+                        barberId: antony.id,
+                        barberName: antony.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(3),
+                        time: '10:30',
+                        services: [mensCut],
+                        serviceNames: ['Men\'s Cut'],
+                        duration: 30,
+                        phone: '555-0006',
+                        email: 'test6@example.com'
+                    },
+                    {
+                        barberId: antony.id,
+                        barberName: antony.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(3),
+                        time: '18:00',  // Late booking
+                        services: [womensCut],
+                        serviceNames: ['Women\'s Cut'],
+                        duration: 45,
+                        phone: '555-0007',
+                        email: 'test7@example.com'
+                    },
+                    // Friday
+                    {
+                        barberId: antony.id,
+                        barberName: antony.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(4),
+                        time: '09:00',
+                        services: [coloring],
+                        serviceNames: ['Hair Coloring'],
+                        duration: 90,
+                        phone: '555-0008',
+                        email: 'test8@example.com'
+                    },
+                    // Saturday
+                    {
+                        barberId: antony.id,
+                        barberName: antony.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(5),
+                        time: '13:00',
+                        services: beijing ? [beijing] : [mensCut],
+                        serviceNames: beijing ? ['Beijing Service'] : ['Men\'s Cut'],
+                        duration: beijing ? services[beijing].duration : 30,
+                        phone: '555-0009',
+                        email: 'test9@example.com'
+                    },
+                    // Sunday
+                    {
+                        barberId: antony.id,
+                        barberName: antony.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(6),
+                        time: '16:00',
+                        services: [mensCut],
+                        serviceNames: ['Men\'s Cut'],
+                        duration: 30,
+                        phone: '555-0010',
+                        email: 'test10@example.com'
+                    }
+                );
+            }
+
+            // Bobby's bookings (10 bookings)
+            if (bobby) {
+                testBookings.push(
+                    // Monday
+                    {
+                        barberId: bobby.id,
+                        barberName: bobby.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(0),
+                        time: '09:30',
+                        services: [mensCut],
+                        serviceNames: ['Men\'s Cut'],
+                        duration: 30,
+                        phone: '555-0011',
+                        email: 'test11@example.com'
+                    },
+                    {
+                        barberId: bobby.id,
+                        barberName: bobby.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(0),
+                        time: '11:00',
+                        services: [coloring],
+                        serviceNames: ['Hair Coloring'],
+                        duration: 90,
+                        phone: '555-0012',
+                        email: 'test12@example.com'
+                    },
+                    {
+                        barberId: bobby.id,
+                        barberName: bobby.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(0),
+                        time: '13:00',  // After coloring ends (11:00 + 1.5 hours = 12:30)
+                        services: [kidsCut],
+                        serviceNames: ['Children\'s Cut'],
+                        duration: 15,
+                        phone: '555-0013',
+                        email: 'test13@example.com'
+                    },
+                    // Tuesday
+                    {
+                        barberId: bobby.id,
+                        barberName: bobby.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(1),
+                        time: '09:00',  // Early morning
+                        services: [mensCut],
+                        serviceNames: ['Men\'s Cut'],
+                        duration: 30,
+                        phone: '555-0014',
+                        email: 'test14@example.com'
+                    },
+                    {
+                        barberId: bobby.id,
+                        barberName: bobby.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(1),
+                        time: '14:00',
+                        services: [womensCut],
+                        serviceNames: ['Women\'s Cut'],
+                        duration: 45,
+                        phone: '555-0015',
+                        email: 'test15@example.com'
+                    },
+                    // Wednesday
+                    {
+                        barberId: bobby.id,
+                        barberName: bobby.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(2),
+                        time: '10:00',
+                        services: [highlights],
+                        serviceNames: ['Highlights'],
+                        duration: 120,
+                        phone: '555-0016',
+                        email: 'test16@example.com'
+                    },
+                    // Thursday
+                    {
+                        barberId: bobby.id,
+                        barberName: bobby.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(3),
+                        time: '15:00',
+                        services: [kidsCut],
+                        serviceNames: ['Children\'s Cut'],
+                        duration: 15,
+                        phone: '555-0017',
+                        email: 'test17@example.com'
+                    },
+                    // Friday
+                    {
+                        barberId: bobby.id,
+                        barberName: bobby.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(4),
+                        time: '11:00',
+                        services: [womensCut],
+                        serviceNames: ['Women\'s Cut'],
+                        duration: 45,
+                        phone: '555-0018',
+                        email: 'test18@example.com'
+                    },
+                    // Saturday
+                    {
+                        barberId: bobby.id,
+                        barberName: bobby.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(5),
+                        time: '10:00',
+                        services: [mensCut],
+                        serviceNames: ['Men\'s Cut'],
+                        duration: 30,
+                        phone: '555-0019',
+                        email: 'test19@example.com'
+                    },
+                    // Sunday
+                    {
+                        barberId: bobby.id,
+                        barberName: bobby.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(6),
+                        time: '14:00',
+                        services: [mensCut],
+                        serviceNames: ['Men\'s Cut'],
+                        duration: 30,
+                        phone: '555-0020',
+                        email: 'test20@example.com'
+                    }
+                );
+            }
+
+            // Sal's bookings (10 bookings)
+            if (sal) {
+                testBookings.push(
+                    // Monday - Same time as Bobby (testing concurrent bookings)
+                    {
+                        barberId: sal.id,
+                        barberName: sal.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(0),
+                        time: '09:30',  // Same as Bobby
+                        services: [womensCut],
+                        serviceNames: ['Women\'s Cut'],
+                        duration: 45,
+                        phone: '555-0021',
+                        email: 'test21@example.com'
+                    },
+                    {
+                        barberId: sal.id,
+                        barberName: sal.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(0),
+                        time: '14:00',
+                        services: [coloring],
+                        serviceNames: ['Hair Coloring'],
+                        duration: 90,
+                        phone: '555-0022',
+                        email: 'test22@example.com'
+                    },
+                    // Tuesday
+                    {
+                        barberId: sal.id,
+                        barberName: sal.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(1),
+                        time: '10:00',
+                        services: [mensCut],
+                        serviceNames: ['Men\'s Cut'],
+                        duration: 30,
+                        phone: '555-0023',
+                        email: 'test23@example.com'
+                    },
+                    {
+                        barberId: sal.id,
+                        barberName: sal.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(1),
+                        time: '15:00',
+                        services: [kidsCut],
+                        serviceNames: ['Children\'s Cut'],
+                        duration: 15,
+                        phone: '555-0024',
+                        email: 'test24@example.com'
+                    },
+                    // Wednesday
+                    {
+                        barberId: sal.id,
+                        barberName: sal.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(2),
+                        time: '09:00',
+                        services: [coloring],
+                        serviceNames: ['Hair Coloring'],
+                        duration: 90,
+                        phone: '555-0025',
+                        email: 'test25@example.com'
+                    },
+                    // Thursday
+                    {
+                        barberId: sal.id,
+                        barberName: sal.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(3),
+                        time: '11:30',
+                        services: [mensCut],
+                        serviceNames: ['Men\'s Cut'],
+                        duration: 30,
+                        phone: '555-0026',
+                        email: 'test26@example.com'
+                    },
+                    // Friday
+                    {
+                        barberId: sal.id,
+                        barberName: sal.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(4),
+                        time: '13:00',
+                        services: [womensCut],
+                        serviceNames: ['Women\'s Cut'],
+                        duration: 45,
+                        phone: '555-0027',
+                        email: 'test27@example.com'
+                    },
+                    // Saturday
+                    {
+                        barberId: sal.id,
+                        barberName: sal.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(5),
+                        time: '11:00',
+                        services: [kidsCut],
+                        serviceNames: ['Children\'s Cut'],
+                        duration: 15,
+                        phone: '555-0028',
+                        email: 'test28@example.com'
+                    },
+                    {
+                        barberId: sal.id,
+                        barberName: sal.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(5),
+                        time: '15:00',
+                        services: [mensCut],
+                        serviceNames: ['Men\'s Cut'],
+                        duration: 30,
+                        phone: '555-0029',
+                        email: 'test29@example.com'
+                    },
+                    // Sunday
+                    {
+                        barberId: sal.id,
+                        barberName: sal.name,
+                        customerName: `Test Customer ${customerCounter++}`,
+                        date: getTestDate(6),
+                        time: '12:00',
+                        services: [mensCut],
+                        serviceNames: ['Men\'s Cut'],
+                        duration: 30,
+                        phone: '555-0030',
+                        email: 'test30@example.com'
+                    }
+                );
+            }
+        }
+
+        function displayBookingPreview() {
+            const preview = document.getElementById('booking-preview');
+            preview.innerHTML = '';
+
+            testBookings.forEach((booking, index) => {
+                const card = document.createElement('div');
+                card.className = 'booking-card';
+                card.innerHTML = `
+                    <h4>Booking #${index + 1}</h4>
+                    <div class="booking-detail"><strong>Barber:</strong> ${booking.barberName}</div>
+                    <div class="booking-detail"><strong>Customer:</strong> ${booking.customerName}</div>
+                    <div class="booking-detail"><strong>Date:</strong> ${booking.date}</div>
+                    <div class="booking-detail"><strong>Time:</strong> ${booking.time}</div>
+                    <div class="booking-detail"><strong>Service:</strong> ${booking.serviceNames.join(', ')}</div>
+                    <div class="booking-detail"><strong>Duration:</strong> ${booking.duration} min</div>
+                    <span class="status pending" id="status-${index}">Pending</span>
+                `;
+                preview.appendChild(card);
+            });
+        }
+
+        async function createAllBookings() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="test-section"><h3>Creating Test Bookings...</h3></div>';
+
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (let i = 0; i < testBookings.length; i++) {
+                const booking = testBookings[i];
+                const statusEl = document.getElementById(`status-${i}`);
+
+                try {
+                    // Create appointment object
+                    // Calculate total price for the appointment
+                    let totalPrice = 0;
+                    const services = SharedData.getServices();
+                    for (const serviceId of booking.services) {
+                        if (services[serviceId]) {
+                            totalPrice += services[serviceId].price || 0;
+                        }
+                    }
+
+                    const appointment = {
+                        date: booking.date,
+                        time: booking.time,
+                        customerName: booking.customerName,
+                        customerPhone: booking.phone,  // Fixed field name
+                        customerEmail: booking.email,  // Fixed field name
+                        services: booking.services,
+                        barberId: booking.barberId,
+                        totalDuration: booking.duration,
+                        totalPrice: totalPrice,  // Added required field
+                        notes: `Test booking for ${booking.customerName}`
+                    };
+
+                    // Save appointment
+                    const appointmentId = await SharedData.saveAppointmentAsync(appointment);
+
+                    if (appointmentId) {
+                        successCount++;
+                        statusEl.className = 'status success';
+                        statusEl.textContent = 'Created';
+                        console.log(`Created booking ${i + 1}:`, appointment);
+                    } else {
+                        errorCount++;
+                        statusEl.className = 'status error';
+                        statusEl.textContent = 'Failed';
+                        console.error(`Failed to create booking ${i + 1}`);
+                    }
+                } catch (error) {
+                    errorCount++;
+                    statusEl.className = 'status error';
+                    statusEl.textContent = 'Error';
+                    console.error(`Error creating booking ${i + 1}:`, error);
+                }
+
+                // Update progress
+                const progress = Math.round(((i + 1) / testBookings.length) * 100);
+                document.getElementById('progress').style.width = `${progress}%`;
+                document.getElementById('progress').textContent = `${progress}%`;
+
+                // Small delay to prevent overwhelming the server
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+
+            results.innerHTML += `
+                <div class="test-section">
+                    <h3>Results</h3>
+                    <p class="success">✅ Successfully created: ${successCount} bookings</p>
+                    ${errorCount > 0 ? `<p class="error">❌ Failed: ${errorCount} bookings</p>` : ''}
+                    <p class="info">Total: ${testBookings.length} bookings</p>
+                </div>
+            `;
+        }
+
+        async function clearExistingBookings() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="test-section"><h3>Clearing Test Bookings...</h3></div>';
+
+            try {
+                const appointments = SharedData.getAppointmentsSync();
+                const testAppointments = appointments.filter(apt =>
+                    apt.customerName && apt.customerName.startsWith('Test Customer')
+                );
+
+                let deleted = 0;
+                for (const apt of testAppointments) {
+                    try {
+                        const success = await SharedData.deleteAppointment(apt.id);
+                        if (success) {
+                            deleted++;
+                        } else {
+                            console.error('Failed to delete appointment:', apt.id);
+                        }
+                    } catch (error) {
+                        console.error('Error deleting appointment:', error);
+                    }
+                }
+
+                // Force refresh of appointments cache
+                await SharedData.getAppointments();
+
+                results.innerHTML += `
+                    <div class="success">✅ Cleared ${deleted} test bookings</div>
+                    <div class="info">💡 Refresh the owner app to see the changes</div>
+                `;
+
+                // Reset status indicators
+                testBookings.forEach((booking, index) => {
+                    const statusEl = document.getElementById(`status-${index}`);
+                    if (statusEl) {
+                        statusEl.className = 'status pending';
+                        statusEl.textContent = 'Pending';
+                    }
+                });
+            } catch (error) {
+                results.innerHTML += `
+                    <div class="error">❌ Error clearing bookings: ${error.message}</div>
+                `;
+            }
+        }
+
+        async function clearAllBookings() {
+            if (!confirm('⚠️ WARNING: This will delete ALL bookings in the system. Are you sure?')) {
+                return;
+            }
+
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="test-section"><h3>Clearing ALL Bookings...</h3></div>';
+
+            try {
+                const appointments = SharedData.getAppointmentsSync();
+                let deletedCount = 0;
+
+                for (const apt of appointments) {
+                    try {
+                        const success = await SharedData.deleteAppointment(apt.id);
+                        if (success) {
+                            deletedCount++;
+                        } else {
+                            console.error('Failed to delete appointment:', apt.id);
+                        }
+                    } catch (error) {
+                        console.error('Error deleting appointment:', error);
+                    }
+                }
+
+                // Force refresh of appointments cache
+                await SharedData.getAppointments();
+
+                results.innerHTML += `
+                    <div class="success">✅ Cleared ${deletedCount} of ${appointments.length} bookings</div>
+                    <div class="info">💡 Refresh the owner app to see the changes</div>
+                `;
+
+                // Reset all status indicators
+                testBookings.forEach((booking, index) => {
+                    const statusEl = document.getElementById(`status-${index}`);
+                    if (statusEl) {
+                        statusEl.className = 'status pending';
+                        statusEl.textContent = 'Pending';
+                    }
+                });
+            } catch (error) {
+                results.innerHTML += `
+                    <div class="error">❌ Error: ${error.message}</div>
+                `;
+            }
+        }
+
+        async function verifyBookings() {
+            window.open('verify-test-results.html', '_blank');
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(initialize, 500);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Barber Hours</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Configuration -->
+    <script src="supabase-config.js"></script>
+    <!-- Supabase Bridge -->
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2C3E50;
+        }
+        .barber-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+        }
+        .hours-table {
+            margin-top: 15px;
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .hours-table th,
+        .hours-table td {
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        .hours-table th {
+            background: #e3f2fd;
+            font-weight: bold;
+        }
+        .closed {
+            color: #f44336;
+            font-weight: bold;
+        }
+        .info {
+            margin: 10px 0;
+            padding: 10px;
+            background: #e3f2fd;
+            border-radius: 5px;
+        }
+        .warning {
+            background: #fff3e0;
+            color: #e65100;
+        }
+        button {
+            background: #2C3E50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #34495e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🕐 Barber Hours Configuration Check</h1>
+
+        <button onclick="checkBarberHours()">Check All Barber Hours</button>
+        <button onclick="checkStoreHours()">Check Store Hours</button>
+        <button onclick="testSaturdaySlots()">Test Saturday Slots</button>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        async function initialize() {
+            await SharedData.initialize();
+            console.log('SharedData initialized');
+        }
+
+        async function checkBarberHours() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="info">Loading barber data...</div>';
+
+            try {
+                const barbers = await SharedData.getBarbers();
+                const storeHours = SharedData.getStoreHours();
+
+                let html = '';
+
+                barbers.forEach(barber => {
+                    html += `<div class="barber-section">`;
+                    html += `<h2>${barber.name} (ID: ${barber.id})</h2>`;
+                    html += `<div class="info ${barber.usesStoreHours ? 'warning' : ''}">`;
+                    html += `<strong>Uses Store Hours:</strong> ${barber.usesStoreHours ? 'YES ⚠️' : 'NO (Custom Hours)'}`;
+                    html += `</div>`;
+
+                    const hours = barber.usesStoreHours ? storeHours : (barber.hours || storeHours);
+
+                    html += `<table class="hours-table">`;
+                    html += `<tr><th>Day</th><th>Open</th><th>Close</th><th>Status</th></tr>`;
+
+                    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                    days.forEach(day => {
+                        const dayHours = hours[day];
+                        if (dayHours) {
+                            html += `<tr>`;
+                            html += `<td style="text-transform: capitalize">${day}</td>`;
+                            html += `<td>${dayHours.open || '-'}</td>`;
+                            html += `<td>${dayHours.close || '-'}</td>`;
+                            html += `<td class="${dayHours.closed ? 'closed' : ''}">${dayHours.closed ? 'CLOSED' : 'Open'}</td>`;
+                            html += `</tr>`;
+                        }
+                    });
+
+                    html += `</table>`;
+
+                    // Special check for Saturday
+                    const saturdayHours = hours.saturday;
+                    if (saturdayHours && !saturdayHours.closed) {
+                        html += `<div class="info" style="margin-top: 15px;">`;
+                        html += `<strong>Saturday Hours:</strong> ${saturdayHours.open} - ${saturdayHours.close}`;
+                        html += `</div>`;
+                    }
+
+                    html += `</div>`;
+                });
+
+                results.innerHTML = html;
+
+            } catch (error) {
+                results.innerHTML = `<div class="info warning">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function checkStoreHours() {
+            const results = document.getElementById('results');
+            const storeHours = SharedData.getStoreHours();
+
+            let html = '<div class="barber-section">';
+            html += '<h2>Store Hours (Default)</h2>';
+            html += '<table class="hours-table">';
+            html += '<tr><th>Day</th><th>Open</th><th>Close</th><th>Status</th></tr>';
+
+            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+            days.forEach(day => {
+                const dayHours = storeHours[day];
+                if (dayHours) {
+                    html += '<tr>';
+                    html += `<td style="text-transform: capitalize">${day}</td>`;
+                    html += `<td>${dayHours.open || '-'}</td>`;
+                    html += `<td>${dayHours.close || '-'}</td>`;
+                    html += `<td class="${dayHours.closed ? 'closed' : ''}">${dayHours.closed ? 'CLOSED' : 'Open'}</td>`;
+                    html += '</tr>';
+                }
+            });
+
+            html += '</table>';
+            html += '</div>';
+
+            results.innerHTML = html;
+        }
+
+        async function testSaturdaySlots() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="info">Testing Saturday slots...</div>';
+
+            try {
+                const barbers = await SharedData.getBarbers();
+                const testDate = new Date('2025-09-27'); // Saturday
+
+                let html = '<div class="barber-section">';
+                html += '<h2>Available Slots for Saturday, Sep 27, 2025</h2>';
+
+                barbers.forEach(barber => {
+                    // Test with women's cut (45 minutes)
+                    const slots = SharedData.getAvailableSlots(testDate, 45, barber.id);
+
+                    html += `<h3>${barber.name}</h3>`;
+                    html += `<div class="info">`;
+                    html += `<strong>Service:</strong> Women's Cut (45 min)<br>`;
+                    html += `<strong>Total Slots Available:</strong> ${slots.length}<br>`;
+                    if (slots.length > 0) {
+                        html += `<strong>First Slot:</strong> ${slots[0]}<br>`;
+                        html += `<strong>Last Slot:</strong> ${slots[slots.length - 1]}<br>`;
+
+                        // Show first 10 and last 10 slots
+                        html += `<strong>First 10 Slots:</strong> ${slots.slice(0, 10).join(', ')}<br>`;
+                        html += `<strong>Last 10 Slots:</strong> ${slots.slice(-10).join(', ')}`;
+                    }
+                    html += `</div>`;
+                });
+
+                html += '</div>';
+                results.innerHTML = html;
+
+            } catch (error) {
+                results.innerHTML = `<div class="info warning">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(initialize, 500);
+        });
+    </script>
+</body>
+</html>

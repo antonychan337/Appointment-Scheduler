@@ -413,21 +413,28 @@ const SharedData = {
             // Transform to match existing format
             return (data || []).map(barber => {
                 console.log(`🔍 Barber "${barber.name}" service_ids from DB:`, barber.service_ids);
+                console.log(`📋 Barber "${barber.name}" uses_store_hours from DB:`, barber.uses_store_hours, 'is_owner:', barber.is_owner);
 
                 const transformedBarber = {
                     id: barber.id,
                     name: barber.name,
                     title: barber.title,
                     isOwner: barber.is_owner,
+                    display_order: barber.display_order,
                     // Transform service_ids array to services object with boolean values
                     services: Array.isArray(barber.service_ids)
                         ? barber.service_ids.reduce((acc, id) => { acc[id] = true; return acc; }, {})
                         : (barber.service_ids || {}),
                     hours: barber.working_hours || this.getStoreHours(),
-                    usesStoreHours: barber.uses_store_hours || barber.is_owner // Owner uses store hours by default
+                    // Allow owner to have custom hours - respect their uses_store_hours preference
+                    // Only default to true if uses_store_hours is null/undefined for owner
+                    usesStoreHours: barber.uses_store_hours !== null && barber.uses_store_hours !== undefined
+                        ? barber.uses_store_hours === true
+                        : (barber.is_owner ? true : false)  // Default: owner uses store hours, staff doesn't
                 };
 
                 console.log(`🔍 Barber "${barber.name}" transformed services:`, transformedBarber.services);
+                console.log(`✅ Barber "${barber.name}" final usesStoreHours:`, transformedBarber.usesStoreHours);
                 return transformedBarber;
             });
         } catch (error) {
@@ -451,14 +458,19 @@ const SharedData = {
         const barber = this.getBarberById(barberId);
         const storeHours = this.getStoreHours();
 
-        if (!barber) return storeHours;
+        if (!barber) {
+            console.log('[Bridge] Barber not found, using store hours');
+            return storeHours;
+        }
 
         // If barber uses store hours, return store hours
         if (barber.usesStoreHours) {
+            console.log('[Bridge] Barber uses store hours');
             return storeHours;
         }
 
         // Return barber's custom hours
+        console.log('[Bridge] Using barber custom hours:', barber.hours);
         return barber.hours || storeHours;
     },
 
@@ -469,13 +481,21 @@ const SharedData = {
             return null;
         }
 
+        // Get current barbers to determine the next display_order
+        const currentBarbers = await this.getBarbers();
+        const maxDisplayOrder = currentBarbers.reduce((max, barber, index) => {
+            // Use index as fallback if no display_order set
+            return Math.max(max, barber.display_order || index);
+        }, -1);
+
         // Get barber to copy from if specified
         let barberData = {
             shop_id: currentShopId,
             name: name,
             is_owner: false,
             is_active: true,
-            working_hours: this.getStoreHours()
+            working_hours: this.getStoreHours(),
+            display_order: maxDisplayOrder + 1  // Add at the end
         };
 
         if (copyFromId && this.barbersCache) {
@@ -733,42 +753,77 @@ const SharedData = {
             // Transform to match existing format (object instead of array)
             const services = {};
 
-            // Define color palette for automatic assignment
+            // Define extended color palette for automatic assignment
+            // These colors are carefully chosen to be visually distinct
             const colorPalette = [
-                '#2196F3', // Blue
-                '#E91E63', // Pink
-                '#4CAF50', // Green
-                '#FF9800', // Orange
-                '#9C27B0', // Purple
-                '#00BCD4', // Cyan
-                '#FFC107', // Amber
-                '#795548', // Brown
-                '#607D8B', // Blue Grey
-                '#F44336'  // Red
+                '#2196F3', // Blue - Men's Cut
+                '#E91E63', // Pink - Women's Cut
+                '#7E57C2', // Deep Purple - Children's Cut
+                '#4CAF50', // Green - Hair Coloring
+                '#FF9800', // Orange - Highlights
+                '#00BCD4', // Cyan - Custom Service 1
+                '#FFC107', // Amber - Custom Service 2
+                '#795548', // Brown - Custom Service 3
+                '#607D8B', // Blue Grey - Custom Service 4
+                '#F44336', // Red - Custom Service 5
+                '#3F51B5', // Indigo - Custom Service 6
+                '#009688', // Teal - Custom Service 7
+                '#CDDC39', // Lime - Custom Service 8
+                '#FF5722', // Deep Orange - Custom Service 9
+                '#9E9E9E', // Grey - Custom Service 10
+                '#673AB7', // Deep Purple Alt - Custom Service 11
+                '#00ACC1', // Cyan Alt - Custom Service 12
+                '#8BC34A', // Light Green - Custom Service 13
+                '#FF6F00', // Amber Alt - Custom Service 14
+                '#D32F2F'  // Red Alt - Custom Service 15
             ];
 
-            let colorIndex = 0;
-            (data || []).forEach(service => {
-                // Get default color based on service name or assign from palette
-                let defaultColor = '#2196F3';
+            // Track which colors are already used
+            const usedColors = new Set();
 
-                // Check for specific service names (case insensitive)
-                const nameLower = service.name.toLowerCase();
-                if (nameLower.includes("men") && nameLower.includes("cut")) {
-                    defaultColor = '#2196F3'; // Blue
-                } else if (nameLower.includes("women") && nameLower.includes("cut")) {
-                    defaultColor = '#E91E63'; // Pink
-                } else if (nameLower.includes("child") || nameLower.includes("kid")) {
-                    defaultColor = '#4CAF50'; // Green
-                } else if (nameLower.includes("color")) {
-                    defaultColor = '#FF9800'; // Orange
-                } else if (nameLower.includes("highlight")) {
-                    defaultColor = '#9C27B0'; // Purple
-                } else {
-                    // Assign from palette based on order
-                    defaultColor = colorPalette[colorIndex % colorPalette.length];
-                    colorIndex++;
+            // First pass: collect all colors already in use (from database)
+            (data || []).forEach(service => {
+                if (service.color) {
+                    usedColors.add(service.color.toUpperCase());
                 }
+            });
+
+            // Second pass: assign colors
+            (data || []).forEach(service => {
+                let assignedColor = service.color; // Use existing color if available
+
+                if (!assignedColor) {
+                    // Get default color based on service name
+                    const nameLower = service.name.toLowerCase();
+
+                    // Check for specific service names (case insensitive)
+                    if (nameLower.includes("men") && nameLower.includes("cut")) {
+                        assignedColor = '#2196F3'; // Blue
+                    } else if (nameLower.includes("women") && nameLower.includes("cut")) {
+                        assignedColor = '#E91E63'; // Pink
+                    } else if (nameLower.includes("child") || nameLower.includes("kid")) {
+                        assignedColor = '#7E57C2'; // Deep Purple
+                    } else if (nameLower.includes("color") || nameLower.includes("染发")) {
+                        assignedColor = '#4CAF50'; // Green
+                    } else if (nameLower.includes("highlight") || nameLower.includes("挑染")) {
+                        assignedColor = '#FF9800'; // Orange
+                    } else {
+                        // Find first unused color from palette
+                        assignedColor = colorPalette.find(color =>
+                            !usedColors.has(color.toUpperCase())
+                        ) || colorPalette[Math.floor(Math.random() * colorPalette.length)];
+                    }
+
+                    // If the chosen color is already used, find an unused one
+                    if (usedColors.has(assignedColor.toUpperCase())) {
+                        assignedColor = colorPalette.find(color =>
+                            !usedColors.has(color.toUpperCase())
+                        ) || assignedColor;
+                    }
+                }
+
+                // Add to used colors set
+                usedColors.add(assignedColor.toUpperCase());
 
                 services[service.id] = {
                     name: service.name,
@@ -779,9 +834,9 @@ const SharedData = {
                     enabled: service.enabled,
                     hasActiveTime: service.has_active_time,
                     activePeriods: service.active_periods,
-                    color: service.color || defaultColor
+                    color: assignedColor
                 };
-                console.log(`Loaded service "${service.name}" with color ${services[service.id].color} (${service.color ? 'from DB' : 'default assigned'})`);
+                console.log(`Loaded service "${service.name}" with color ${services[service.id].color} (${service.color ? 'from DB' : 'auto-assigned unique'})`);
             });
 
             // Cache services for synchronous access
@@ -855,21 +910,46 @@ const SharedData = {
 
             const finalServiceIds = [];
 
-            // Define color palette for services
+            // Define extended color palette for services
             const colorPalette = [
-                '#2196F3', // Blue
-                '#E91E63', // Pink
-                '#4CAF50', // Green
-                '#FF9800', // Orange
-                '#9C27B0', // Purple
+                '#2196F3', // Blue - Men's Cut
+                '#E91E63', // Pink - Women's Cut
+                '#7E57C2', // Deep Purple - Children's Cut
+                '#4CAF50', // Green - Hair Coloring
+                '#FF9800', // Orange - Highlights
                 '#00BCD4', // Cyan
                 '#FFC107', // Amber
                 '#795548', // Brown
                 '#607D8B', // Blue Grey
-                '#F44336'  // Red
+                '#F44336', // Red
+                '#3F51B5', // Indigo
+                '#009688', // Teal
+                '#CDDC39', // Lime
+                '#FF5722', // Deep Orange
+                '#9E9E9E', // Grey
+                '#673AB7', // Deep Purple Alt
+                '#00ACC1', // Cyan Alt
+                '#8BC34A', // Light Green
+                '#FF6F00', // Amber Alt
+                '#D32F2F'  // Red Alt
             ];
 
-            let colorIndex = 0;
+            // Track which colors are already in use
+            const usedColors = new Set();
+
+            // Get all existing services to track their colors
+            const { data: allExisting } = await supabaseClient
+                .from('services')
+                .select('id, name, color')
+                .eq('shop_id', currentShopId);
+
+            // Track colors already in use from existing services
+            (allExisting || []).forEach(s => {
+                if (s.color) {
+                    usedColors.add(s.color.toUpperCase());
+                }
+            });
+
             const serviceList = Object.entries(services);
 
             for (const [serviceId, service] of serviceList) {
@@ -885,23 +965,36 @@ const SharedData = {
                     } else if (nameLower.includes("women") && nameLower.includes("cut")) {
                         assignedColor = '#E91E63'; // Pink
                     } else if (nameLower.includes("child") || nameLower.includes("kid")) {
-                        assignedColor = '#4CAF50'; // Green
+                        assignedColor = '#7E57C2'; // Deep Purple
                     } else if (nameLower.includes("color")) {
                         assignedColor = '#FF9800'; // Orange
                     } else if (nameLower.includes("highlight")) {
                         assignedColor = '#9C27B0'; // Purple
                     } else {
-                        // Use color from existing service if available, otherwise assign from palette
+                        // Use color from existing service if available
                         const existingService = existingByName[service.name];
                         if (existingService && this.servicesCache && this.servicesCache[existingService]) {
                             assignedColor = this.servicesCache[existingService].color;
                         }
+
+                        // If still no color, find first unused color from palette
                         if (!assignedColor) {
-                            // Assign sequential colors from palette to make them distinct
+                            assignedColor = colorPalette.find(color =>
+                                !usedColors.has(color.toUpperCase())
+                            );
+                        }
+
+                        // If all colors are used, use least common one
+                        if (!assignedColor) {
                             const index = serviceList.findIndex(([id]) => id === serviceId);
                             assignedColor = colorPalette[index % colorPalette.length];
                         }
                     }
+                }
+
+                // Add to used colors set for this session
+                if (assignedColor) {
+                    usedColors.add(assignedColor.toUpperCase());
                 }
 
                 const serviceData = {
@@ -1007,9 +1100,12 @@ const SharedData = {
                 customerPhone: apt.customer_phone,
                 customerEmail: apt.customer_email,
                 services: apt.service_ids,
+                serviceNames: apt.service_names,
                 date: apt.appointment_date,
                 time: apt.start_time,
                 endTime: apt.end_time,
+                totalDuration: apt.total_duration,
+                totalPrice: apt.total_price,
                 status: apt.status,
                 notes: apt.customer_notes,
                 createdAt: apt.created_at
@@ -1198,6 +1294,27 @@ const SharedData = {
             return true;
         } catch (error) {
             console.error('Error cancelling appointment:', error);
+            return false;
+        }
+    },
+
+    async deleteAppointment(appointmentId) {
+        try {
+            const { error } = await supabaseClient
+                .from('appointments')
+                .delete()
+                .eq('id', appointmentId);
+
+            if (error) throw error;
+
+            // Remove from cache
+            if (this.appointmentsCache) {
+                this.appointmentsCache = this.appointmentsCache.filter(apt => apt.id !== appointmentId);
+            }
+
+            return true;
+        } catch (error) {
+            console.error('Error deleting appointment:', error);
             return false;
         }
     },
@@ -1410,7 +1527,7 @@ const SharedData = {
     },
 
     // AVAILABILITY CHECKING
-    getAvailableSlots(date, serviceDuration = 30, barberId = null) {
+    getAvailableSlots(date, serviceDuration = 30, barberId = null, serviceIds = []) {
         // Ensure appointments cache is loaded
         if (!this.appointmentsCache) {
             console.log('[Bridge] Appointments cache not loaded, loading now...');
@@ -1429,6 +1546,7 @@ const SharedData = {
             dateString: date ? date.toString() : 'null',
             serviceDuration: serviceDuration,
             barberId: barberId,
+            serviceIds: serviceIds,
             appointmentsLoaded: this.appointmentsCache ? this.appointmentsCache.length : 'not loaded'
         });
         const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
@@ -1437,8 +1555,7 @@ const SharedData = {
         // Get hours for the specific barber or store
         let hours;
         if (barberId) {
-            const barber = this.getBarberById(barberId);
-            hours = barber ? barber.hours : this.getStoreHours();
+            hours = this.getBarberHours(barberId);
         } else {
             hours = this.getStoreHours();
         }
@@ -1463,7 +1580,8 @@ const SharedData = {
             const time = this.minutesToTime(minutes);
 
             // Check if this slot is available (not blocked and no conflicts)
-            if (!this.isSlotConflicting(date, time, serviceDuration, barberId)) {
+            // Pass serviceIds to check active periods properly
+            if (!this.isSlotConflicting(date, time, serviceDuration, barberId, serviceIds)) {
                 slots.push(time);
             }
         }
@@ -1472,8 +1590,9 @@ const SharedData = {
         return slots;
     },
 
-    isSlotConflicting(date, time, duration, barberId = null) {
+    isSlotConflicting(date, time, duration, barberId = null, serviceIds = []) {
         // Check if this time slot conflicts with existing appointments
+        // If serviceIds are provided, check if services have active periods
         const dateStr = typeof date === 'string' ? date : date.toISOString().split('T')[0];
 
         // Get appointments for this date
@@ -1482,6 +1601,48 @@ const SharedData = {
         // Convert time to minutes for easier comparison
         const slotStart = this.timeToMinutes(time);
         const slotEnd = slotStart + duration;
+
+        // Get services if we need to check active periods
+        let activePeriodsToCheck = [];
+        if (serviceIds && serviceIds.length > 0) {
+            const services = this.getServices();
+            let currentOffset = 0;
+
+            serviceIds.forEach(serviceId => {
+                const service = services[serviceId];
+                if (service) {
+                    // If service has active periods, collect them with proper offset
+                    if (service.hasActiveTime && service.activePeriods && service.activePeriods.length > 0) {
+                        service.activePeriods.forEach(period => {
+                            activePeriodsToCheck.push({
+                                start: slotStart + period.start,
+                                end: slotStart + period.end
+                            });
+                        });
+                    } else {
+                        // No active periods means the entire service duration is active
+                        activePeriodsToCheck.push({
+                            start: slotStart + currentOffset,
+                            end: slotStart + currentOffset + service.duration
+                        });
+                    }
+                    currentOffset += service.duration;
+                }
+            });
+
+            // If we have active periods, log them for debugging
+            if (activePeriodsToCheck.length > 0) {
+                console.log(`[Bridge] Checking conflicts for active periods:`, activePeriodsToCheck);
+            }
+        }
+
+        // If no active periods were found, treat entire duration as active
+        if (activePeriodsToCheck.length === 0) {
+            activePeriodsToCheck = [{
+                start: slotStart,
+                end: slotEnd
+            }];
+        }
 
         // Check each appointment for conflicts
         for (const apt of appointments) {
@@ -1494,11 +1655,55 @@ const SharedData = {
             const aptStart = this.timeToMinutes(apt.time);
             const aptEnd = this.timeToMinutes(apt.endTime);
 
-            // Check for overlap
-            // Slots conflict if they overlap at any point
-            if ((slotStart < aptEnd && slotEnd > aptStart)) {
-                console.log(`Slot conflict detected: ${time} conflicts with appointment at ${apt.time}-${apt.endTime}`);
-                return true;
+            // Check if the existing appointment has active periods (services with breaks)
+            let existingAptActivePeriods = [];
+            if (apt.services && apt.services.length > 0) {
+                const services = this.getServices();
+                let currentOffset = 0;
+
+                // Build active periods for the existing appointment
+                apt.services.forEach(serviceId => {
+                    const service = services[serviceId];
+                    if (service) {
+                        if (service.hasActiveTime && service.activePeriods && service.activePeriods.length > 0) {
+                            // Service has active periods (with breaks)
+                            service.activePeriods.forEach(period => {
+                                existingAptActivePeriods.push({
+                                    start: aptStart + period.start,
+                                    end: aptStart + period.end
+                                });
+                            });
+                        } else {
+                            // No active periods means entire service duration is active
+                            existingAptActivePeriods.push({
+                                start: aptStart + currentOffset,
+                                end: aptStart + currentOffset + service.duration
+                            });
+                        }
+                        currentOffset += service.duration;
+                    }
+                });
+
+                console.log(`[Bridge] Existing apt has ${existingAptActivePeriods.length} active periods`);
+            }
+
+            // If existing appointment has no active periods info, treat entire appointment as active
+            if (existingAptActivePeriods.length === 0) {
+                existingAptActivePeriods = [{
+                    start: aptStart,
+                    end: aptEnd
+                }];
+            }
+
+            // Check if any of the new appointment's active periods conflict with existing appointment's active periods
+            for (const newPeriod of activePeriodsToCheck) {
+                for (const existingPeriod of existingAptActivePeriods) {
+                    // Check for overlap between active periods
+                    if ((newPeriod.start < existingPeriod.end && newPeriod.end > existingPeriod.start)) {
+                        console.log(`Slot conflict detected: New active period ${this.minutesToTime(newPeriod.start)}-${this.minutesToTime(newPeriod.end)} conflicts with existing active period ${this.minutesToTime(existingPeriod.start)}-${this.minutesToTime(existingPeriod.end)}`);
+                        return true;
+                    }
+                }
             }
         }
 
@@ -1507,9 +1712,9 @@ const SharedData = {
         return false;
     },
 
-    isTimeSlotBooked(date, time, duration, barberId) {
+    isTimeSlotBooked(date, time, duration, barberId, serviceIds = []) {
         // Use the same conflict checking logic
-        return this.isSlotConflicting(date, time, duration, barberId);
+        return this.isSlotConflicting(date, time, duration, barberId, serviceIds);
     },
 
     // OWNER PROFILE
@@ -1742,6 +1947,12 @@ const SharedData = {
         }
     },
 
+    getBlockedTimesByDate(date) {
+        // Synchronous version - returns empty array for now since blocked times aren't fully implemented
+        // TODO: Implement blocked times cache and filtering
+        return [];
+    },
+
     async addBlockedTime(blockedTime) {
         if (!currentShopId) return;
 
@@ -1804,7 +2015,7 @@ const SharedData = {
             price: 15,
             enabled: true,
             hasActiveTime: false,
-            color: '#4CAF50'
+            color: '#7E57C2'
         }
     },
 
@@ -1819,7 +2030,7 @@ const SharedData = {
     serviceColors: {
         'mens-cut': '#2196F3',
         'womens-cut': '#E91E63',
-        'kids-cut': '#4CAF50',
+        'kids-cut': '#7E57C2',
         'coloring': '#FF9800',
         'highlights': '#9C27B0'
     },

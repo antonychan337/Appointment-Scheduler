@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Antony Chan's Hours Setting</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Configuration -->
+    <script src="supabase-config.js"></script>
+    <!-- Supabase Bridge -->
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2C3E50;
+        }
+        .barber-info {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+        }
+        .property {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+        }
+        .property-label {
+            font-weight: 600;
+            color: #666;
+        }
+        .true {
+            color: #4caf50;
+            font-weight: bold;
+        }
+        .false {
+            color: #f44336;
+            font-weight: bold;
+        }
+        button {
+            background: #2C3E50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 10px 10px 0;
+        }
+        button:hover {
+            background: #34495e;
+        }
+        .fix-button {
+            background: #f44336;
+        }
+        .fix-button:hover {
+            background: #d32f2f;
+        }
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #4caf50;
+        }
+        .warning {
+            background: #fff3e0;
+            color: #e65100;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #ff9800;
+        }
+        .hours-display {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e3f2fd;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Fix Antony Chan's Hours Setting</h1>
+
+        <button onclick="checkAntonyStatus()">Check Antony's Current Status</button>
+        <button onclick="loadRawFromDB()">Load Raw Database Data</button>
+
+        <div id="status"></div>
+
+        <div id="fix-section" style="display: none;">
+            <h2>Fix Options</h2>
+            <button class="fix-button" onclick="fixAntonyHours()">Set Antony to Use Custom Hours</button>
+            <button onclick="setAntonyStoreHours()">Set Antony to Use Store Hours</button>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        let antonyId = null;
+
+        async function initialize() {
+            await SharedData.initialize();
+            console.log('SharedData initialized');
+            checkAntonyStatus();
+        }
+
+        async function checkAntonyStatus() {
+            const status = document.getElementById('status');
+            const results = document.getElementById('results');
+            const fixSection = document.getElementById('fix-section');
+
+            status.innerHTML = '<div class="warning">Checking Antony Chan\'s status...</div>';
+
+            try {
+                const barbers = await SharedData.getBarbers();
+                const antony = barbers.find(b => b.name.includes('Antony'));
+
+                if (!antony) {
+                    status.innerHTML = '<div class="warning">Antony Chan not found in barbers list</div>';
+                    return;
+                }
+
+                antonyId = antony.id;
+                fixSection.style.display = 'block';
+
+                let html = '<div class="barber-info">';
+                html += '<h2>Current Status from SharedData</h2>';
+                html += `<div class="property"><span class="property-label">Name:</span> ${antony.name}</div>`;
+                html += `<div class="property"><span class="property-label">ID:</span> ${antony.id}</div>`;
+                html += `<div class="property"><span class="property-label">Is Owner:</span> <span class="${antony.isOwner}">${antony.isOwner}</span></div>`;
+                html += `<div class="property"><span class="property-label">Uses Store Hours:</span> <span class="${antony.usesStoreHours}">${antony.usesStoreHours}</span></div>`;
+
+                if (antony.usesStoreHours) {
+                    html += '<div class="warning">⚠️ Antony is set to use store hours - this needs to be fixed if you want custom hours</div>';
+                } else {
+                    html += '<div class="success">✅ Antony is set to use custom hours</div>';
+                }
+
+                if (antony.hours) {
+                    html += '<div class="property"><span class="property-label">Current Hours:</span></div>';
+                    html += '<div class="hours-display">' + JSON.stringify(antony.hours, null, 2) + '</div>';
+                }
+
+                html += '</div>';
+                status.innerHTML = html;
+
+            } catch (error) {
+                status.innerHTML = `<div class="warning">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function loadRawFromDB() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="warning">Loading raw database data...</div>';
+
+            try {
+                const currentShopId = SharedData.getCurrentShopId();
+
+                const { data, error } = await supabaseClient
+                    .from('barbers')
+                    .select('*')
+                    .eq('shop_id', currentShopId)
+                    .ilike('name', '%Antony%');
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    const antonyDB = data[0];
+
+                    let html = '<div class="barber-info">';
+                    html += '<h2>Raw Database Record</h2>';
+                    html += `<div class="property"><span class="property-label">ID:</span> ${antonyDB.id}</div>`;
+                    html += `<div class="property"><span class="property-label">Name:</span> ${antonyDB.name}</div>`;
+                    html += `<div class="property"><span class="property-label">uses_store_hours:</span> <span class="${antonyDB.uses_store_hours}">${antonyDB.uses_store_hours}</span></div>`;
+                    html += `<div class="property"><span class="property-label">is_owner:</span> <span class="${antonyDB.is_owner}">${antonyDB.is_owner}</span></div>`;
+
+                    if (antonyDB.working_hours) {
+                        html += '<div class="property"><span class="property-label">working_hours:</span></div>';
+                        html += '<div class="hours-display">' + JSON.stringify(antonyDB.working_hours, null, 2) + '</div>';
+                    } else {
+                        html += '<div class="property"><span class="property-label">working_hours:</span> NULL</div>';
+                    }
+
+                    html += '</div>';
+                    results.innerHTML = html;
+                } else {
+                    results.innerHTML = '<div class="warning">No data found for Antony in database</div>';
+                }
+
+            } catch (error) {
+                results.innerHTML = `<div class="warning">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function fixAntonyHours() {
+            if (!antonyId) {
+                alert('Antony ID not found. Please check status first.');
+                return;
+            }
+
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="warning">Fixing Antony\'s hours setting...</div>';
+
+            // Custom hours for Antony
+            const customHours = {
+                monday: { open: '09:00', close: '18:00', closed: false },
+                tuesday: { open: '09:00', close: '18:00', closed: false },
+                wednesday: { open: '09:00', close: '18:00', closed: false },
+                thursday: { open: '09:00', close: '18:00', closed: false },
+                friday: { open: '09:00', close: '18:00', closed: false },
+                saturday: { open: '10:00', close: '22:00', closed: false },
+                sunday: { closed: true }
+            };
+
+            try {
+                // Direct database update to ensure it's saved correctly
+                const currentShopId = SharedData.getCurrentShopId();
+
+                const { error } = await supabaseClient
+                    .from('barbers')
+                    .update({
+                        uses_store_hours: false,
+                        working_hours: customHours
+                    })
+                    .eq('id', antonyId)
+                    .eq('shop_id', currentShopId);
+
+                if (error) throw error;
+
+                results.innerHTML = '<div class="success">✅ Successfully updated Antony to use custom hours!</div>';
+
+                // Refresh the cache
+                await SharedData.getBarbers();
+
+                // Check status again
+                setTimeout(checkAntonyStatus, 1000);
+
+            } catch (error) {
+                results.innerHTML = `<div class="warning">Error updating: ${error.message}</div>`;
+            }
+        }
+
+        async function setAntonyStoreHours() {
+            if (!antonyId) {
+                alert('Antony ID not found. Please check status first.');
+                return;
+            }
+
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="warning">Setting Antony to use store hours...</div>';
+
+            try {
+                const success = await SharedData.updateBarber(antonyId, {
+                    usesStoreHours: true
+                });
+
+                if (success) {
+                    results.innerHTML = '<div class="success">✅ Successfully updated Antony to use store hours!</div>';
+                } else {
+                    results.innerHTML = '<div class="warning">Failed to update Antony\'s settings</div>';
+                }
+
+                // Check status again
+                setTimeout(checkAntonyStatus, 1000);
+
+            } catch (error) {
+                results.innerHTML = `<div class="warning">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(initialize, 500);
+        });
+    </script>
+</body>
+</html>

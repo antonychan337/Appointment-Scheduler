@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Antony Save Issue</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Configuration -->
+    <script src="supabase-config.js"></script>
+    <!-- Supabase Bridge -->
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2C3E50;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .warning {
+            background: #fff3e0;
+            color: #e65100;
+        }
+        .info {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+        button {
+            background: #2C3E50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #34495e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐛 Debug Antony Save Issue</h1>
+
+        <button onclick="testAntonySave()">Test Save Antony with Custom Hours</button>
+        <button onclick="checkAntonyData()">Check Antony's Current Data</button>
+        <button onclick="clearLogs()">Clear Logs</button>
+
+        <div id="logs"></div>
+    </div>
+
+    <script>
+        const logsDiv = document.getElementById('logs');
+
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logsDiv.appendChild(entry);
+        }
+
+        function clearLogs() {
+            logsDiv.innerHTML = '';
+        }
+
+        async function initialize() {
+            await SharedData.initialize();
+            log('SharedData initialized', 'success');
+        }
+
+        async function checkAntonyData() {
+            clearLogs();
+            log('Checking Antony\'s data...', 'info');
+
+            try {
+                const barbers = await SharedData.getBarbers();
+                const antony = barbers.find(b => b.name.includes('Antony'));
+
+                if (!antony) {
+                    log('Antony not found in barbers list!', 'error');
+                    return;
+                }
+
+                log(`Found Antony: ID = ${antony.id}`, 'success');
+                log(`Is Owner: ${antony.isOwner}`, antony.isOwner ? 'warning' : 'info');
+                log(`Uses Store Hours: ${antony.usesStoreHours}`, antony.usesStoreHours ? 'warning' : 'info');
+
+                // Check database directly
+                const currentShopId = SharedData.getCurrentShopId();
+                const { data, error } = await supabaseClient
+                    .from('barbers')
+                    .select('*')
+                    .eq('id', antony.id)
+                    .eq('shop_id', currentShopId)
+                    .single();
+
+                if (error) {
+                    log(`Database error: ${error.message}`, 'error');
+                } else {
+                    log('Database record:', 'info');
+                    log(`  is_owner: ${data.is_owner}`, data.is_owner ? 'warning' : 'info');
+                    log(`  uses_store_hours: ${data.uses_store_hours}`, data.uses_store_hours ? 'warning' : 'info');
+
+                    if (data.is_owner) {
+                        log('⚠️ PROBLEM: Antony is marked as owner in database!', 'error');
+                    }
+                }
+
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAntonySave() {
+            clearLogs();
+            log('Testing save for Antony...', 'info');
+
+            try {
+                const barbers = await SharedData.getBarbers();
+                const antony = barbers.find(b => b.name.includes('Antony'));
+
+                if (!antony) {
+                    log('Antony not found!', 'error');
+                    return;
+                }
+
+                log(`Antony ID: ${antony.id}`, 'info');
+                log(`Current usesStoreHours: ${antony.usesStoreHours}`, 'info');
+
+                // Test saving with custom hours
+                const customHours = {
+                    monday: { open: '08:00', close: '20:00', closed: false },
+                    tuesday: { open: '08:00', close: '20:00', closed: false },
+                    wednesday: { open: '08:00', close: '20:00', closed: false },
+                    thursday: { open: '08:00', close: '20:00', closed: false },
+                    friday: { open: '08:00', close: '20:00', closed: false },
+                    saturday: { open: '10:00', close: '22:00', closed: false },
+                    sunday: { closed: true }
+                };
+
+                log('Saving with usesStoreHours: false and custom hours...', 'warning');
+
+                // Call update with logging
+                const updateData = {
+                    hours: customHours,
+                    usesStoreHours: false
+                };
+
+                log(`Update data: ${JSON.stringify(updateData)}`, 'info');
+
+                const success = await SharedData.updateBarber(antony.id, updateData);
+
+                if (success) {
+                    log('Update successful!', 'success');
+
+                    // Check the result
+                    log('Reloading barber data...', 'info');
+                    const updatedBarbers = await SharedData.getBarbers();
+                    const updatedAntony = updatedBarbers.find(b => b.id === antony.id);
+
+                    if (updatedAntony) {
+                        log(`After update - usesStoreHours: ${updatedAntony.usesStoreHours}`,
+                            updatedAntony.usesStoreHours ? 'error' : 'success');
+
+                        // Check database directly
+                        const { data, error } = await supabaseClient
+                            .from('barbers')
+                            .select('uses_store_hours')
+                            .eq('id', antony.id)
+                            .single();
+
+                        if (!error && data) {
+                            log(`Database uses_store_hours: ${data.uses_store_hours}`,
+                                data.uses_store_hours ? 'error' : 'success');
+
+                            if (data.uses_store_hours !== false) {
+                                log('⚠️ Database not updating correctly!', 'error');
+                            }
+                        }
+                    }
+                } else {
+                    log('Update failed!', 'error');
+                }
+
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(initialize, 500);
+        });
+    </script>
+</body>
+</html>

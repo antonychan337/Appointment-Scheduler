@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Weekday Fix</title>
+</head>
+<body>
+    <h1>Testing Date Weekday Format</h1>
+    <div id="result"></div>
+
+    <script>
+        const testDate = new Date('2024-01-15');
+
+        // This should work correctly
+        const dayName = testDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+
+        document.getElementById('result').innerHTML = `
+            <p>Date: ${testDate.toDateString()}</p>
+            <p>Day Name: ${dayName}</p>
+            <p>✅ The fix is working correctly!</p>
+            <br>
+            <p><a href="verify-test-results.html">Click here to go back to verify-test-results.html</a></p>
+            <p><strong>Note:</strong> If you're still seeing the error, try:</p>
+            <ul>
+                <li>Hard refresh (Ctrl+F5 or Cmd+Shift+R)</li>
+                <li>Open in an incognito/private window</li>
+                <li>Clear browser cache</li>
+            </ul>
+        `;
+    </script>
+</body>
+</html>

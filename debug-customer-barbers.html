@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Customer App Barbers</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Configuration -->
+    <script src="supabase-config.js"></script>
+    <!-- Supabase Bridge -->
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #2C3E50; }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+        }
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .warning {
+            background: #fff3e0;
+            color: #e65100;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .info {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        button {
+            background: #2C3E50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #34495e;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug Customer App - Barbers Not Showing</h1>
+
+        <button onclick="testFullInitialization()">Test Full Initialization</button>
+        <button onclick="checkShopContext()">Check Shop Context</button>
+        <button onclick="loadBarbersDirectly()">Load Barbers Directly</button>
+        <button onclick="testWithSpecificShop()">Test with Specific Shop</button>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const results = document.getElementById('results');
+
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+
+        async function testFullInitialization() {
+            results.innerHTML = '<div class="test-section"><h3>Testing Full Customer App Initialization</h3></div>';
+
+            try {
+                // Simulate customer app initialization
+                const urlParams = new URLSearchParams(window.location.search);
+                const shopSlug = urlParams.get('shop') || 'antonys_salon';
+
+                log(`Shop slug from URL: ${shopSlug}`, 'info');
+
+                // Initialize SharedData
+                await SharedData.initialize();
+                log('SharedData initialized', 'success');
+
+                // Get shop ID from slug
+                const shopId = await SharedData.getShopIdFromSlug(shopSlug);
+                log(`Shop ID from slug: ${shopId}`, shopId ? 'success' : 'error');
+
+                if (!shopId) {
+                    log('Failed to get shop ID from slug!', 'error');
+                    return;
+                }
+
+                // Set shop context
+                SharedData.setCurrentShopId(shopId);
+                log(`Shop ID set in SharedData: ${SharedData.getCurrentShopId()}`, 'success');
+
+                // Load barbers
+                const barbers = await SharedData.getBarbers();
+                log(`Barbers loaded: ${barbers.length} barbers`, barbers.length > 0 ? 'success' : 'error');
+
+                if (barbers.length > 0) {
+                    const barbersInfo = barbers.map(b => `${b.name} (${b.id})`).join(', ');
+                    log(`Barbers: ${barbersInfo}`, 'info');
+                } else {
+                    log('No barbers found! Checking database directly...', 'warning');
+
+                    // Direct database check
+                    const currentShopId = SharedData.getCurrentShopId();
+                    const { data, error } = await supabaseClient
+                        .from('barbers')
+                        .select('*')
+                        .eq('shop_id', currentShopId)
+                        .eq('is_active', true);
+
+                    if (error) {
+                        log(`Database error: ${error.message}`, 'error');
+                    } else if (data && data.length > 0) {
+                        log(`Found ${data.length} barbers in database directly`, 'warning');
+                        log(`Database barbers: <pre>${JSON.stringify(data, null, 2)}</pre>`, 'info');
+                    } else {
+                        log('No active barbers in database for this shop', 'error');
+                    }
+                }
+
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+
+        async function checkShopContext() {
+            results.innerHTML = '<div class="test-section"><h3>Checking Shop Context</h3></div>';
+
+            // Check localStorage
+            const localShopId = localStorage.getItem('supabase_shop_id');
+            log(`LocalStorage shop_id: ${localShopId || 'Not set'}`, localShopId ? 'info' : 'warning');
+
+            // Check SharedData
+            await SharedData.initialize();
+            const sharedShopId = SharedData.getCurrentShopId();
+            log(`SharedData shop_id: ${sharedShopId || 'Not set'}`, sharedShopId ? 'info' : 'warning');
+
+            // Check if we can get shop details
+            if (sharedShopId) {
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('shops')
+                        .select('*')
+                        .eq('id', sharedShopId)
+                        .single();
+
+                    if (data) {
+                        log(`Shop found: ${data.name} (${data.slug})`, 'success');
+                    } else if (error) {
+                        log(`Error fetching shop: ${error.message}`, 'error');
+                    }
+                } catch (error) {
+                    log(`Error: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        async function loadBarbersDirectly() {
+            results.innerHTML = '<div class="test-section"><h3>Loading Barbers Directly</h3></div>';
+
+            try {
+                await SharedData.initialize();
+
+                // Try different methods
+                log('Method 1: SharedData.getBarbers()', 'info');
+                const barbers1 = await SharedData.getBarbers();
+                log(`Result: ${barbers1.length} barbers`, barbers1.length > 0 ? 'success' : 'warning');
+
+                log('Method 2: SharedData.getBarbersSync()', 'info');
+                const barbers2 = SharedData.getBarbersSync();
+                log(`Result: ${barbers2.length} barbers`, barbers2.length > 0 ? 'success' : 'warning');
+
+                // Check cache
+                log('Checking barbersCache:', 'info');
+                log(`Cache: ${SharedData.barbersCache ? SharedData.barbersCache.length + ' barbers' : 'Not cached'}`, 'info');
+
+                // If no barbers, try forcing a reload
+                if (barbers1.length === 0) {
+                    log('Attempting to force reload barbers...', 'warning');
+
+                    // Clear cache
+                    SharedData.barbersCache = null;
+
+                    // Try again
+                    const barbersRetry = await SharedData.getBarbers();
+                    log(`After retry: ${barbersRetry.length} barbers`, barbersRetry.length > 0 ? 'success' : 'error');
+                }
+
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testWithSpecificShop() {
+            results.innerHTML = '<div class="test-section"><h3>Testing with Specific Shop</h3></div>';
+
+            try {
+                // First, find a shop that should have barbers
+                const { data: shops, error: shopError } = await supabaseClient
+                    .from('shops')
+                    .select('id, name, slug')
+                    .limit(5);
+
+                if (shopError) {
+                    log(`Error fetching shops: ${shopError.message}`, 'error');
+                    return;
+                }
+
+                if (!shops || shops.length === 0) {
+                    log('No shops found in database', 'error');
+                    return;
+                }
+
+                log(`Found ${shops.length} shops:`, 'info');
+
+                for (const shop of shops) {
+                    log(`Testing shop: ${shop.name} (${shop.slug})`, 'info');
+
+                    // Set shop context
+                    SharedData.setCurrentShopId(shop.id);
+
+                    // Clear barbers cache
+                    SharedData.barbersCache = null;
+
+                    // Load barbers for this shop
+                    const barbers = await SharedData.getBarbers();
+
+                    if (barbers.length > 0) {
+                        log(`✅ ${shop.name}: ${barbers.length} barbers found`, 'success');
+                        const barberNames = barbers.map(b => b.name).join(', ');
+                        log(`Barbers: ${barberNames}`, 'info');
+                    } else {
+                        log(`❌ ${shop.name}: No barbers found`, 'warning');
+                    }
+                }
+
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            log('Debug page loaded. Click a button to start testing.', 'info');
+        });
+    </script>
+</body>
+</html>

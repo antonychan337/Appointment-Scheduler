@@ -932,9 +932,11 @@
                 console.log('Calling getAvailableSlots with:', {
                     date: selectedDate,
                     totalDuration: totalDuration,
-                    barberId: selectedBarberId
+                    barberId: selectedBarberId,
+                    selectedServices: selectedServices
                 });
-                availableSlots = SharedData.getAvailableSlots(selectedDate, totalDuration, selectedBarberId);
+                // Pass selectedServices to check active periods properly
+                availableSlots = SharedData.getAvailableSlots(selectedDate, totalDuration, selectedBarberId, selectedServices);
                 console.log('Slots returned:', availableSlots);
             } catch (e) {
                 // Generate default slots if SharedData isn't available
@@ -1080,7 +1082,8 @@
                         }, 0);
 
                         // Check if any active periods would conflict for the selected barber
-                        isBooked = SharedData.isTimeSlotBooked(selectedDate, time, totalDuration, selectedBarber);
+                        // Pass selectedServices to check active periods properly
+                        isBooked = SharedData.isTimeSlotBooked(selectedDate, time, totalDuration, selectedBarber, selectedServices);
                     } catch (e) {
                         // If SharedData not available, skip booking check
                     }

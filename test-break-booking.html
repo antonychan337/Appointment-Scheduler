@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Break Period Booking</title>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Configuration -->
+    <script src="supabase-config.js"></script>
+    <!-- Supabase Bridge -->
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2C3E50;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+        }
+        .appointment-info {
+            margin: 15px 0;
+            padding: 15px;
+            background: #e3f2fd;
+            border-radius: 5px;
+        }
+        .break-period {
+            display: inline-block;
+            padding: 5px 10px;
+            background: #fff3e0;
+            color: #e65100;
+            border-radius: 3px;
+            margin: 3px;
+        }
+        .active-period {
+            display: inline-block;
+            padding: 5px 10px;
+            background: #e8f5e9;
+            color: #2e7d32;
+            border-radius: 3px;
+            margin: 3px;
+        }
+        .slot {
+            display: inline-block;
+            padding: 8px 12px;
+            margin: 5px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .slot.available {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #4caf50;
+        }
+        .slot.conflict {
+            background: #ffebee;
+            color: #c62828;
+            text-decoration: line-through;
+        }
+        button {
+            background: #2C3E50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #34495e;
+        }
+        .timeline {
+            margin: 20px 0;
+            padding: 15px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+        }
+        .time-block {
+            display: inline-block;
+            width: 60px;
+            padding: 5px;
+            margin: 2px;
+            text-align: center;
+            font-size: 12px;
+            border-radius: 3px;
+        }
+        .time-block.active {
+            background: #ffcdd2;
+            color: #c62828;
+        }
+        .time-block.break {
+            background: #fff9c4;
+            color: #f57f17;
+        }
+        .time-block.free {
+            background: #c8e6c9;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Booking During Break Periods</h1>
+
+        <div class="appointment-info">
+            <h3>Existing Appointment: Bob's Coloring (Sep 26, 9:00-10:30)</h3>
+            <p><strong>Service:</strong> Coloring (90 minutes)</p>
+            <p><strong>Active Periods:</strong></p>
+            <span class="active-period">9:00-9:15 (Active)</span>
+            <span class="break-period">9:15-9:30 (Break)</span>
+            <span class="active-period">9:30-9:45 (Active)</span>
+            <span class="break-period">9:45-10:00 (Break)</span>
+            <span class="active-period">10:00-10:30 (Active)</span>
+        </div>
+
+        <button onclick="checkCurrentAppointments()">Check Current Appointments</button>
+        <button onclick="testChildrensCutSlots()">Test Children's Cut Slots (9:00-11:00)</button>
+        <button onclick="testSpecificSlot()">Test Specific Slot (9:30)</button>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        let bobId = null;
+
+        async function initialize() {
+            await SharedData.initialize();
+            console.log('SharedData initialized');
+
+            // Find Bob's barber ID
+            const barbers = await SharedData.getBarbers();
+            const bob = barbers.find(b => b.name.toLowerCase().includes('bob'));
+            if (bob) {
+                bobId = bob.id;
+                console.log('Found Bob:', bob);
+            }
+        }
+
+        async function checkCurrentAppointments() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="test-section"><h3>Current Appointments for Sep 26</h3></div>';
+
+            const appointments = SharedData.getAppointmentsByDate('2025-09-26');
+            const section = results.querySelector('.test-section');
+
+            if (appointments.length === 0) {
+                section.innerHTML += '<p>No appointments found for Sep 26</p>';
+                return;
+            }
+
+            appointments.forEach(apt => {
+                const aptDiv = document.createElement('div');
+                aptDiv.style.marginBottom = '15px';
+                aptDiv.innerHTML = `
+                    <div style="padding: 10px; background: #f5f5f5; border-radius: 5px;">
+                        <strong>Time:</strong> ${apt.time} - ${apt.endTime}<br>
+                        <strong>Customer:</strong> ${apt.customerName}<br>
+                        <strong>Barber ID:</strong> ${apt.barberId}<br>
+                        <strong>Services:</strong> ${JSON.stringify(apt.services)}<br>
+                        <strong>Duration:</strong> ${apt.totalDuration} minutes
+                    </div>
+                `;
+                section.appendChild(aptDiv);
+            });
+        }
+
+        async function testChildrensCutSlots() {
+            if (!bobId) {
+                alert('Bob not found in system');
+                return;
+            }
+
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="test-section"><h3>Testing Children\'s Cut Availability (15 min)</h3></div>';
+
+            const services = SharedData.getServices();
+            const kidsCutId = Object.keys(services).find(id =>
+                services[id].name.toLowerCase().includes('child') ||
+                services[id].name.toLowerCase().includes('kid'));
+
+            if (!kidsCutId) {
+                results.innerHTML += '<p>Children\'s cut service not found</p>';
+                return;
+            }
+
+            const kidsCut = services[kidsCutId];
+            results.innerHTML += `<p>Service: ${kidsCut.name} (${kidsCut.duration} min)</p>`;
+
+            // Create timeline visualization
+            const timeline = document.createElement('div');
+            timeline.className = 'timeline';
+            timeline.innerHTML = '<h4>Timeline for 9:00-11:00</h4>';
+
+            // Check each 15-minute slot from 9:00 to 11:00
+            const testDate = new Date('2025-09-26');
+            const slots = [];
+
+            for (let hour = 9; hour < 11; hour++) {
+                for (let min = 0; min < 60; min += 15) {
+                    const time = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
+
+                    // Check if this slot conflicts
+                    const isConflict = SharedData.isSlotConflicting(
+                        testDate,
+                        time,
+                        kidsCut.duration,
+                        bobId,
+                        [kidsCutId]
+                    );
+
+                    const timeBlock = document.createElement('div');
+                    timeBlock.className = 'time-block';
+                    timeBlock.textContent = time;
+
+                    // Determine the status of this time block
+                    const timeInMinutes = hour * 60 + min;
+                    const coloringStart = 9 * 60; // 9:00
+                    const coloringEnd = 10.5 * 60; // 10:30
+
+                    if (timeInMinutes >= coloringStart && timeInMinutes < coloringEnd) {
+                        // During coloring appointment
+                        const relativeMin = timeInMinutes - coloringStart;
+
+                        // Check if it's during a break
+                        if ((relativeMin >= 15 && relativeMin < 30) ||
+                            (relativeMin >= 45 && relativeMin < 60)) {
+                            timeBlock.classList.add(isConflict ? 'active' : 'break');
+                            if (!isConflict) {
+                                slots.push(time);
+                            }
+                        } else {
+                            timeBlock.classList.add('active');
+                        }
+                    } else {
+                        timeBlock.classList.add(isConflict ? 'active' : 'free');
+                        if (!isConflict) {
+                            slots.push(time);
+                        }
+                    }
+
+                    timeline.appendChild(timeBlock);
+                }
+            }
+
+            results.querySelector('.test-section').appendChild(timeline);
+
+            // Show available slots
+            const slotsDiv = document.createElement('div');
+            slotsDiv.style.marginTop = '20px';
+            slotsDiv.innerHTML = '<h4>Available Slots for Children\'s Cut:</h4>';
+
+            if (slots.length > 0) {
+                slotsDiv.innerHTML += `<p style="color: #2e7d32;">✅ Found ${slots.length} available slots!</p>`;
+
+                // Check if the break periods are included
+                const hasBreakSlots = slots.some(s => s === '09:15' || s === '09:45');
+                if (hasBreakSlots) {
+                    slotsDiv.innerHTML += '<p style="color: #2e7d32;">✅ Break periods are correctly available!</p>';
+                } else {
+                    slotsDiv.innerHTML += '<p style="color: #c62828;">❌ Break periods (9:15-9:30, 9:45-10:00) are NOT available!</p>';
+                }
+
+                slots.forEach(slot => {
+                    const slotEl = document.createElement('span');
+                    slotEl.className = 'slot available';
+                    slotEl.textContent = slot;
+                    slotsDiv.appendChild(slotEl);
+                });
+            } else {
+                slotsDiv.innerHTML += '<p style="color: #c62828;">❌ No slots available</p>';
+            }
+
+            results.querySelector('.test-section').appendChild(slotsDiv);
+
+            // Legend
+            const legend = document.createElement('div');
+            legend.style.marginTop = '20px';
+            legend.innerHTML = `
+                <h4>Legend:</h4>
+                <span class="time-block active" style="display: inline-block;">Busy</span>
+                <span class="time-block break" style="display: inline-block;">Break (Should be available)</span>
+                <span class="time-block free" style="display: inline-block;">Free</span>
+            `;
+            results.querySelector('.test-section').appendChild(legend);
+        }
+
+        async function testSpecificSlot() {
+            if (!bobId) {
+                alert('Bob not found in system');
+                return;
+            }
+
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="test-section"><h3>Testing 9:30 Slot Specifically</h3></div>';
+
+            const services = SharedData.getServices();
+            const kidsCutId = Object.keys(services).find(id =>
+                services[id].name.toLowerCase().includes('child') ||
+                services[id].name.toLowerCase().includes('kid'));
+
+            const testDate = new Date('2025-09-26');
+            const testTime = '09:30';
+
+            // Test with detailed logging
+            console.log('Testing slot:', testTime);
+            console.log('Date:', testDate);
+            console.log('Barber ID:', bobId);
+            console.log('Service ID:', kidsCutId);
+
+            const isConflict = SharedData.isSlotConflicting(
+                testDate,
+                testTime,
+                15, // Children's cut duration
+                bobId,
+                [kidsCutId]
+            );
+
+            const section = results.querySelector('.test-section');
+
+            if (isConflict) {
+                section.innerHTML += `
+                    <p style="color: #c62828;">❌ Slot 9:30 is NOT available</p>
+                    <p>This slot falls during Bob's coloring break period (9:45-10:00) and should be available!</p>
+                    <p>Please check console for detailed conflict information.</p>
+                `;
+            } else {
+                section.innerHTML += `
+                    <p style="color: #2e7d32;">✅ Slot 9:30 IS available!</p>
+                    <p>The system correctly recognizes that Bob is on a break during this time.</p>
+                `;
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(initialize, 500);
+        });
+    </script>
+</body>
+</html>

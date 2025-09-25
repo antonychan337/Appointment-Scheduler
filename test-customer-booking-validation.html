@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Booking Validation Test Suite</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2C3E50;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .summary-card {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #2196F3;
+        }
+        .summary-card h3 {
+            margin: 0 0 10px 0;
+            color: #2C3E50;
+        }
+        .summary-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #2196F3;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+        .test-section h2 {
+            color: #2C3E50;
+            margin-bottom: 20px;
+        }
+        .booking-attempt {
+            margin: 10px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 5px;
+            border-left: 4px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .booking-success {
+            border-left-color: #4CAF50;
+            background: #f1f8e9;
+        }
+        .booking-failed {
+            border-left-color: #f44336;
+            background: #ffebee;
+        }
+        .booking-violation {
+            border-left-color: #ff9800;
+            background: #fff3e0;
+        }
+        .booking-details {
+            flex: 1;
+        }
+        .booking-status {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        .status-success {
+            background: #4CAF50;
+            color: white;
+        }
+        .status-failed {
+            background: #f44336;
+            color: white;
+        }
+        .status-violation {
+            background: #ff9800;
+            color: white;
+        }
+        .violations-log {
+            margin-top: 20px;
+            padding: 20px;
+            background: #ffebee;
+            border-radius: 8px;
+            border: 1px solid #f44336;
+        }
+        .violations-log h3 {
+            color: #c62828;
+            margin-bottom: 15px;
+        }
+        .violation-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            border-left: 3px solid #f44336;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 10px 10px 0;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button.secondary {
+            background: #2196F3;
+        }
+        button.secondary:hover {
+            background: #1976D2;
+        }
+        button.danger {
+            background: #f44336;
+        }
+        button.danger:hover {
+            background: #d32f2f;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #2196F3);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .filter-controls {
+            margin: 20px 0;
+            padding: 15px;
+            background: #e3f2fd;
+            border-radius: 8px;
+        }
+        .filter-controls label {
+            margin-right: 15px;
+            font-weight: bold;
+        }
+        .filter-controls select {
+            padding: 5px 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            margin-right: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Customer Booking Validation Test Suite</h1>
+
+        <div class="summary-grid">
+            <div class="summary-card">
+                <h3>Total Attempts</h3>
+                <div class="summary-value" id="total-attempts">0</div>
+            </div>
+            <div class="summary-card">
+                <h3>Successful</h3>
+                <div class="summary-value" id="successful-bookings" style="color: #4CAF50;">0</div>
+            </div>
+            <div class="summary-card">
+                <h3>Failed (Expected)</h3>
+                <div class="summary-value" id="expected-failures" style="color: #2196F3;">0</div>
+            </div>
+            <div class="summary-card">
+                <h3>Violations</h3>
+                <div class="summary-value" id="policy-violations" style="color: #ff9800;">0</div>
+            </div>
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress" style="width: 0%">0%</div>
+        </div>
+
+        <div class="filter-controls">
+            <label>View:</label>
+            <select id="filter-view" onchange="filterResults()">
+                <option value="all">All Attempts</option>
+                <option value="violations">Violations Only</option>
+                <option value="successful">Successful Only</option>
+                <option value="failed">Failed Only</option>
+            </select>
+            <label>Barber:</label>
+            <select id="filter-barber" onchange="filterResults()">
+                <option value="all">All Barbers</option>
+                <option value="antony">Antony Chan</option>
+                <option value="bobby">Bobby</option>
+                <option value="sal">Sal</option>
+            </select>
+        </div>
+
+        <div>
+            <button onclick="runValidationTests()">▶️ Run All Validation Tests</button>
+            <button class="secondary" onclick="runWeek1Tests()">📅 Test Week 1 Only</button>
+            <button class="secondary" onclick="runWeek2Tests()">📅 Test Week 2 Only</button>
+            <button class="danger" onclick="clearResults()">🗑️ Clear Results</button>
+        </div>
+
+        <div id="test-results"></div>
+
+        <div class="violations-log" id="violations-log" style="display: none;">
+            <h3>⚠️ Policy Violations Detected</h3>
+            <div id="violations-list"></div>
+        </div>
+    </div>
+
+    <script>
+        let barbers = [];
+        let services = {};
+        let storeHours = {};
+        let bookingPolicies = {};
+        let testResults = [];
+        let violations = [];
+
+        async function initialize() {
+            await SharedData.initialize();
+            barbers = await SharedData.getBarbers();
+            services = SharedData.getServices();
+            storeHours = SharedData.getStoreHours();
+            bookingPolicies = SharedData.getBookingPolicies();
+
+            console.log('System Configuration:', {
+                barbers: barbers.map(b => ({ name: b.name, id: b.id })),
+                services: Object.keys(services).length,
+                storeHours,
+                bookingPolicies
+            });
+        }
+
+        // Generate test bookings for validation
+        function generateTestBookings(weekOffset = 0) {
+            const bookings = [];
+            const today = new Date();
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - today.getDay() + 1 + (weekOffset * 7)); // Start from Monday
+
+            // Get barber IDs
+            const antony = barbers.find(b => b.name.includes('Antony'));
+            const bobby = barbers.find(b => b.name.toLowerCase().includes('bobby'));
+            const sal = barbers.find(b => b.name.toLowerCase().includes('sal'));
+
+            // Get service IDs
+            const serviceList = Object.entries(services);
+            const mensCut = serviceList.find(([id, s]) => s.name.includes('男士') || s.name.toLowerCase().includes('men'))?.[0];
+            const womensCut = serviceList.find(([id, s]) => s.name.includes('女士') || s.name.toLowerCase().includes('women'))?.[0];
+            const kidsCut = serviceList.find(([id, s]) => s.name.includes('儿童') || s.name.toLowerCase().includes('child'))?.[0];
+            const coloring = serviceList.find(([id, s]) => s.name.includes('染发') || s.name.toLowerCase().includes('color'))?.[0];
+
+            // Helper to get date
+            const getDate = (dayOffset) => {
+                const date = new Date(weekStart);
+                date.setDate(weekStart.getDate() + dayOffset);
+                return date;
+            };
+
+            // Test scenarios for each barber (20 bookings each)
+            const barberConfigs = [
+                { barber: antony, name: 'Antony Chan', dayOff: 4 }, // Friday
+                { barber: bobby, name: 'Bobby', dayOff: 5 }, // Saturday
+                { barber: sal, name: 'Sal', dayOff: 6 } // Sunday
+            ];
+
+            let bookingId = weekOffset * 60 + 1;
+
+            barberConfigs.forEach(config => {
+                if (!config.barber) return;
+
+                // Valid bookings (should succeed)
+                for (let day = 0; day < 7; day++) {
+                    const date = getDate(day);
+                    const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+
+                    // Test 1: Valid booking on open day
+                    if (dayName !== 'wednesday' && dayName !== 'thursday' && day !== config.dayOff) {
+                        bookings.push({
+                            id: bookingId++,
+                            barberId: config.barber.id,
+                            barberName: config.name,
+                            date: date.toISOString().split('T')[0],
+                            time: '10:00',
+                            services: [mensCut],
+                            serviceNames: ['Men\'s Cut'],
+                            duration: 30,
+                            customerName: `Test Customer ${bookingId}`,
+                            phone: `555-${String(bookingId).padStart(4, '0')}`,
+                            email: `test${bookingId}@example.com`,
+                            expectedResult: 'success',
+                            testType: 'valid-booking'
+                        });
+                    }
+
+                    // Test 2: Booking on closed days (should fail)
+                    if (dayName === 'wednesday' || dayName === 'thursday') {
+                        bookings.push({
+                            id: bookingId++,
+                            barberId: config.barber.id,
+                            barberName: config.name,
+                            date: date.toISOString().split('T')[0],
+                            time: '14:00',
+                            services: [womensCut],
+                            serviceNames: ['Women\'s Cut'],
+                            duration: 45,
+                            customerName: `Test Customer ${bookingId}`,
+                            phone: `555-${String(bookingId).padStart(4, '0')}`,
+                            email: `test${bookingId}@example.com`,
+                            expectedResult: 'fail',
+                            failureReason: 'store-closed',
+                            testType: 'store-hours-violation'
+                        });
+                    }
+
+                    // Test 3: Booking on barber's day off (should fail)
+                    if (day === config.dayOff) {
+                        bookings.push({
+                            id: bookingId++,
+                            barberId: config.barber.id,
+                            barberName: config.name,
+                            date: date.toISOString().split('T')[0],
+                            time: '11:00',
+                            services: [kidsCut],
+                            serviceNames: ['Children\'s Cut'],
+                            duration: 15,
+                            customerName: `Test Customer ${bookingId}`,
+                            phone: `555-${String(bookingId).padStart(4, '0')}`,
+                            email: `test${bookingId}@example.com`,
+                            expectedResult: 'fail',
+                            failureReason: 'barber-off',
+                            testType: 'barber-hours-violation'
+                        });
+                    }
+                }
+
+                // Test 4: Overlapping appointments (should fail)
+                if (weekOffset === 0) { // Only for first week
+                    const monday = getDate(0);
+                    // First appointment
+                    bookings.push({
+                        id: bookingId++,
+                        barberId: config.barber.id,
+                        barberName: config.name,
+                        date: monday.toISOString().split('T')[0],
+                        time: '15:00',
+                        services: [coloring],
+                        serviceNames: ['Hair Coloring'],
+                        duration: 90,
+                        customerName: `Test Customer ${bookingId}`,
+                        phone: `555-${String(bookingId).padStart(4, '0')}`,
+                        email: `test${bookingId}@example.com`,
+                        expectedResult: 'success',
+                        testType: 'valid-booking'
+                    });
+
+                    // Overlapping appointment (should fail)
+                    bookings.push({
+                        id: bookingId++,
+                        barberId: config.barber.id,
+                        barberName: config.name,
+                        date: monday.toISOString().split('T')[0],
+                        time: '15:30',
+                        services: [mensCut],
+                        serviceNames: ['Men\'s Cut'],
+                        duration: 30,
+                        customerName: `Test Customer ${bookingId}`,
+                        phone: `555-${String(bookingId).padStart(4, '0')}`,
+                        email: `test${bookingId}@example.com`,
+                        expectedResult: 'fail',
+                        failureReason: 'time-conflict',
+                        testType: 'overlap-violation'
+                    });
+                }
+
+                // Test 5: Booking with insufficient notice (should fail if < min hours)
+                if (weekOffset === 0) {
+                    const now = new Date();
+                    const tooSoon = new Date(now.getTime() + 30 * 60000); // 30 minutes from now
+                    bookings.push({
+                        id: bookingId++,
+                        barberId: config.barber.id,
+                        barberName: config.name,
+                        date: tooSoon.toISOString().split('T')[0],
+                        time: tooSoon.toTimeString().slice(0, 5),
+                        services: [mensCut],
+                        serviceNames: ['Men\'s Cut'],
+                        duration: 30,
+                        customerName: `Test Customer ${bookingId}`,
+                        phone: `555-${String(bookingId).padStart(4, '0')}`,
+                        email: `test${bookingId}@example.com`,
+                        expectedResult: 'fail',
+                        failureReason: 'insufficient-notice',
+                        testType: 'policy-violation'
+                    });
+                }
+
+                // Test 6: Booking too far in advance (should fail if > max days)
+                const farFuture = new Date();
+                farFuture.setDate(farFuture.getDate() + 100); // 100 days from now
+                bookings.push({
+                    id: bookingId++,
+                    barberId: config.barber.id,
+                    barberName: config.name,
+                    date: farFuture.toISOString().split('T')[0],
+                    time: '14:00',
+                    services: [womensCut],
+                    serviceNames: ['Women\'s Cut'],
+                    duration: 45,
+                    customerName: `Test Customer ${bookingId}`,
+                    phone: `555-${String(bookingId).padStart(4, '0')}`,
+                    email: `test${bookingId}@example.com`,
+                    expectedResult: 'fail',
+                    failureReason: 'too-far-advance',
+                    testType: 'policy-violation'
+                });
+            });
+
+            return bookings;
+        }
+
+        // Validate a booking attempt
+        async function validateBooking(booking) {
+            const result = {
+                bookingId: booking.id,
+                attempted: true,
+                success: false,
+                violations: [],
+                details: {}
+            };
+
+            try {
+                // 1. Check store hours
+                const bookingDate = new Date(booking.date);
+                const dayName = bookingDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+                const dayHours = storeHours[dayName];
+
+                if (!dayHours || dayHours.closed) {
+                    result.violations.push(`Store closed on ${dayName}`);
+                    result.details.storeClosedViolation = true;
+                }
+
+                // 2. Check barber availability
+                const barber = barbers.find(b => b.id === booking.barberId);
+                if (barber && barber.hours) {
+                    const barberDayHours = barber.hours[dayName];
+                    if (!barberDayHours || barberDayHours.closed) {
+                        result.violations.push(`${barber.name} is off on ${dayName}`);
+                        result.details.barberOffViolation = true;
+                    }
+                }
+
+                // 3. Check booking policies
+                const now = new Date();
+                const bookingTime = new Date(`${booking.date} ${booking.time}`);
+                const hoursNotice = (bookingTime - now) / (1000 * 60 * 60);
+
+                if (hoursNotice < bookingPolicies.minBookingHours) {
+                    result.violations.push(`Insufficient notice: ${hoursNotice.toFixed(1)}h < ${bookingPolicies.minBookingHours}h required`);
+                    result.details.minNoticeViolation = true;
+                }
+
+                const daysAdvance = (bookingTime - now) / (1000 * 60 * 60 * 24);
+                if (daysAdvance > bookingPolicies.maxBookingDays) {
+                    result.violations.push(`Too far in advance: ${Math.floor(daysAdvance)} days > ${bookingPolicies.maxBookingDays} days max`);
+                    result.details.maxAdvanceViolation = true;
+                }
+
+                // 4. Check time slot availability
+                const availableSlots = SharedData.getAvailableSlots(
+                    bookingDate,
+                    booking.duration,
+                    booking.barberId,
+                    booking.services
+                );
+
+                if (!availableSlots.includes(booking.time)) {
+                    result.violations.push(`Time slot ${booking.time} not available`);
+                    result.details.slotUnavailable = true;
+                }
+
+                // 5. Attempt to create booking if no violations
+                if (result.violations.length === 0) {
+                    const appointmentData = {
+                        date: booking.date,
+                        time: booking.time,
+                        customerName: booking.customerName,
+                        customerPhone: booking.phone,
+                        customerEmail: booking.email,
+                        services: booking.services,
+                        barberId: booking.barberId,
+                        totalDuration: booking.duration,
+                        totalPrice: booking.services.reduce((sum, sId) => {
+                            return sum + (services[sId]?.price || 0);
+                        }, 0),
+                        notes: `Validation test booking #${booking.id}`
+                    };
+
+                    try {
+                        const appointmentId = await SharedData.saveAppointmentAsync(appointmentData);
+                        if (appointmentId) {
+                            result.success = true;
+                            result.appointmentId = appointmentId;
+                        }
+                    } catch (error) {
+                        result.violations.push(`Booking failed: ${error.message}`);
+                        result.details.bookingError = error.message;
+                    }
+                }
+
+                // Check if result matches expectation
+                result.asExpected = (booking.expectedResult === 'success' && result.success) ||
+                                   (booking.expectedResult === 'fail' && !result.success);
+
+                // ONLY flag as violation if booking SUCCEEDED when it should have FAILED
+                // If it failed as expected, that's the system working correctly!
+                if (booking.expectedResult === 'fail' && result.success) {
+                    violations.push({
+                        bookingId: booking.id,
+                        barber: booking.barberName,
+                        date: booking.date,
+                        time: booking.time,
+                        reason: `VIOLATION: Booking succeeded when it should have been blocked (${booking.failureReason})`,
+                        details: booking
+                    });
+                }
+
+            } catch (error) {
+                result.violations.push(`Validation error: ${error.message}`);
+                result.details.validationError = error.message;
+            }
+
+            return result;
+        }
+
+        // Run validation tests
+        async function runValidationTests() {
+            await initialize();
+            clearResults();
+
+            const week1Bookings = generateTestBookings(0);
+            const week2Bookings = generateTestBookings(1);
+            const allBookings = [...week1Bookings, ...week2Bookings];
+
+            console.log(`Starting validation of ${allBookings.length} bookings`);
+
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = '<h2>Test Results</h2>';
+
+            let successCount = 0;
+            let failCount = 0;
+            let violationCount = 0;
+            let expectedFailures = 0;
+
+            for (let i = 0; i < allBookings.length; i++) {
+                const booking = allBookings[i];
+                const result = await validateBooking(booking);
+
+                testResults.push({ booking, result });
+
+                // Update counters
+                if (result.success) {
+                    successCount++;
+                    if (booking.expectedResult === 'fail') {
+                        violationCount++;
+                    }
+                } else {
+                    failCount++;
+                    if (booking.expectedResult === 'fail') {
+                        expectedFailures++;
+                    }
+                }
+
+                // Display result
+                displayBookingResult(booking, result);
+
+                // Update progress
+                const progress = Math.round(((i + 1) / allBookings.length) * 100);
+                document.getElementById('progress').style.width = `${progress}%`;
+                document.getElementById('progress').textContent = `${progress}%`;
+
+                // Small delay to prevent overwhelming
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
+            // Update summary
+            document.getElementById('total-attempts').textContent = allBookings.length;
+            document.getElementById('successful-bookings').textContent = successCount;
+            document.getElementById('expected-failures').textContent = expectedFailures;
+            document.getElementById('policy-violations').textContent = violationCount;
+
+            // Show violations log if any
+            if (violations.length > 0) {
+                displayViolations();
+            }
+        }
+
+        function displayBookingResult(booking, result) {
+            const resultsDiv = document.getElementById('test-results');
+            const bookingDiv = document.createElement('div');
+
+            let statusClass = 'booking-failed';
+            let statusLabel = 'FAILED';
+
+            if (result.success && booking.expectedResult === 'success') {
+                statusClass = 'booking-success';
+                statusLabel = 'SUCCESS ✓';
+            } else if (!result.success && booking.expectedResult === 'fail') {
+                statusClass = 'booking-success';  // Green because system worked correctly
+                statusLabel = 'CORRECTLY BLOCKED ✓';
+            } else if (result.success && booking.expectedResult === 'fail') {
+                statusClass = 'booking-violation';
+                statusLabel = '⚠️ VIOLATION';
+            } else if (!result.success && booking.expectedResult === 'success') {
+                statusClass = 'booking-failed';
+                statusLabel = '❌ UNEXPECTED FAIL';
+            }
+
+            bookingDiv.className = `booking-attempt ${statusClass}`;
+            bookingDiv.dataset.barber = booking.barberName.toLowerCase().replace(' ', '');
+            bookingDiv.dataset.status = statusClass.replace('booking-', '');
+
+            bookingDiv.innerHTML = `
+                <div class="booking-details">
+                    <strong>#${booking.id} - ${booking.barberName}</strong><br>
+                    ${booking.date} at ${booking.time} - ${booking.serviceNames.join(', ')}<br>
+                    ${booking.customerName} - Test Type: ${booking.testType}
+                    ${result.violations.length > 0 ? '<br>Issues: ' + result.violations.join(', ') : ''}
+                </div>
+                <div class="booking-status status-${statusClass.replace('booking-', '')}">${statusLabel}</div>
+            `;
+
+            resultsDiv.appendChild(bookingDiv);
+        }
+
+        function displayViolations() {
+            const violationsLog = document.getElementById('violations-log');
+            const violationsList = document.getElementById('violations-list');
+
+            violationsLog.style.display = 'block';
+            violationsList.innerHTML = '';
+
+            violations.forEach(violation => {
+                const violationDiv = document.createElement('div');
+                violationDiv.className = 'violation-item';
+                violationDiv.innerHTML = `
+                    <strong>Booking #${violation.bookingId} - ${violation.barber}</strong><br>
+                    ${violation.date} at ${violation.time}<br>
+                    <span style="color: #c62828;">${violation.reason}</span>
+                `;
+                violationsList.appendChild(violationDiv);
+            });
+        }
+
+        function filterResults() {
+            const viewFilter = document.getElementById('filter-view').value;
+            const barberFilter = document.getElementById('filter-barber').value;
+
+            const bookings = document.querySelectorAll('.booking-attempt');
+
+            bookings.forEach(booking => {
+                let show = true;
+
+                // Apply view filter
+                if (viewFilter !== 'all') {
+                    const status = booking.dataset.status;
+                    if (viewFilter === 'violations' && status !== 'violation') show = false;
+                    if (viewFilter === 'successful' && status !== 'success') show = false;
+                    if (viewFilter === 'failed' && status !== 'failed') show = false;
+                }
+
+                // Apply barber filter
+                if (barberFilter !== 'all') {
+                    const barber = booking.dataset.barber;
+                    if (!barber.includes(barberFilter)) show = false;
+                }
+
+                booking.style.display = show ? 'flex' : 'none';
+            });
+        }
+
+        function runWeek1Tests() {
+            // Run only week 1 tests
+            runTestsForWeek(0);
+        }
+
+        function runWeek2Tests() {
+            // Run only week 2 tests
+            runTestsForWeek(1);
+        }
+
+        async function runTestsForWeek(weekOffset) {
+            await initialize();
+            clearResults();
+
+            const bookings = generateTestBookings(weekOffset);
+            // Similar to runValidationTests but with single week
+            // ... implementation similar to above
+        }
+
+        function clearResults() {
+            document.getElementById('test-results').innerHTML = '';
+            document.getElementById('violations-log').style.display = 'none';
+            document.getElementById('total-attempts').textContent = '0';
+            document.getElementById('successful-bookings').textContent = '0';
+            document.getElementById('expected-failures').textContent = '0';
+            document.getElementById('policy-violations').textContent = '0';
+            document.getElementById('progress').style.width = '0%';
+            document.getElementById('progress').textContent = '0%';
+            testResults = [];
+            violations = [];
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(initialize, 500);
+        });
+    </script>
+</body>
+</html>

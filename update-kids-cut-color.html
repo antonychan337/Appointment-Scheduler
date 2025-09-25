@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update Children's Cut Color</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-bridge.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2C3E50;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .color-preview {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border-radius: 5px;
+            vertical-align: middle;
+            margin: 0 10px;
+            border: 2px solid #ddd;
+        }
+        button {
+            background: #2C3E50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #34495e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Update Children's Cut Service Color</h1>
+
+        <div class="info">
+            <h3>Color Change:</h3>
+            <p>
+                <strong>Old Color:</strong>
+                <span class="color-preview" style="background: #4CAF50;"></span>
+                #4CAF50 (Green - Same as Hair Coloring)
+            </p>
+            <p>
+                <strong>New Color:</strong>
+                <span class="color-preview" style="background: #7E57C2;"></span>
+                #7E57C2 (Deep Purple - Unique color, distinct from all other services)
+            </p>
+        </div>
+
+        <button onclick="updateColor()">Update Color in Database</button>
+        <button onclick="checkServices()">Check All Service Colors</button>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        async function updateColor() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="info">Updating color...</div>';
+
+            try {
+                await SharedData.initialize();
+                const shopId = SharedData.getCurrentShopId();
+
+                // Find the Children's Cut service
+                const { data: services, error: fetchError } = await supabaseClient
+                    .from('services')
+                    .select('*')
+                    .eq('shop_id', shopId)
+                    .or('name.ilike.%child%,name.ilike.%儿童%,name_en.ilike.%child%,name_zh.ilike.%儿童%');
+
+                if (fetchError) {
+                    results.innerHTML = `<div class="error">Error fetching services: ${fetchError.message}</div>`;
+                    return;
+                }
+
+                if (!services || services.length === 0) {
+                    results.innerHTML = '<div class="error">Children\'s Cut service not found</div>';
+                    return;
+                }
+
+                // Update each matching service
+                let updateCount = 0;
+                for (const service of services) {
+                    const { error: updateError } = await supabaseClient
+                        .from('services')
+                        .update({ color: '#7E57C2' })
+                        .eq('id', service.id);
+
+                    if (updateError) {
+                        results.innerHTML += `<div class="error">Error updating ${service.name}: ${updateError.message}</div>`;
+                    } else {
+                        updateCount++;
+                        results.innerHTML += `<div class="success">✅ Updated: ${service.name} (${service.name_en || service.name_zh})</div>`;
+                    }
+                }
+
+                if (updateCount > 0) {
+                    results.innerHTML += `<div class="success"><strong>Successfully updated ${updateCount} service(s)</strong></div>`;
+                    results.innerHTML += '<div class="info">Please refresh the owner app to see the changes</div>';
+                }
+
+            } catch (error) {
+                results.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function checkServices() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="info">Loading services...</div>';
+
+            try {
+                await SharedData.initialize();
+                const shopId = SharedData.getCurrentShopId();
+
+                const { data: services, error } = await supabaseClient
+                    .from('services')
+                    .select('*')
+                    .eq('shop_id', shopId)
+                    .order('name');
+
+                if (error) {
+                    results.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                    return;
+                }
+
+                let html = '<div class="info"><h3>All Services and Their Colors:</h3>';
+                services.forEach(service => {
+                    const color = service.color || '#4A90E2';
+                    html += `
+                        <p>
+                            <span class="color-preview" style="background: ${color};"></span>
+                            <strong>${service.name}</strong>
+                            ${service.name_en ? `(${service.name_en})` : ''}
+                            - ${color}
+                        </p>
+                    `;
+                });
+                html += '</div>';
+                results.innerHTML = html;
+
+            } catch (error) {
+                results.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
