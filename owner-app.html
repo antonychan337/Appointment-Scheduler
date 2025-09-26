@@ -1575,7 +1575,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="toggle-switch" onclick="toggleService(this)"></div>
+                                    <div class="toggle-switch" onclick="toggleService(this).catch(console.error)"></div>
                                 </div>
                                 <div class="service-item" data-service="womens-cut">
                                     <div style="flex: 1;">
@@ -1609,7 +1609,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="toggle-switch" onclick="toggleService(this)"></div>
+                                    <div class="toggle-switch" onclick="toggleService(this).catch(console.error)"></div>
                                 </div>
                                 <div class="service-item" data-service="kids-cut">
                                     <div style="flex: 1;">
@@ -1643,7 +1643,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="toggle-switch" onclick="toggleService(this)"></div>
+                                    <div class="toggle-switch" onclick="toggleService(this).catch(console.error)"></div>
                                 </div>
                                 <div class="service-item" data-service="coloring">
                                     <div style="flex: 1;">
@@ -1686,7 +1686,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="toggle-switch" onclick="toggleService(this)"></div>
+                                    <div class="toggle-switch" onclick="toggleService(this).catch(console.error)"></div>
                                 </div>
                                 <div class="service-item" data-service="highlights">
                                     <div style="flex: 1;">
@@ -1737,7 +1737,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="toggle-switch" onclick="toggleService(this)"></div>
+                                    <div class="toggle-switch" onclick="toggleService(this).catch(console.error)"></div>
                                 </div> -->
                             </div>
                             <button class="add-button" id="add-service-btn" onclick="openAddServiceModal()">Add New Service</button>
@@ -2839,13 +2839,60 @@
             populateBarberSelectors().catch(err => console.error('Error populating barber selectors:', err));
         }
 
-        function toggleService(element) {
+        async function toggleService(element) {
+            // Get the service item to find which service this is
+            const serviceItem = element.closest('.service-item');
+            const serviceId = serviceItem ? serviceItem.dataset.serviceId : null;
+
             // Toggle the visual state
+            const wasActive = element.classList.contains('active');
             element.classList.toggle('active');
-            console.log('Service toggled, active state:', element.classList.contains('active'));
-            // Save services (which will read the new state)
-            saveServices();
-            // Don't call loadServices here - it would reset the toggle
+            const isNowActive = element.classList.contains('active');
+
+            console.log(`🔄 TOGGLE SERVICE: ${serviceId}`);
+            console.log(`  Was: ${wasActive}, Now: ${isNowActive}`);
+            console.log(`  Should set enabled to: ${isNowActive}`);
+
+            // Save services (which will read the new state) - AWAIT it!
+            await saveServices();
+
+            // The save will reload from database, so get fresh data
+            const services = SharedData.getServices();
+            const savedService = services[serviceId];
+            console.log(`✅ After save - Service ${serviceId}:`);
+            console.log(`  enabled in cache: ${savedService ? savedService.enabled : 'SERVICE NOT FOUND'}`);
+            console.log(`  Toggle DOM state: ${element.classList.contains('active')}`);
+
+            // Verify directly from database
+            if (typeof supabaseClient !== 'undefined' && serviceId) {
+                try {
+                    const { data: dbService, error } = await supabaseClient
+                        .from('services')
+                        .select('enabled, name')
+                        .eq('id', serviceId)
+                        .single();
+
+                    if (!error && dbService) {
+                        console.log(`  🔍 Direct DB query - ${dbService.name}: enabled=${dbService.enabled}`);
+                        if (dbService.enabled !== isNowActive) {
+                            console.error(`  ⚠️ DATABASE MISMATCH! Expected ${isNowActive}, got ${dbService.enabled}`);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error verifying from database:', err);
+                }
+            }
+
+            // Update toggle to match what was actually saved
+            if (savedService) {
+                if (savedService.enabled && !element.classList.contains('active')) {
+                    console.log('  📍 Correcting toggle to match DB: adding active class');
+                    element.classList.add('active');
+                } else if (!savedService.enabled && element.classList.contains('active')) {
+                    console.log('  📍 Correcting toggle to match DB: removing active class');
+                    element.classList.remove('active');
+                }
+            }
         }
 
         function deleteService(serviceId) {
@@ -4230,8 +4277,21 @@
 
         async function saveServices() {
             console.log('saveServices called');
+
             // Always work with the full services object from SharedData
-            const services = SharedData.getServices();
+            let services = SharedData.getServices();
+
+            // Check if services are loaded
+            if (!services || Object.keys(services).length === 0) {
+                console.log('No services loaded, loading services first...');
+                await SharedData.loadServices();
+                services = SharedData.getServices();
+            }
+
+            if (!services || Object.keys(services).length === 0) {
+                console.error('Unable to load services - cannot save');
+                return;
+            }
 
             // Get current barber to update their service list later if needed
             const barber = SharedData.getBarberById(window.currentBarberId || 'owner');
@@ -4240,12 +4300,17 @@
             // Get all service items
             const serviceItems = document.querySelectorAll('.service-item[data-service]');
             console.log('Found service items:', serviceItems.length);
+            console.log('Services in cache:', Object.keys(services).length);
 
             serviceItems.forEach(item => {
                 // Use the actual service ID that was stored during loadServices
                 const actualServiceId = item.dataset.actualServiceId || item.dataset.service;
+                console.log(`Processing service item: actualServiceId=${actualServiceId}, dataset=`, item.dataset);
+
                 if (!services[actualServiceId]) {
                     console.warn(`Service not found for ID: ${actualServiceId}`);
+                    console.warn(`  Available service IDs:`, Object.keys(services));
+                    console.warn(`  Item dataset:`, item.dataset);
                     return;
                 }
 
@@ -4281,8 +4346,12 @@
                 // Get enabled state
                 const toggleSwitch = item.querySelector('.toggle-switch');
                 const isEnabled = toggleSwitch.classList.contains('active');
-                console.log(`Service ${actualServiceId}: enabled = ${isEnabled}`);
+                console.log(`📝 SAVING Service ${actualServiceId} (${services[actualServiceId].name}):`);
+                console.log(`  Toggle DOM has 'active' class: ${toggleSwitch.classList.contains('active')}`);
+                console.log(`  Previous enabled value in memory: ${services[actualServiceId].enabled}`);
+                console.log(`  Setting enabled to: ${isEnabled}`);
                 services[actualServiceId].enabled = isEnabled;
+                console.log(`  After assignment, enabled is: ${services[actualServiceId].enabled}`);
 
                 // Get duration
                 const durationInput = item.querySelector('.service-duration');
@@ -4351,7 +4420,12 @@
             });
 
             if (!hasErrors) {
-                SharedData.saveServices(services);
+                console.log('📤 About to save services to database:');
+                Object.entries(services).forEach(([id, service]) => {
+                    console.log(`  ${id}: ${service.name} - enabled=${service.enabled}`);
+                });
+                await SharedData.saveServices(services);
+                console.log('✅ Save completed');
 
                 // ALWAYS update all barbers to have access to ALL services
                 // This ensures customer app can filter based on enabled status
@@ -4367,10 +4441,10 @@
                 console.log('Updating barbers with all services:', allServiceIds);
                 console.log('Service assignment object:', serviceAssignment);
 
-                barbers.forEach(barber => {
+                for (const barber of barbers) {
                     console.log(`Updating ${barber.name} (${barber.id}) with ${allServiceIds.length} services`);
-                    SharedData.updateBarber(barber.id, { services: serviceAssignment });
-                });
+                    await SharedData.updateBarber(barber.id, { services: serviceAssignment });
+                }
 
                 // Verify the update
                 const updatedBarber = SharedData.getBarberById(barbers[0]?.id || 'owner');
@@ -4420,6 +4494,7 @@
             div.className = 'service-item';
             div.dataset.service = serviceId;
             div.dataset.actualServiceId = serviceId;
+            div.dataset.serviceId = serviceId;  // Add this for toggle function
 
             // Build active periods HTML if any exist
             let activePeriodsHtml = '';
@@ -4508,7 +4583,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="toggle-switch ${service.enabled ? 'active' : ''}" onclick="toggleService(this)"></div>
+                <div class="toggle-switch ${service.enabled === true ? 'active' : ''}" onclick="toggleService(this).catch(console.error)"></div>
             `;
 
             return div;
@@ -5356,6 +5431,8 @@
             const newServiceDiv = document.createElement('div');
             newServiceDiv.className = 'service-item';
             newServiceDiv.dataset.service = serviceId;
+            newServiceDiv.dataset.actualServiceId = serviceId;
+            newServiceDiv.dataset.serviceId = serviceId;  // Ensure all dataset attributes are set
 
             const hasActive = service.hasActiveTime && service.activePeriods;
             const activePeriodsHtml = hasActive ? service.activePeriods.map((period, index) => `
@@ -5391,7 +5468,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="toggle-switch ${service.enabled ? 'active' : ''}" onclick="toggleService(this)"></div>
+                <div class="toggle-switch ${service.enabled === true ? 'active' : ''}" onclick="toggleService(this).catch(console.error)"></div>
             `;
 
             serviceList.appendChild(newServiceDiv);
@@ -6481,7 +6558,14 @@
 
         // Check if creating a new appointment would create a conflict
         function checkNewAppointmentConflict(newDate, newTime, duration, activePeriods = null, barberId = null) {
-            const appointments = SharedData.getAppointments();
+            // Use synchronous version to get cached appointments
+            let appointments = SharedData.getAppointmentsSync();
+
+            // Ensure appointments is an array
+            if (!appointments || !Array.isArray(appointments)) {
+                console.log('Appointments is not an array, defaulting to empty array');
+                appointments = [];
+            }
 
             console.log('Checking conflict for:', { newDate, newTime, duration, barberId });
 
@@ -7078,8 +7162,9 @@
             const todayStr = today.toLocaleDateString('en-US');
 
             try {
-                // Ensure appointments are loaded first
+                // Ensure appointments and blocked times are loaded first
                 await SharedData.getAppointments();
+                await SharedData.getBlockedTimes();
                 const appointments = SharedData.getAppointmentsByDate(today);
 
                 if (appointments.length === 0) {
@@ -7254,11 +7339,7 @@
             let appointments = await SharedData.getAppointments();
             appointments = appointments || [];
 
-            // Filter by selected barber if one is selected
-            if (dashboardBarberId) {
-                appointments = appointments.filter(apt => apt.barberId === dashboardBarberId);
-            }
-
+            const barbers = await SharedData.getBarbers();
             const storeHours = await SharedData.getStoreHours();
 
             // Ensure storeHours is valid
@@ -7269,38 +7350,146 @@
 
             let totalAvailableMinutes = 0;
             let totalBookedMinutes = 0;
+            let totalBlockedMinutes = 0;
 
-            // Calculate for each day of the week
-            for (let i = 0; i < 7; i++) {
-                const d = new Date(startOfWeek);
-                d.setDate(startOfWeek.getDate() + i);
+            // If calculating for specific barber
+            if (dashboardBarberId) {
+                const barber = barbers.find(b => b.id === dashboardBarberId);
+                if (!barber) return 0;
 
-                const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-                const dayName = dayNames[d.getDay()];
-                const dayHours = storeHours[dayName];
+                // Filter appointments for this barber
+                appointments = appointments.filter(apt => apt.barberId === dashboardBarberId);
 
-                if (!dayHours.closed) {
-                    const openMinutes = SharedData.timeToMinutes(dayHours.open);
-                    const closeMinutes = SharedData.timeToMinutes(dayHours.close);
-                    totalAvailableMinutes += (closeMinutes - openMinutes);
+                // Calculate for each day of the week for this specific barber
+                for (let i = 0; i < 7; i++) {
+                    const d = new Date(startOfWeek);
+                    d.setDate(startOfWeek.getDate() + i);
 
-                    // Get appointments for this day
-                    const dayAppointments = SharedData.getAppointmentsByDate(d);
-                    dayAppointments.forEach(apt => {
-                        // Count only active time if service has active periods
-                        if (apt.activePeriods && apt.activePeriods.length > 0) {
-                            apt.activePeriods.forEach(period => {
-                                totalBookedMinutes += (period.end - period.start);
-                            });
+                    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+                    const dayName = dayNames[d.getDay()];
+
+                    // Use barber's individual hours or store hours if they use store hours
+                    let dayHours;
+                    if (barber.usesStoreHours || !barber.hours || !barber.hours[dayName]) {
+                        dayHours = storeHours[dayName];
+                    } else {
+                        dayHours = barber.hours[dayName];
+                    }
+
+                    if (!dayHours.closed) {
+                        const openMinutes = SharedData.timeToMinutes(dayHours.open);
+                        const closeMinutes = SharedData.timeToMinutes(dayHours.close);
+                        totalAvailableMinutes += (closeMinutes - openMinutes);
+
+                        // Get blocked times for this barber on this day
+                        const blockedTimes = SharedData.getBlockedTimesByDate(d);
+                        const barberBlockedTimes = blockedTimes.filter(block =>
+                            !block.barberId || block.barberId === dashboardBarberId
+                        );
+
+                        barberBlockedTimes.forEach(block => {
+                            const blockStart = SharedData.timeToMinutes(block.startTime);
+                            const blockEnd = SharedData.timeToMinutes(block.endTime);
+
+                            // Only count blocked time that overlaps with working hours
+                            const workStart = openMinutes;
+                            const workEnd = closeMinutes;
+
+                            // Calculate overlap between blocked time and working hours
+                            const overlapStart = Math.max(blockStart, workStart);
+                            const overlapEnd = Math.min(blockEnd, workEnd);
+
+                            if (overlapStart < overlapEnd) {
+                                totalBlockedMinutes += (overlapEnd - overlapStart);
+                            }
+                        });
+
+                        // Get appointments for this day
+                        const dayAppointments = SharedData.getAppointmentsByDate(d);
+                        const barberAppointments = dayAppointments.filter(apt => apt.barberId === dashboardBarberId);
+
+                        barberAppointments.forEach(apt => {
+                            // Count only active time if service has active periods
+                            if (apt.activePeriods && apt.activePeriods.length > 0) {
+                                apt.activePeriods.forEach(period => {
+                                    totalBookedMinutes += (period.end - period.start);
+                                });
+                            } else {
+                                totalBookedMinutes += apt.totalDuration || 0;
+                            }
+                        });
+                    }
+                }
+            } else {
+                // Calculate for all staff combined
+                for (const barber of barbers) {
+                    for (let i = 0; i < 7; i++) {
+                        const d = new Date(startOfWeek);
+                        d.setDate(startOfWeek.getDate() + i);
+
+                        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+                        const dayName = dayNames[d.getDay()];
+
+                        // Use barber's individual hours or store hours if they use store hours
+                        let dayHours;
+                        if (barber.usesStoreHours || !barber.hours || !barber.hours[dayName]) {
+                            dayHours = storeHours[dayName];
                         } else {
-                            totalBookedMinutes += apt.totalDuration || 0;
+                            dayHours = barber.hours[dayName];
                         }
-                    });
+
+                        if (!dayHours.closed) {
+                            const openMinutes = SharedData.timeToMinutes(dayHours.open);
+                            const closeMinutes = SharedData.timeToMinutes(dayHours.close);
+                            totalAvailableMinutes += (closeMinutes - openMinutes);
+
+                            // Get blocked times for this barber on this day
+                            const blockedTimes = SharedData.getBlockedTimesByDate(d);
+                            const barberBlockedTimes = blockedTimes.filter(block =>
+                                !block.barberId || block.barberId === barber.id
+                            );
+
+                            barberBlockedTimes.forEach(block => {
+                                const blockStart = SharedData.timeToMinutes(block.startTime);
+                                const blockEnd = SharedData.timeToMinutes(block.endTime);
+
+                                // Only count blocked time that overlaps with working hours
+                                const workStart = openMinutes;
+                                const workEnd = closeMinutes;
+
+                                // Calculate overlap between blocked time and working hours
+                                const overlapStart = Math.max(blockStart, workStart);
+                                const overlapEnd = Math.min(blockEnd, workEnd);
+
+                                if (overlapStart < overlapEnd) {
+                                    totalBlockedMinutes += (overlapEnd - overlapStart);
+                                }
+                            });
+
+                            // Get appointments for this barber on this day
+                            const dayAppointments = SharedData.getAppointmentsByDate(d);
+                            const barberAppointments = dayAppointments.filter(apt => apt.barberId === barber.id);
+
+                            barberAppointments.forEach(apt => {
+                                // Count only active time if service has active periods
+                                if (apt.activePeriods && apt.activePeriods.length > 0) {
+                                    apt.activePeriods.forEach(period => {
+                                        totalBookedMinutes += (period.end - period.start);
+                                    });
+                                } else {
+                                    totalBookedMinutes += apt.totalDuration || 0;
+                                }
+                            });
+                        }
+                    }
                 }
             }
 
-            if (totalAvailableMinutes === 0) return 0;
-            return (totalBookedMinutes / totalAvailableMinutes) * 100;
+            // Subtract blocked time from available time
+            const actualAvailableMinutes = totalAvailableMinutes - totalBlockedMinutes;
+
+            if (actualAvailableMinutes <= 0) return 0;
+            return (totalBookedMinutes / actualAvailableMinutes) * 100;
         }
 
         function updateWeeklyRevenueChart() {
@@ -7681,7 +7870,7 @@
             document.getElementById('owner-booking-modal').style.display = 'none';
         }
 
-        function confirmOwnerBooking() {
+        async function confirmOwnerBooking() {
             const barberId = document.getElementById('owner-booking-barber').value;
             const serviceId = document.getElementById('owner-booking-service').value;
             const customerName = document.getElementById('owner-booking-name').value.trim();
@@ -7774,9 +7963,9 @@
 
                 // If no conflicts, save all blocked times
                 if (!hasAnyConflict) {
-                    blocksToCreate.forEach(block => {
-                        SharedData.saveBlockedTime(block);
-                    });
+                    for (const block of blocksToCreate) {
+                        await SharedData.addBlockedTime(block);
+                    }
                 }
             } else {
                 // Create a regular appointment
@@ -7820,7 +8009,7 @@
                     appointment.activePeriods = service.activePeriods;
                 }
 
-                SharedData.saveAppointment(appointment);
+                await SharedData.saveAppointment(appointment);
 
                 // Send confirmation email if customer email is provided
                 if (appointment.customerEmail) {
@@ -7831,8 +8020,8 @@
             // Close modal and refresh calendar
             closeOwnerBookingModal();
             generateWeeklyCalendar();
-            loadAppointments();
-            updateDashboardMetrics();
+            await loadAppointments();
+            await updateDashboardMetrics();
         }
 
         function showBlockedTimeDetails(block) {
@@ -8118,16 +8307,16 @@
             }
         }
 
-        function cancelAppointment() {
+        async function cancelAppointment() {
             if (!currentAppointment) return;
 
             // Handle blocked time
             if (currentAppointment.isBlocked) {
                 if (confirm(isZh ? '确定要删除这个屏蔽时间吗？' : 'Are you sure you want to delete this blocked time?')) {
-                    SharedData.deleteBlockedTime(currentAppointment.id);
+                    await SharedData.deleteBlockedTime(currentAppointment.id);
                     closeModal();
                     generateWeeklyCalendar();
-                    loadAppointments();
+                    await loadAppointments();
                 }
             } else {
                 if (confirm(isZh ? '确定要取消这个预约吗？' : 'Are you sure you want to cancel this appointment?')) {
@@ -8135,10 +8324,10 @@
                     if (currentAppointment.customerEmail) {
                         SharedData.sendCancellationEmail(currentAppointment);
                     }
-                    SharedData.deleteAppointment(currentAppointment.id);
+                    await SharedData.deleteAppointment(currentAppointment.id);
                     closeModal();
                     generateWeeklyCalendar();
-                    loadAppointments();
+                    await loadAppointments();
                 }
             }
         }
@@ -8812,56 +9001,35 @@
 
             // Override saveServices to save to current barber
             const originalSaveServices = window.saveServices;
-            window.saveServices = function() {
+            window.saveServices = async function() {
+                // ALWAYS save the actual service definitions first (including enabled states)
+                // This ensures toggle states are persisted to the database
+                console.log('Calling original saveServices to persist service states...');
+                await originalSaveServices();
+                console.log('Service states saved to database');
+
+                // Then update barber service assignments if needed
+                const services = SharedData.getServices();
+
                 if (window.currentBarberId && window.currentBarberId !== 'owner') {
-                    // Save to specific barber
-                    const services = {};
-                    document.querySelectorAll('.service-item').forEach(item => {
-                        const serviceId = item.getAttribute('data-service');
-                        const nameInput = item.querySelector('.service-name-input');
-                        const durationInput = item.querySelector('.service-duration');
-                        const priceInput = item.querySelector('.service-price');
-                        const toggle = item.querySelector('.toggle-switch');
-                        const hasActiveTime = item.querySelector('.active-time-toggle')?.checked || false;
-
-                        services[serviceId] = {
-                            name: nameInput.value,
-                            duration: parseInt(durationInput.value),
-                            price: parseFloat(priceInput.value),
-                            enabled: toggle.classList.contains('active'),
-                            hasActiveTime: hasActiveTime
-                        };
-
-                        if (hasActiveTime) {
-                            const periods = [];
-                            item.querySelectorAll(`#periods-${serviceId} .active-period-item`).forEach(periodItem => {
-                                const start = parseInt(periodItem.querySelector('.period-start').value);
-                                const end = parseInt(periodItem.querySelector('.period-end').value);
-                                periods.push({ start, end });
-                            });
-                            services[serviceId].activePeriods = periods;
-                        }
-                    });
-
                     // Convert services to proper boolean mapping for barber update
+                    // This determines which services the barber offers
                     const serviceAssignment = {};
                     Object.keys(services).forEach(id => {
-                        serviceAssignment[id] = services[id].enabled || false;
-                    });
-                    SharedData.updateBarber(window.currentBarberId, { services: serviceAssignment });
-                    // Show save message
-                    showServiceSaveMessage();
-                } else {
-                    // Save to main store services (owner)
-                    originalSaveServices();
-                    // Also update owner barber
-                    const services = SharedData.getServices();
-                    // Convert services to proper format (object with boolean values)
-                    const serviceAssignment = {};
-                    Object.keys(services).forEach(id => {
+                        // Barber has all services, customer app filters by enabled
                         serviceAssignment[id] = true;
                     });
-                    SharedData.updateBarber('owner', { services: serviceAssignment });
+                    console.log('Updating barber service assignments...');
+                    await SharedData.updateBarber(window.currentBarberId, { services: serviceAssignment });
+                } else {
+                    // For owner, also update their barber record
+                    const serviceAssignment = {};
+                    Object.keys(services).forEach(id => {
+                        // Owner has access to all services
+                        serviceAssignment[id] = true;
+                    });
+                    console.log('Updating owner service assignments...');
+                    await SharedData.updateBarber('owner', { services: serviceAssignment });
                 }
             };
 
@@ -8946,7 +9114,8 @@
                 loadStoreHours();
                 updateDashboardMetrics();
             } else if (e.key === 'services') {
-                loadServices();
+                // Don't automatically reload services - causes race conditions with toggle persistence
+                // loadServices();
                 updateDashboardMetrics();
             } else if (e.key === 'appointments' || e.key === 'blockedTimes') {
                 // Just reload appointments, not services

@@ -148,6 +148,7 @@ const SharedData = {
                 // Then load other data
                 this.barbersCache = await this.getBarbers();
                 this.appointmentsCache = await this.getAppointments();
+                this.blockedTimesCache = await this.getBlockedTimes();
                 await this.loadServices();
             } else {
                 console.warn('No shop ID available, loading default caches');
@@ -405,7 +406,6 @@ const SharedData = {
                 .from('barbers')
                 .select('*')
                 .eq('shop_id', currentShopId)
-                .eq('is_active', true)
                 .order('display_order');
 
             if (error) throw error;
@@ -646,7 +646,7 @@ const SharedData = {
         try {
             const { error } = await supabaseClient
                 .from('barbers')
-                .update({ is_active: false }) // Soft delete
+                .delete() // Hard delete - actually remove from database
                 .eq('id', barberId);
 
             if (error) throw error;
@@ -750,6 +750,23 @@ const SharedData = {
                 });
             }
 
+            // Sort services to ensure Men's Cut is at the top
+            if (data && data.length > 0) {
+                data.sort((a, b) => {
+                    // Put Men's Cut at the top
+                    const aIsMensCut = a.name_en === "Men's Cut" || a.name_zh === "男士理发" ||
+                                       a.name === "Men's Cut" || a.name === "男士理发";
+                    const bIsMensCut = b.name_en === "Men's Cut" || b.name_zh === "男士理发" ||
+                                       b.name === "Men's Cut" || b.name === "男士理发";
+
+                    if (aIsMensCut && !bIsMensCut) return -1;
+                    if (!aIsMensCut && bIsMensCut) return 1;
+
+                    // Otherwise sort by display_order
+                    return (a.display_order || 999) - (b.display_order || 999);
+                });
+            }
+
             // Transform to match existing format (object instead of array)
             const services = {};
 
@@ -825,23 +842,41 @@ const SharedData = {
                 // Add to used colors set
                 usedColors.add(assignedColor.toUpperCase());
 
+                // Check if this is Men's Cut and default to enabled if needed
+                const isMensCut = service.name_en === "Men's Cut" || service.name_zh === "男士理发" ||
+                                  service.name === "Men's Cut" || service.name === "男士理发";
+
+                let enabledValue = service.enabled;
+                // Default Men's Cut to enabled if it's null or undefined
+                if (isMensCut && (enabledValue === null || enabledValue === undefined)) {
+                    console.log(`🔧 Defaulting Men's Cut to enabled (was ${enabledValue})`);
+                    enabledValue = true;
+                }
+
                 services[service.id] = {
                     name: service.name,
                     name_en: service.name_en,
                     name_zh: service.name_zh,
                     duration: service.duration,
                     price: service.price,
-                    enabled: service.enabled,
+                    enabled: enabledValue,
                     hasActiveTime: service.has_active_time,
                     activePeriods: service.active_periods,
-                    color: assignedColor
+                    color: assignedColor,
+                    display_order: isMensCut ? 0 : (service.display_order || 999)
                 };
-                console.log(`Loaded service "${service.name}" with color ${services[service.id].color} (${service.color ? 'from DB' : 'auto-assigned unique'})`);
+                console.log(`🔍 LOADED service "${service.name}" (ID: ${service.id}):`);
+                console.log(`  enabled from DB raw: ${service.enabled} (type: ${typeof service.enabled})`);
+                console.log(`  enabled in cache: ${services[service.id].enabled} (type: ${typeof services[service.id].enabled})`);
+                console.log(`  color: ${services[service.id].color} (${service.color ? 'from DB' : 'auto-assigned unique'})`);
             });
 
             // Cache services for synchronous access
             this.servicesCache = services;
-            console.log('🔍 SERVICES CACHE STORED:', this.servicesCache);
+            console.log('🔍 SERVICES CACHE STORED - Total services:', Object.keys(this.servicesCache).length);
+            Object.entries(this.servicesCache).forEach(([id, s]) => {
+                console.log(`  ${id}: ${s.name} - enabled=${s.enabled}`);
+            });
             return services;
         } catch (error) {
             console.error('Error fetching services:', error);
@@ -882,31 +917,25 @@ const SharedData = {
         if (!currentShopId) return;
 
         try {
-            // Get existing services to check for duplicates by name
+            // Get existing services to check for duplicates by ID and name
             const { data: existing } = await supabaseClient
                 .from('services')
                 .select('id, name')
                 .eq('shop_id', currentShopId);
 
+            const existingById = {};
             const existingByName = {};
             const existingIds = [];
             (existing || []).forEach(s => {
+                existingById[s.id] = s;
                 existingByName[s.name] = s.id;
                 existingIds.push(s.id);
             });
 
-            // Collect service names from the new list
-            const newServiceNames = Object.values(services).map(s => s.name);
-
-            // Delete services that are no longer in the list
-            const servicesToDelete = existing?.filter(s => !newServiceNames.includes(s.name)) || [];
-            for (const serviceToDelete of servicesToDelete) {
-                await supabaseClient
-                    .from('services')
-                    .delete()
-                    .eq('id', serviceToDelete.id);
-                console.log(`Deleted service: ${serviceToDelete.name}`);
-            }
+            // REMOVED DANGEROUS AUTO-DELETE LOGIC
+            // Services should only be deleted when explicitly requested by the owner
+            // This prevents accidental data loss when the cache is empty
+            // Deletion is handled by the deleteService function when owner clicks delete
 
             const finalServiceIds = [];
 
@@ -1010,17 +1039,38 @@ const SharedData = {
                 };
 
                 console.log(`💾 Preparing service "${service.name}" for database:`);
+                console.log(`💾   Service ID from object: ${serviceId}`);
+                console.log(`💾   enabled: ${serviceData.enabled} (type: ${typeof serviceData.enabled})`);
                 console.log(`💾   name_en: "${serviceData.name_en}", name_zh: "${serviceData.name_zh}"`);
 
-                // Check if a service with this name already exists
-                if (existingByName[service.name]) {
-                    // Update existing service by name match
-                    const existingId = existingByName[service.name];
-                    await supabaseClient
+                // First check if this service exists by ID (for services loaded from DB)
+                // Then check by name (for renamed services or legacy matching)
+                let existingId = null;
+                if (existingById[serviceId]) {
+                    existingId = serviceId;
+                    console.log(`💾   Matched by ID: ${serviceId}`);
+                } else if (existingByName[service.name]) {
+                    existingId = existingByName[service.name];
+                    console.log(`💾   Matched by name: ${service.name} -> ID: ${existingId}`);
+                }
+
+                if (existingId) {
+                    // Update existing service
+                    console.log(`💾   Updating service ${existingId} with data:`, serviceData);
+                    const { data: updateResult, error: updateError } = await supabaseClient
                         .from('services')
                         .update(serviceData)
-                        .eq('id', existingId);
+                        .eq('id', existingId)
+                        .select();
+
+                    if (updateError) {
+                        console.error(`❌ Failed to update service ${existingId}:`, updateError);
+                    } else {
+                        console.log(`✅ Successfully updated service ${existingId}:`, updateResult);
+                    }
+
                     finalServiceIds.push(existingId);
+                    console.log(`💾   Updated service ID: ${existingId}`);
                 } else {
                     // Insert new service
                     const { data: newService } = await supabaseClient
@@ -1038,8 +1088,26 @@ const SharedData = {
                 }
             }
 
-            // Reload services cache after saving
+            // Wait a moment to ensure database write completes
+            console.log('⏳ Waiting for database write to complete...');
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Now reload services from database to get fresh data
+            console.log('🔄 Reloading services after save...');
             await this.loadServices();
+            console.log('🔄 Services reloaded from database');
+
+            // Verify the save worked correctly
+            console.log('✅ Verifying saved services:');
+            for (const [serviceId, service] of Object.entries(services)) {
+                const savedService = this.servicesCache[serviceId];
+                if (savedService) {
+                    console.log(`  ${service.name}: requested enabled=${service.enabled}, saved enabled=${savedService.enabled}`);
+                    if (service.enabled !== savedService.enabled) {
+                        console.error(`  ⚠️ MISMATCH for ${service.name}!`);
+                    }
+                }
+            }
 
             // Return the actual service IDs for barber updates
             return finalServiceIds;
@@ -1933,7 +2001,7 @@ const SharedData = {
 
             if (error) throw error;
 
-            return (data || []).map(block => ({
+            const blockedTimes = (data || []).map(block => ({
                 id: block.id,
                 barberId: block.barber_id,
                 date: block.start_datetime.split('T')[0],
@@ -1941,6 +2009,11 @@ const SharedData = {
                 endTime: new Date(block.end_datetime).toTimeString().slice(0, 5),
                 reason: block.reason
             }));
+
+            // Cache the blocked times
+            this.blockedTimesCache = blockedTimes;
+            console.log('Loaded blocked times:', blockedTimes.length);
+            return blockedTimes;
         } catch (error) {
             console.error('Error fetching blocked times:', error);
             return [];
@@ -1948,9 +2021,18 @@ const SharedData = {
     },
 
     getBlockedTimesByDate(date) {
-        // Synchronous version - returns empty array for now since blocked times aren't fully implemented
-        // TODO: Implement blocked times cache and filtering
-        return [];
+        // Synchronous version using cache
+        if (!this.blockedTimesCache) {
+            console.log('Warning: Blocked times cache not loaded, returning empty array');
+            return [];
+        }
+
+        // Convert date to string format if it's a Date object
+        const dateStr = typeof date === 'string' ? date :
+            `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+        // Filter blocked times by date
+        return this.blockedTimesCache.filter(block => block.date === dateStr);
     },
 
     async addBlockedTime(blockedTime) {
@@ -1960,7 +2042,7 @@ const SharedData = {
             const startDateTime = new Date(`${blockedTime.date}T${blockedTime.startTime}`);
             const endDateTime = new Date(`${blockedTime.date}T${blockedTime.endTime}`);
 
-            await supabaseClient
+            const { data, error } = await supabaseClient
                 .from('blocked_times')
                 .insert({
                     shop_id: currentShopId,
@@ -1969,9 +2051,42 @@ const SharedData = {
                     end_datetime: endDateTime.toISOString(),
                     reason: blockedTime.reason,
                     block_type: 'other'
-                });
+                })
+                .select();
+
+            if (error) throw error;
+
+            // Refresh the blocked times cache
+            await this.getBlockedTimes();
+            console.log('Added blocked time and refreshed cache');
+
+            return data;
         } catch (error) {
             console.error('Error adding blocked time:', error);
+            throw error;
+        }
+    },
+
+    async deleteBlockedTime(blockedTimeId) {
+        if (!currentShopId) return;
+
+        try {
+            const { error } = await supabaseClient
+                .from('blocked_times')
+                .delete()
+                .eq('id', blockedTimeId)
+                .eq('shop_id', currentShopId);
+
+            if (error) throw error;
+
+            // Refresh the blocked times cache
+            await this.getBlockedTimes();
+            console.log('Deleted blocked time and refreshed cache');
+
+            return true;
+        } catch (error) {
+            console.error('Error deleting blocked time:', error);
+            return false;
         }
     },
 
@@ -2025,6 +2140,7 @@ const SharedData = {
     servicesCache: {},
     storeHoursCache: null,  // Cache for store hours
     bookingPoliciesCache: null,  // Cache for booking policies
+    blockedTimesCache: [],  // Cache for blocked times
 
     // Color palette for services
     serviceColors: {
@@ -2336,6 +2452,15 @@ const SharedData = {
 
     sendCancellationEmail(appointment) {
         this.sendEmail('cancelled', appointment);
+    },
+
+    // Expose utilities for debugging
+    getSupabaseClient() {
+        return supabaseClient;
+    },
+
+    getCurrentShopId() {
+        return currentShopId;
     }
 };
 
